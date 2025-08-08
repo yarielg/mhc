@@ -1,0 +1,151 @@
+<template>
+  <div class="mhc-app">
+    <el-container class="mhc-layout">
+
+      <!-- HEADER -->
+      <el-header class="mhc-header">
+        <div class="mhc-left">
+          <el-button link class="mhc-hamburger" @click="toggleAside" :icon="Menu" />
+          <img
+              style="width: 100px"
+              src="http://mhc.com/wp-content/uploads/2025/08/ChatGPT-Image-Aug-8-2025-04_20_10-PM.png"
+              alt="Element logo"
+          />
+        </div>
+        <div class="mhc-right">
+          <el-dropdown trigger="click">
+            <span class="el-dropdown-link">
+              {{ userName }}
+              <el-icon><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="go('/settings')">Settings</el-dropdown-item>
+                <el-dropdown-item divided @click="logout">Log out</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </el-header>
+
+      <el-container>
+        <!-- ASIDE (desktop) -->
+        <el-aside :width="collapsed ? '64px' : '220px'" class="mhc-aside">
+          <el-menu :default-active="route.path" :collapse="collapsed" router>
+            <el-menu-item index="/">
+              <el-icon><House /></el-icon><span>Dashboard</span>
+            </el-menu-item>
+            <el-menu-item index="/workers">
+              <el-icon><User /></el-icon><span>Workers</span>
+            </el-menu-item>
+            <el-menu-item index="/patients">
+              <el-icon><UserFilled /></el-icon><span>Patients</span>
+            </el-menu-item>
+            <el-sub-menu index="/payrolls">
+              <template #title>
+                <el-icon><Wallet /></el-icon><span>Payrolls</span>
+              </template>
+              <el-menu-item index="/payrolls">All Payrolls</el-menu-item>
+              <el-menu-item index="/payrolls/new">New Payroll</el-menu-item>
+            </el-sub-menu>
+            <el-menu-item index="/settings">
+              <el-icon><Setting /></el-icon><span>Settings</span>
+            </el-menu-item>
+          </el-menu>
+          <div class="mhc-collapse">
+            <el-button text size="small" @click="collapsed = !collapsed">
+              <el-icon><Fold v-if="!collapsed" /><Expand v-else /></el-icon>
+              <span v-if="!collapsed" style="margin-left:6px">Collapse</span>
+            </el-button>
+          </div>
+        </el-aside>
+
+        <!-- MAIN -->
+        <el-main class="mhc-main">
+          <router-view />
+        </el-main>
+      </el-container>
+
+      <!-- MOBILE DRAWER -->
+      <el-drawer v-model="drawer" size="75%" direction="ltr" :with-header="false" class="mhc-drawer">
+        <el-menu :default-active="route.path" router @select="closeDrawer">
+          <el-menu-item index="/"><el-icon><House /></el-icon><span>Dashboard</span></el-menu-item>
+          <el-menu-item index="/workers"><el-icon><User /></el-icon><span>Workers</span></el-menu-item>
+          <el-menu-item index="/patients"><el-icon><UserFilled /></el-icon><span>Patients</span></el-menu-item>
+          <el-sub-menu index="/payrolls">
+            <template #title><el-icon><Wallet /></el-icon><span>Payrolls</span></template>
+            <el-menu-item index="/payrolls">All Payrolls</el-menu-item>
+            <el-menu-item index="/payrolls/new">New Payroll</el-menu-item>
+          </el-sub-menu>
+          <el-menu-item index="/settings"><el-icon><Setting /></el-icon><span>Settings</span></el-menu-item>
+        </el-menu>
+      </el-drawer>
+    </el-container>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, watch, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  ArrowDown, House, User, UserFilled, Wallet, Setting, Menu, Fold, Expand
+} from '@element-plus/icons-vue'
+
+const route = useRoute()
+const router = useRouter()
+
+// Layout state
+const collapsed = ref(false)
+const drawer = ref(false)
+const dark = ref(false)
+
+const userName = 'Admin' // swap for current user name if you expose it from WP
+
+const toggleAside = () => {
+  // On mobile, open drawer; on desktop, collapse
+  if (window.matchMedia('(max-width: 1024px)').matches) {
+    drawer.value = !drawer.value
+  } else {
+    collapsed.value = !collapsed.value
+  }
+}
+const closeDrawer = () => (drawer.value = false)
+const go = (to: string) => router.push(to)
+
+// Logout via WP
+const logout = () => {
+  // If you saved login page ID in options, you can output it to window.mhcLoginUrl via localized script
+  const fallback = '/'
+  const to = (window as any).mhcLoginUrl || fallback
+  window.location.href = `/wp-login.php?action=logout&redirect_to=${encodeURIComponent(to)}&_wpnonce=${(window as any).mhcLogoutNonce || ''}`
+}
+</script>
+
+<style scoped>
+.mhc-layout { min-height: 100vh; }
+.mhc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 10; background: var(--el-bg-color-overlay);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding: 0 16px;
+}
+.mhc-left { display: flex; align-items: center; gap: 12px; }
+.mhc-title { font-size: 16px; margin: 0 4px 0 0; font-weight: 600; }
+.mhc-right { display: flex; align-items: center; gap: 16px; }
+.mhc-aside {
+  border-right: 1px solid var(--el-border-color-lighter);
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.mhc-collapse { padding: 8px; text-align: center; }
+.mhc-main { padding: 16px; background: var(--el-bg-color); }
+.mhc-hamburger { margin-left: -6px; }
+.el-breadcrumb { margin-left: 8px; }
+
+/* Mobile tweaks */
+@media (max-width: 1024px) {
+  .mhc-aside { display: none; }
+}
+
+/* Simple dark token (optional) */
+:global(html[data-theme="dark"]) body { background: #0a0a0a; }
+</style>

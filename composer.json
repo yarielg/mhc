@@ -1,0 +1,17 @@
+{
+    "name": "dev/mhc_payroll",
+    "description": "Create approval flow for content to a top level",
+    "authors": [
+        {
+            "name": "yarielg",
+            "email": "yariel.gordillo@gmail.com"
+        }
+    ],
+    "require": {
+        "guzzlehttp/guzzle": "^7.0"
+    },
+    "autoload": {
+        "psr-4": { "Mhc\\Inc\\": "./inc"
+        }
+    }
+}
