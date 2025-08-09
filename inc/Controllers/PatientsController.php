@@ -57,8 +57,26 @@ class PatientsController{
         if ($data['first_name'] === '' || $data['last_name'] === '') {
             wp_send_json_error(['message' => 'First and last name are required'], 400);
         }
+
+        $assignments = [];
+        if (isset($_POST['assignments'])) {
+            $json = wp_unslash($_POST['assignments']);
+            $parsed = json_decode($json, true);
+            if (is_array($parsed)) $assignments = $parsed;
+        }
+
         $item = Patient::create($data);
         if (!$item) wp_send_json_error(['message' => 'DB error creating patient'], 500);
+
+        // Persist worker-patient-role rows
+        if (!empty($assignments)) {
+            $ok = Patient::assignWorkers((int)$item['id'], $assignments);
+            if (!$ok) {
+                // Optionally, you may rollback patient insert here if you want strict atomicity.
+                wp_send_json_error(['message' => 'Error saving assignments'], 500);
+            }
+        }
+
         wp_send_json_success(['item' => $item]);
     }
 

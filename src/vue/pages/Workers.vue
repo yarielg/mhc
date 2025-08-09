@@ -37,7 +37,17 @@
       <el-table-column prop="first_name" label="First Name" width="200" show-overflow-tooltip />
       <el-table-column prop="last_name" label="Last Name" width="200" show-overflow-tooltip />
 
-      <!-- New: show all roles with labels + rates -->
+      <!-- New: Supervisor -->
+      <el-table-column label="Supervisor" min-width="220" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span v-if="row.supervisor_id">
+            {{ row.supervisor_full_name || (row.supervisor_first_name + ' ' + row.supervisor_last_name).trim() }}
+          </span>
+          <span v-else class="text-gray-400">—</span>
+        </template>
+      </el-table-column>
+
+      <!-- Roles with labels + rates -->
       <el-table-column label="Roles" min-width="280">
         <template #default="{ row }">
           <div class="flex flex-wrap gap-1">
@@ -102,6 +112,27 @@
 
         <el-form-item label="Last Name" prop="last_name">
           <el-input v-model="form.last_name" />
+        </el-form-item>
+
+        <!-- New: Supervisor (remote autocomplete) -->
+        <el-form-item label="Supervisor">
+          <el-select
+              v-model="form.supervisor_id"
+              filterable
+              remote
+              clearable
+              placeholder="Type a name..."
+              :remote-method="searchSupervisors"
+              :loading="state.loadingSupers"
+              style="width:100%;"
+          >
+            <el-option
+                v-for="opt in supervisorOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="Roles & Rates">
@@ -191,10 +222,16 @@ const state = reactive({
 
   // roles
   loadingRoles: false,
+
+  // supervisors search
+  loadingSupers: false,
 })
 
 /** ROLES OPTIONS for selector */
 const rolesOptions = ref([])
+
+/** SUPERVISOR OPTIONS for remote select */
+const supervisorOptions = ref([])
 
 /** Quick lookup for labels by id */
 const roleLabelById = computed(() => {
@@ -209,7 +246,8 @@ const form = reactive({
   first_name: '',
   last_name: '',
   is_active: '1',
-  worker_roles: [] // [{ uid, role_id:Number, general_rate:Number }]
+  supervisor_id: null,        // NEW
+  worker_roles: []            // [{ uid, role_id:Number, general_rate:Number }]
 })
 
 /** VALIDATION */
@@ -255,7 +293,6 @@ async function fetchRoles() {
     rolesOptions.value = items
         .filter(r => String(r.is_active) === '1')
         .map(r => ({ value: Number(r.id), label: `${r.code || 'ROLE'}` }))
-       // .map(r => ({ value: Number(r.id), label: `${r.code || 'ROLE'} — ${r.name}` }))
   } catch (e) {
     console.error(e)
     ElMessage.error(e.message || 'Error loading roles')
@@ -264,11 +301,47 @@ async function fetchRoles() {
   }
 }
 
+/** SUPERVISOR remote search */
+async function searchSupervisors(query) {
+  try {
+    state.loadingSupers = true
+    const fd = new FormData()
+    fd.append('action', 'mhc_workers_search')
+    fd.append('nonce', parameters.nonce)
+    fd.append('q', query || '')
+    // Avoid selecting self as supervisor when editing
+    if (state.editing && state.currentId) fd.append('exclude_id', state.currentId)
+    const { data } = await axios.post(parameters.ajax_url, fd)
+    if (!data.success) throw new Error(data.data?.message || 'Search failed')
+    const items = Array.isArray(data.data?.items) ? data.data.items : []
+    supervisorOptions.value = items.map(w => ({
+      value: Number(w.id),
+      label: w.full_name || `${w.first_name || ''} ${w.last_name || ''}`.trim()
+    }))
+  } catch (e) {
+    console.error(e)
+    ElMessage.error(e.message || 'Error searching supervisors')
+  } finally {
+    state.loadingSupers = false
+  }
+}
+
 /** MAP row -> form (for edit) */
 function mapRowToForm(row) {
   form.first_name = row.first_name || ''
   form.last_name  = row.last_name || ''
   form.is_active  = String(row.is_active ?? '1')
+  form.supervisor_id = row.supervisor_id != null ? Number(row.supervisor_id) : null
+
+  // ensure current supervisor shows as selected label in the remote select
+  if (form.supervisor_id) {
+    const label =
+        row.supervisor_full_name ||
+        `${row.supervisor_first_name || ''} ${row.supervisor_last_name || ''}`.trim()
+    if (label && !supervisorOptions.value.find(o => o.value === form.supervisor_id)) {
+      supervisorOptions.value.push({ value: form.supervisor_id, label })
+    }
+  }
 
   const incoming = Array.isArray(row.worker_roles)
       ? row.worker_roles
@@ -288,9 +361,11 @@ function resetForm() {
   form.first_name = ''
   form.last_name = ''
   form.is_active = '1'
+  form.supervisor_id = null
   form.worker_roles = []
   state.currentId = null
   state.editing = false
+  supervisorOptions.value = []
 }
 function openCreate() {
   resetForm()
@@ -358,6 +433,13 @@ async function submit() {
     fd.append('last_name', form.last_name)
     fd.append('is_active', form.is_active)
 
+    if (form.supervisor_id != null && form.supervisor_id !== '') {
+      fd.append('supervisor_id', String(form.supervisor_id))
+    } else {
+      // explicit empty to clear
+      fd.append('supervisor_id', '')
+    }
+
     const payloadRoles = form.worker_roles.map(r => ({
       role_id: r.role_id != null ? Number(r.role_id) : null,
       general_rate: r.general_rate != null ? Number(r.general_rate) : null,
@@ -418,4 +500,5 @@ onMounted(() => {
 .flex { display: flex; }
 .flex-wrap { flex-wrap: wrap; }
 .gap-1 { gap: 0.25rem; }
+.text-gray-400 { color: #a0aec0; }
 </style>

@@ -82,4 +82,40 @@ class Patient {
         $ok = $wpdb->delete($table, ['id' => intval($id)], ['%d']);
         return $ok !== false;
     }
+
+    public static function assignWorkers($patient_id, array $assignments) {
+        global $wpdb;
+        $pfx = $wpdb->prefix;
+        $wpr = "{$pfx}mhc_worker_patient_roles";
+        $workers = "{$pfx}mhc_workers";
+        $roles   = "{$pfx}mhc_roles";
+
+        $today = current_time('Y-m-d');
+
+        foreach ($assignments as $a) {
+            $worker_id = isset($a['worker_id']) ? intval($a['worker_id']) : 0;
+            $role_id   = isset($a['role_id'])   ? intval($a['role_id'])   : 0;
+            $rate      = isset($a['rate']) && $a['rate'] !== '' ? floatval($a['rate']) : null;
+
+            if ($worker_id <= 0 || $role_id <= 0) continue;
+
+            // lightweight existence checks
+            $exists_worker = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $workers WHERE id=%d", $worker_id));
+            $exists_role   = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $roles WHERE id=%d", $role_id));
+            if (!$exists_worker || !$exists_role) continue;
+
+            $wpdb->insert($wpr, [
+                'worker_id'  => $worker_id,
+                'patient_id' => $patient_id,
+                'role_id'    => $role_id,
+                'rate'       => $rate,           // nullable; if null, later payroll logic can fall back to general_rate
+                'start_date' => $today,
+                'created_at' => current_time('mysql'),
+            ], [
+                '%d','%d','%d', $rate === null ? 'NULL' : '%f', '%s','%s'
+            ]);
+            if ($wpdb->last_error) return false;
+        }
+        return true;
+    }
 }
