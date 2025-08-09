@@ -9,10 +9,12 @@ namespace Mhc\Inc\Controllers;
 
 use Mhc\Inc\Models\SpecialRate;
 
-class SpecialRatesController{
-    
+class SpecialRatesController
+{
 
-    public function register(){
+
+    public function register()
+    {
         add_action('wp_ajax_mhc_special_rates_list',   [$this, 'list']);
         add_action('wp_ajax_mhc_special_rates_create', [$this, 'create']);
         add_action('wp_ajax_mhc_special_rates_update', [$this, 'update']);
@@ -20,7 +22,8 @@ class SpecialRatesController{
         add_action('wp_ajax_mhc_special_rates_get',    [$this, 'getById']);
     }
 
-    protected static function check() {
+    protected static function check()
+    {
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mhc_ajax')) {
             wp_send_json_error(['message' => 'Invalid nonce'], 403);
         }
@@ -29,17 +32,33 @@ class SpecialRatesController{
         }
     }
 
-    public static function list() {
+    public static function list()
+    {
         self::check();
         $search = isset($_POST['search']) ? trim(wp_unslash($_POST['search'])) : '';
-        $result = SpecialRate::findAll($search);
-        wp_send_json_success([
-            'items' => $result['items'],
-            'total' => $result['total'],
-        ]);
+        $page = isset($_POST['page']) ? intval($_POST['page']) : null;
+        $per_page = isset($_POST['per_page']) ? intval($_POST['per_page']) : null;
+        $args = ['search' => $search];
+        if ($page && $per_page) {
+            $args['limit'] = $per_page;
+            $args['offset'] = ($page - 1) * $per_page;
+        }
+        $result = SpecialRate::findAll($args);
+        if (is_array($result) && isset($result['items']) && isset($result['total'])) {
+            wp_send_json_success([
+                'items' => $result['items'],
+                'total' => $result['total'],
+            ]);
+        } else {
+            wp_send_json_success([
+                'items' => $result,
+                'total' => is_array($result) ? count($result) : 0,
+            ]);
+        }
     }
 
-    public static function create() {
+    public static function create()
+    {
         self::check();
         $data = [
             'code' => sanitize_text_field(wp_unslash($_POST['code'] ?? '')),
@@ -56,7 +75,8 @@ class SpecialRatesController{
         wp_send_json_success(['item' => $item]);
     }
 
-    public static function update() {
+    public static function update()
+    {
         self::check();
         $id = intval($_POST['id'] ?? 0);
         if ($id <= 0) wp_send_json_error(['message' => 'Invalid id'], 400);
@@ -72,7 +92,8 @@ class SpecialRatesController{
         wp_send_json_success(['item' => $item]);
     }
 
-    public static function delete() {
+    public static function delete()
+    {
         self::check();
         $id = intval($_POST['id'] ?? 0);
         if ($id <= 0) wp_send_json_error(['message' => 'Invalid id'], 400);
@@ -81,7 +102,8 @@ class SpecialRatesController{
         wp_send_json_success(['id' => $id]);
     }
 
-    public static function getById() {
+    public static function getById()
+    {
         self::check();
         $id = intval($_POST['id'] ?? 0);
         if ($id <= 0) wp_send_json_error(['message' => 'Invalid id'], 400);
