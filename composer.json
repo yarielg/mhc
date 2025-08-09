@@ -5,10 +5,12 @@
         {
             "name": "yarielg",
             "email": "yariel.gordillo@gmail.com"
+        },{
+            "name": "aristidesgp",
+            "email": "aristidesgp@gmail.com"
         }
     ],
-    "require": {
-        "guzzlehttp/guzzle": "^7.0"
+    "require": {        
     },
     "autoload": {
         "psr-4": { "Mhc\\Inc\\": "./inc"
