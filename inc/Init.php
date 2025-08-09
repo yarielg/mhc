@@ -11,9 +11,10 @@ final class Init{
             Base\Shortcodes::class,
             Controllers\Patients::class,
             Controllers\Workers::class,
+            Controllers\Roles::class,
 
             //Base\Ajax::class,
-        ] ;
+        ];
     }
 
     public static function register_services(){
