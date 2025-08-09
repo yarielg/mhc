@@ -208,7 +208,7 @@ async function submit() {
       const idx = state.items.findIndex(r => r.id === item.id)
       if (idx >= 0) state.items.splice(idx, 1, item)
     } else {
-      // Prepend; or you can refetch the current page
+      // Prepend; or you can refetch the current pages
       state.items.unshift(item)
       state.total += 1
     }
