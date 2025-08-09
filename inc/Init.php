@@ -12,7 +12,7 @@ final class Init{
             Controllers\Patients::class,
 
             //Base\Ajax::class,
-        ] ;
+        ];
     }
 
     public static function register_services(){
