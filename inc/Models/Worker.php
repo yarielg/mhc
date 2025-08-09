@@ -105,20 +105,20 @@ class Worker {
             $roles_payload = json_decode($data['worker_roles'], true);
             if (!is_array($roles_payload)) $roles_payload = [];
         }
+        
         foreach ($roles_payload as $r) {
             $role_id      = isset($r['role_id']) ? (int)$r['role_id'] : 0;
             $general_rate = isset($r['general_rate']) && $r['general_rate'] !== '' ? (float)$r['general_rate'] : null;
-            $start_date   = isset($r['start_date']) ? sanitize_text_field($r['start_date']) : '';
-            $end_date     = isset($r['end_date'])   ? sanitize_text_field($r['end_date'])   : '';
+            $start_date   = isset($r['start_date']) && $r['start_date'] !== '' ? sanitize_text_field($r['start_date']) : date('Y-m-d');
+            $end_date     = isset($r['end_date']) && $r['end_date'] !== '' ? sanitize_text_field($r['end_date']) : null;
             if ($role_id <= 0) continue;
-            if ($start_date === '') continue;
-            if ($end_date !== '' && $end_date < $start_date) continue;
+            if ($end_date !== null && $end_date < $start_date) continue;
             $wpdb->insert($wr, [
                 'worker_id'    => $worker_id,
                 'role_id'      => $role_id,
                 'general_rate' => $general_rate,
                 'start_date'   => $start_date,
-                'end_date'     => ($end_date !== '' ? $end_date : null),
+                'end_date'     => $end_date,
                 'created_at'   => current_time('mysql'),
             ], ['%d','%d','%f','%s','%s','%s']);
         }
@@ -157,17 +157,16 @@ class Worker {
         foreach ($roles_payload as $r) {
             $role_id      = isset($r['role_id']) ? (int)$r['role_id'] : 0;
             $general_rate = isset($r['general_rate']) && $r['general_rate'] !== '' ? (float)$r['general_rate'] : null;
-            $start_date   = isset($r['start_date']) ? sanitize_text_field($r['start_date']) : '';
-            $end_date     = isset($r['end_date'])   ? sanitize_text_field($r['end_date'])   : '';
+            $start_date   = isset($r['start_date']) && $r['start_date'] !== '' ? sanitize_text_field($r['start_date']) : date('Y-m-d');
+            $end_date     = isset($r['end_date']) && $r['end_date'] !== '' ? sanitize_text_field($r['end_date']) : null;
             if ($role_id <= 0) continue;
-            if ($start_date === '') continue;
-            if ($end_date !== '' && $end_date < $start_date) continue;
+            if ($end_date !== null && $end_date < $start_date) continue;
             $wpdb->insert($wr, [
                 'worker_id'    => $id,
                 'role_id'      => $role_id,
                 'general_rate' => $general_rate,
                 'start_date'   => $start_date,
-                'end_date'     => ($end_date !== '' ? $end_date : null),
+                'end_date'     => $end_date,
                 'created_at'   => current_time('mysql'),
             ], ['%d','%d','%f','%s','%s','%s']);
         }
