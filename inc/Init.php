@@ -9,8 +9,9 @@ final class Init{
         return [
             Base\Enqueue::class,
             Base\Shortcodes::class,
-            Base\Settings::class,
-            Base\Ajax::class,
+            Controllers\Patients::class,
+
+            //Base\Ajax::class,
         ] ;
     }
 

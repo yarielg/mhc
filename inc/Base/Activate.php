@@ -41,7 +41,8 @@ class Activate {
         // 2) Workers
         $sql[] = "CREATE TABLE {$pfx}mhc_workers (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            name VARCHAR(255) NOT NULL,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             start_date DATE NULL,
             end_date DATE NULL,
