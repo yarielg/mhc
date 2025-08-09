@@ -8,9 +8,9 @@
           <el-button link class="mhc-hamburger" @click="toggleAside" :icon="Menu" />
           <img
               style="width: 100px"
-              src="http://mhc.com/wp-content/uploads/2025/08/ChatGPT-Image-Aug-8-2025-04_20_10-PM.png"
-              alt="Element logo"
-          />
+              :src="img_url + 'mentalhelt.png'"
+              alt="Agency of Mental Health Services"
+            />
         </div>
         <div class="mhc-right">
           <el-dropdown trigger="click">
@@ -94,6 +94,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const img_url = window.parameters?.img_url || '';
 
 // Layout state
 const collapsed = ref(false)

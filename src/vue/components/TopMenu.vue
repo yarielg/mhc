@@ -7,11 +7,11 @@
       @select="handleSelect"
   >
     <el-menu-item index="0">
-      <img
-          style="width: 100px"
-          src="http://mhc.com/wp-content/uploads/2025/08/ChatGPT-Image-Aug-8-2025-04_20_10-PM.png"
-          alt="Element logo"
-      />
+    <img
+              style="width: 100px"
+              :src="img_url + 'mentalhelt.png'"
+              alt="Agency of Mental Health Services"
+            />
     </el-menu-item>
     <el-menu-item index="1">Processing Center</el-menu-item>
     <el-sub-menu index="2">
@@ -32,6 +32,7 @@
 <script lang="ts" setup>
 import { ref } from 'vue'
 
+const img_url = window.parameters?.img_url || '';
 const activeIndex = ref('1')
 const handleSelect = (key: string, keyPath: string[]) => {
   console.log(key, keyPath)
