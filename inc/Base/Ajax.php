@@ -122,7 +122,7 @@ class Ajax{
         if (isset($_POST['last_name']))  { $data['last_name']  = sanitize_text_field(wp_unslash($_POST['last_name']));  $fmt[] = '%s'; }
         if (isset($_POST['is_active'])) {
             $st = sanitize_text_field(wp_unslash($_POST['is_active']));
-            if (!in_array($st, [1,0], true)) $st = 1;
+            if (!in_array(intval($st), [1,0], true)) $st = 1;
             $data['is_active'] = $st; $fmt[] = '%s';
         }
 

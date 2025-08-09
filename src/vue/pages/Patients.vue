@@ -2,22 +2,31 @@
   <div class="wp-wrap">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-xl font-semibold">Patients</h2>
-      <el-button type="primary" @click="openCreate">Add Patient</el-button>
+
     </div>
 
-    <div class="mb-3">
-      <el-input
-          v-model="state.search"
-          placeholder="Search by name..."
-          clearable
-          @clear="fetchData(1)"
-          @keyup.enter.native="fetchData(1)"
-      >
-        <template #append>
-          <el-button @click="fetchData(1)">Search</el-button>
-        </template>
-      </el-input>
-    </div>
+    <el-row :gutter="20">
+      <el-col :span="20"><div class="grid-content ep-bg-purple" />
+        <el-button type="primary" @click="openCreate">Add Patient</el-button>
+      </el-col>
+      <el-col :span="4"><div class="grid-content ep-bg-purple" />
+        <div class="mb-3">
+          <el-input
+              v-model="state.search"
+              placeholder="Search by name..."
+              clearable
+              @clear="fetchData(1)"
+              @keyup.enter.native="fetchData(1)"
+          >
+            <template #append>
+              <el-button @click="fetchData(1)">Search</el-button>
+            </template>
+          </el-input>
+        </div>
+      </el-col>
+    </el-row>
+
+
 
     <el-table
         :data="state.items"
@@ -114,7 +123,7 @@ const formRef = ref(null)
 const form = reactive({
   first_name: '',
   last_name: '',
-  is_active: 1
+  is_active: '1'
 })
 
 const rules = {
@@ -125,7 +134,7 @@ const rules = {
 function resetForm() {
   form.first_name = ''
   form.last_name = ''
-  form.is_active = 1
+  form.is_active = '1'
   state.currentId = null
   state.editing = false
 }

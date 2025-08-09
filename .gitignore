@@ -3,4 +3,6 @@ node_modules
 /vendor
 /node_modules
 vendor
+assets/dist
+/assets/dist
 
