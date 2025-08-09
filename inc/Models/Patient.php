@@ -3,7 +3,7 @@ namespace Mhc\Inc\Models;
 
 class Patient {
 
-    
+
     public static function findById($id) {
         global $wpdb;
         $pfx = $wpdb->prefix;
@@ -14,23 +14,27 @@ class Patient {
         return $row ?: null;
     }
 
-    public static function findAll($args = []) {
+    public static function findAll($search = '', $page = 1, $per_page = 10) {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $table = "{$pfx}mhc_patients";
+        $offset = ($page - 1) * $per_page;
         $where = "WHERE 1=1";
         $params = [];
-        if (isset($args['search']) && $args['search'] !== '') {
+        if ($search !== '') {
             $where .= " AND (first_name LIKE %s OR last_name LIKE %s OR CONCAT(first_name,' ',last_name) LIKE %s)";
-            $like = '%' . $wpdb->esc_like($args['search']) . '%';
+            $like = '%' . $wpdb->esc_like($search) . '%';
             $params[] = $like; $params[] = $like; $params[] = $like;
         }
-        $sql = "SELECT * FROM $table $where ORDER BY id DESC";
-        if (isset($args['limit']) && isset($args['offset'])) {
-            $sql .= $wpdb->prepare(" LIMIT %d OFFSET %d", intval($args['limit']), intval($args['offset']));
-        }
-        $rows = $wpdb->get_results($wpdb->prepare($sql, $params), ARRAY_A);
-        return $rows;
+        $total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table $where", $params));
+        $rows = $wpdb->get_results(
+            $wpdb->prepare("SELECT * FROM $table $where ORDER BY id DESC LIMIT %d OFFSET %d", array_merge($params, [$per_page, $offset])),
+            ARRAY_A
+        );
+        return [
+            'items' => $rows,
+            'total' => $total,
+        ];
     }
 
     public static function create($data) {
@@ -49,7 +53,8 @@ class Patient {
         $fmts[] = '%s';
         $ok = $wpdb->insert($table, $fields, $fmts);
         if (!$ok) return false;
-        return $wpdb->insert_id;
+        $id = $wpdb->insert_id;
+        return self::findById($id);
     }
 
     public static function update($id, $data) {
@@ -66,7 +71,8 @@ class Patient {
         }
         if (!$fields) return false;
         $ok = $wpdb->update($table, $fields, ['id' => intval($id)], $fmts, ['%d']);
-        return $ok !== false;
+        if ($ok === false) return false;
+        return self::findById($id);
     }
 
     public static function delete($id) {
