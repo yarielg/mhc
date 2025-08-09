@@ -8,11 +8,13 @@ final class Init{
 
         return [
             Base\Enqueue::class,
+            Base\Settings::class,
             Base\Shortcodes::class,
             Controllers\PatientsController::class,
             Controllers\WorkersController::class,
             Controllers\RolesController::class,
             Controllers\SpecialRatesController::class,
+            Controllers\DashboardController::class,
 
             //Base\Ajax::class,
         ];
