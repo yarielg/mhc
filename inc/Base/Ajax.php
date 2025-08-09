@@ -84,7 +84,7 @@ class Ajax{
 
         $first = sanitize_text_field(wp_unslash($_POST['first_name'] ?? ''));
         $last  = sanitize_text_field(wp_unslash($_POST['last_name'] ?? ''));
-        $status = in_array($_POST['is_active'] ?? 1, [1,0], true) ? $_POST['is_active'] : 1;
+        $status = intval($_POST['is_active'] ?? 1);
 
         if ($first === '' || $last === '') {
             wp_send_json_error(['message' => 'First and last name are required'], 400);

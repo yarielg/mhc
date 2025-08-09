@@ -32,7 +32,7 @@
       <el-table-column prop="last_name" label="Last Name"/>
       <el-table-column prop="is_active" label="Is Active?" width="110">
         <template #default="{ row }">
-          <el-tag :type="row.is_active === 1 ? 'success' : 'info'">{{ row.is_active }}</el-tag>
+          <el-tag :type="row.is_active == 1 ? 'success' : 'info'">{{ row.is_active == 1  ? 'Active' : 'Inactive'}}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="Actions" width="180" fixed="right">
@@ -79,8 +79,8 @@
 
         <el-form-item label="Is Active?">
           <el-select v-model="form.is_active">
-            <el-option label="Active" value="active" />
-            <el-option label="Inactive" value="inactive" />
+            <el-option label="Active" value="1" />
+            <el-option label="Inactive" value="0" />
           </el-select>
         </el-form-item>
       </el-form>
