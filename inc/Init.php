@@ -10,6 +10,7 @@ final class Init{
             Base\Enqueue::class,
             Base\Shortcodes::class,
             Controllers\Patients::class,
+            Controllers\Workers::class,
 
             //Base\Ajax::class,
         ];
