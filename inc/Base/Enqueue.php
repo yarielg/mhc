@@ -36,7 +36,7 @@ class Enqueue{
 
         wp_enqueue_script('vue-custom-js', MHC_PLUGIN_URL . 'assets/dist/app.js' ,array('jquery'),'1.0', true);
 
-        wp_localize_script( 'vue-custom-js', 'parameters', ['site_url' => site_url(),'ajax_url'=> admin_url('admin-ajax.php'), 'plugin_path' => MHC_PLUGIN_URL]);
+        wp_localize_script( 'vue-custom-js', 'parameters', ['site_url' => site_url(),'ajax_url'=> admin_url('admin-ajax.php'), 'plugin_path' => MHC_PLUGIN_URL, 'nonce'   => wp_create_nonce('mhc_ajax'),]);
 
         wp_enqueue_style( 'main_css', MHC_PLUGIN_URL . '/assets/dist/app.css'  );
     }

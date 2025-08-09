@@ -10,7 +10,7 @@ final class Init{
             Base\Enqueue::class,
             Base\Shortcodes::class,
             Base\Settings::class,
-           // Base\Ajax::class,
+            Base\Ajax::class,
         ] ;
     }
 
