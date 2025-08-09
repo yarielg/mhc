@@ -22,7 +22,7 @@ class Activate {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
         $sql = [];
-
+            
         // 1) Roles (RBT, BCaBA, BCBA, etc.)
         $sql[] = "CREATE TABLE {$pfx}mhc_roles (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -41,6 +41,7 @@ class Activate {
         // 2) Workers
         $sql[] = "CREATE TABLE {$pfx}mhc_workers (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            supervisor_id BIGINT UNSIGNED NULL,
             first_name VARCHAR(100) NOT NULL,
             last_name VARCHAR(100) NOT NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -49,6 +50,7 @@ class Activate {
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
+            KEY idx_supervisor (supervisor_id),
             KEY idx_active (is_active)
         ) {$charset_collate};";
 
@@ -98,23 +100,7 @@ class Activate {
             KEY idx_patient (patient_id),
             KEY idx_role (role_id),
             KEY idx_worker_patient_role_dates (worker_id, patient_id, role_id, start_date)
-        ) {$charset_collate};";
-
-        // 6) SupervisorAssignment (dynamic supervisor/supervisee mapping with history)
-        $sql[] = "CREATE TABLE {$pfx}mhc_supervisor_assignments (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            supervisor_id BIGINT UNSIGNED NOT NULL,
-            supervised_id BIGINT UNSIGNED NOT NULL,
-            start_date DATE NOT NULL,
-            end_date DATE NULL,
-            notes VARCHAR(255) NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
-            KEY idx_supervisor (supervisor_id),
-            KEY idx_supervised (supervised_id),
-            KEY idx_supervisor_supervised_dates (supervisor_id, supervised_id, start_date)
-        ) {$charset_collate};";
+        ) {$charset_collate};";        
 
         // 7) Payrolls
         $sql[] = "CREATE TABLE {$pfx}mhc_payrolls (
@@ -178,6 +164,20 @@ class Activate {
             UNIQUE KEY code (code),
             KEY idx_active (is_active)
         ) {$charset_collate};";
+
+        // PatientPayrolls
+        $sql[] = "CREATE TABLE {$pfx}mhc_patient_payrolls (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            patient_id BIGINT UNSIGNED NOT NULL,
+            payroll_id BIGINT UNSIGNED NOT NULL,
+            is_proceed TINYINT(1) NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY idx_patient (patient_id),
+            KEY idx_payroll (payroll_id)
+        ) {$charset_collate};";
+
 
         // Run dbDelta for each statement to allow incremental upgrades.
         foreach ($sql as $statement) {
