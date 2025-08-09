@@ -5,10 +5,10 @@
     </div>
 
     <el-row :gutter="20">
-      <el-col :span="20">
+      <el-col :span="16">
         <el-button type="primary" @click="openCreate">Add Worker</el-button>
       </el-col>
-      <el-col :span="4">
+      <el-col :span="8">
         <div class="mb-3">
           <el-input
               v-model="state.search"
@@ -34,8 +34,24 @@
         empty-text="No workers found"
     >
       <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="first_name" label="First Name" />
-      <el-table-column prop="last_name" label="Last Name" />
+      <el-table-column prop="first_name" label="First Name" width="200" show-overflow-tooltip />
+      <el-table-column prop="last_name" label="Last Name" width="200" show-overflow-tooltip />
+
+      <!-- New: show all roles with labels + rates -->
+      <el-table-column label="Roles" min-width="280">
+        <template #default="{ row }">
+          <div class="flex flex-wrap gap-1">
+            <el-tag
+                v-for="rr in (row.worker_roles || [])"
+                :key="(rr.id ?? rr.role_id) + '-' + (rr.general_rate ?? '')"
+                size="small"
+            >
+              {{ roleLabelById.get(Number(rr.role_id)) || rr.role_id }} — ${{ rr.general_rate ?? 0 }}
+            </el-tag>
+          </div>
+        </template>
+      </el-table-column>
+
       <el-table-column label="Active" width="110">
         <template #default="{ row }">
           <el-tag :type="String(row.is_active) === '1' ? 'success' : 'info'">
@@ -44,13 +60,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="Roles (count)" width="130">
-        <template #default="{ row }">
-          {{ Array.isArray(row.worker_roles) ? row.worker_roles.length : (row.roles_assignments?.length || 0) }}
-        </template>
-      </el-table-column>
-
-      <el-table-column label="Actions" width="220" fixed="right">
+      <el-table-column label="Actions" width="180" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openEdit(row)">Edit</el-button>
           <el-popconfirm
@@ -93,8 +103,6 @@
         <el-form-item label="Last Name" prop="last_name">
           <el-input v-model="form.last_name" />
         </el-form-item>
-
-
 
         <el-form-item label="Roles & Rates">
           <div style="width:100%;">
@@ -162,7 +170,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
@@ -188,13 +196,20 @@ const state = reactive({
 /** ROLES OPTIONS for selector */
 const rolesOptions = ref([])
 
+/** Quick lookup for labels by id */
+const roleLabelById = computed(() => {
+  const m = new Map()
+  for (const o of rolesOptions.value) m.set(Number(o.value), o.label)
+  return m
+})
+
 /** FORM */
 const formRef = ref(null)
 const form = reactive({
   first_name: '',
   last_name: '',
   is_active: '1',
-  worker_roles: [] // [{ uid, role_id, general_rate }]
+  worker_roles: [] // [{ uid, role_id:Number, general_rate:Number }]
 })
 
 /** VALIDATION */
@@ -220,7 +235,7 @@ function removeRoleRow (row) {
 }
 function validateRoleRows () {
   for (const r of form.worker_roles) {
-    if (!r.role_id) throw new Error('Each role row needs a Role.')
+    if (r.role_id == null) throw new Error('Each role row needs a Role.')
     if (r.general_rate === null || r.general_rate === '' || isNaN(Number(r.general_rate))) {
       throw new Error('Each role row needs a numeric Rate.')
     }
@@ -239,7 +254,8 @@ async function fetchRoles() {
     const items = Array.isArray(data.data?.items) ? data.data.items : []
     rolesOptions.value = items
         .filter(r => String(r.is_active) === '1')
-        .map(r => ({ value: r.id, label: `${r.code || 'ROLE'} — ${r.name}` }))
+        .map(r => ({ value: Number(r.id), label: `${r.code || 'ROLE'}` }))
+       // .map(r => ({ value: Number(r.id), label: `${r.code || 'ROLE'} — ${r.name}` }))
   } catch (e) {
     console.error(e)
     ElMessage.error(e.message || 'Error loading roles')
@@ -262,7 +278,7 @@ function mapRowToForm(row) {
 
   form.worker_roles = incoming.map((r) => ({
     uid: Math.random().toString(36).slice(2),
-    role_id: r.role_id ?? r.id ?? null,
+    role_id: r.role_id != null ? Number(r.role_id) : (r.id != null ? Number(r.id) : null),
     general_rate: r.general_rate != null ? Number(r.general_rate) : null,
   }))
 }
@@ -281,9 +297,12 @@ function openCreate() {
   addRoleRow()
   state.showDialog = true
 }
-function openEdit(row) {
+async function openEdit(row) {
   state.editing = true
   state.currentId = row.id
+  if (!rolesOptions.value.length) {
+    await fetchRoles() // ensure options exist so labels render
+  }
   mapRowToForm(row)
   if (form.worker_roles.length === 0) addRoleRow()
   state.showDialog = true
@@ -340,8 +359,8 @@ async function submit() {
     fd.append('is_active', form.is_active)
 
     const payloadRoles = form.worker_roles.map(r => ({
-      role_id: r.role_id,
-      general_rate: r.general_rate !== null ? Number(r.general_rate) : null,
+      role_id: r.role_id != null ? Number(r.role_id) : null,
+      general_rate: r.general_rate != null ? Number(r.general_rate) : null,
     }))
     fd.append('worker_roles', JSON.stringify(payloadRoles))
 
@@ -396,4 +415,7 @@ onMounted(() => {
 <style scoped>
 .wp-wrap { padding: 0.5rem; }
 .el-pagination { margin-top: 20px; }
+.flex { display: flex; }
+.flex-wrap { flex-wrap: wrap; }
+.gap-1 { gap: 0.25rem; }
 </style>
