@@ -11,12 +11,14 @@ use WP_Error;
 use wpdb;
 
 class Roles{
+    
 
     public function register(){
         add_action('wp_ajax_mhc_roles_list',   [$this, 'list']);
         add_action('wp_ajax_mhc_roles_create', [$this, 'create']);
         add_action('wp_ajax_mhc_roles_update', [$this, 'update']);
         add_action('wp_ajax_mhc_roles_delete', [$this, 'delete']);
+        add_action('wp_ajax_mhc_roles_get',    [$this, 'getById']);
     }
 
     protected static function check() {
@@ -136,5 +138,21 @@ class Roles{
         if (!$ok) wp_send_json_error(['message' => 'Unable to delete role'], 500);
 
         wp_send_json_success(['id' => $id]);
+    }
+    
+    public static function getById() {
+        self::check();
+        global $wpdb;
+
+        $pfx = $wpdb->prefix;
+        $table = "{$pfx}mhc_roles";
+
+        $id = intval($_POST['id'] ?? 0);
+        if ($id <= 0) wp_send_json_error(['message' => 'Invalid id'], 400);
+
+        $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id=%d", $id), ARRAY_A);
+        if (!$row) wp_send_json_error(['message' => 'Role not found'], 404);
+
+        wp_send_json_success(['item' => $row]);
     }
 }
