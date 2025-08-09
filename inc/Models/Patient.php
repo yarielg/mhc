@@ -8,16 +8,24 @@ class Patient {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $table = "{$pfx}mhc_patients";
+        $wpr = "{$pfx}mhc_worker_patient_roles";
         $id = intval($id);
         if ($id <= 0) return null;
         $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id=%d", $id), ARRAY_A);
-        return $row ?: null;
+        if (!$row) return null;
+        $row['assignments'] = $wpdb->get_results(
+            $wpdb->prepare("SELECT worker_id, role_id, rate FROM $wpr WHERE patient_id=%d", $id),
+            ARRAY_A
+        );
+        error_log(print_r($row, true));
+        return $row;
     }
 
     public static function findAll($search = '', $page = 1, $per_page = 10) {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $table = "{$pfx}mhc_patients";
+        $wpr = "{$pfx}mhc_worker_patient_roles";
         $offset = ($page - 1) * $per_page;
         $where = "WHERE 1=1";
         $params = [];
@@ -31,6 +39,14 @@ class Patient {
             $wpdb->prepare("SELECT * FROM $table $where ORDER BY id DESC LIMIT %d OFFSET %d", array_merge($params, [$per_page, $offset])),
             ARRAY_A
         );
+        foreach ($rows as &$row) {
+            $row['assignments'] = $wpdb->get_results(
+                $wpdb->prepare("SELECT worker_id, role_id, rate FROM $wpr WHERE patient_id=%d", $row['id']),
+                ARRAY_A
+            );
+        }
+        unset($row);
+        error_log(print_r($rows, true));
         return [
             'items' => $rows,
             'total' => $total,
@@ -54,6 +70,10 @@ class Patient {
         $ok = $wpdb->insert($table, $fields, $fmts);
         if (!$ok) return false;
         $id = $wpdb->insert_id;
+        // Guardar asignaciones si existen
+        if (!empty($data['assignments']) && is_array($data['assignments'])) {
+            self::assignWorkers($id, $data['assignments']);
+        }
         return self::findById($id);
     }
 
@@ -61,6 +81,7 @@ class Patient {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $table = "{$pfx}mhc_patients";
+        $wpr = "{$pfx}mhc_worker_patient_roles";
         $fields = [];
         $fmts = [];
         foreach (["first_name","last_name","is_active","start_date","end_date"] as $field) {
@@ -72,6 +93,12 @@ class Patient {
         if (!$fields) return false;
         $ok = $wpdb->update($table, $fields, ['id' => intval($id)], $fmts, ['%d']);
         if ($ok === false) return false;
+        // Actualizar asignaciones si existen
+        if (isset($data['assignments']) && is_array($data['assignments'])) {
+            // Eliminar asignaciones previas
+            $wpdb->delete($wpr, ['patient_id' => intval($id)], ['%d']);
+            self::assignWorkers($id, $data['assignments']);
+        }
         return self::findById($id);
     }
 

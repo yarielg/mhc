@@ -72,9 +72,10 @@ class PatientsController{
         if (!empty($assignments)) {
             $ok = Patient::assignWorkers((int)$item['id'], $assignments);
             if (!$ok) {
-                // Optionally, you may rollback patient insert here if you want strict atomicity.
                 wp_send_json_error(['message' => 'Error saving assignments'], 500);
             }
+            // REFRESH patient object to include assignments
+            $item = Patient::findById((int)$item['id']);
         }
 
         wp_send_json_success(['item' => $item]);
@@ -91,6 +92,16 @@ class PatientsController{
             $st = intval($_POST['is_active']);
             if (!in_array($st, [1,0], true)) $st = 1;
             $data['is_active'] = $st;
+        }
+        // Recibir assignments si existen
+        $assignments = [];
+        if (isset($_POST['assignments'])) {
+            $json = wp_unslash($_POST['assignments']);
+            $parsed = json_decode($json, true);
+            if (is_array($parsed)) $assignments = $parsed;
+        }
+        if (!empty($assignments)) {
+            $data['assignments'] = $assignments;
         }
         if (!$data) wp_send_json_error(['message' => 'Nothing to update'], 400);
         $item = Patient::update($id, $data);

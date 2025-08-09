@@ -235,14 +235,37 @@ function openCreate() {
   state.showDialog = true
 }
 
-function openEdit(row) {
-  // Keep the base behavior; assignments-on-edit can be added later if needed.
+async function openEdit(row) {
   state.editing = true
   state.currentId = row.id
   form.first_name = row.first_name
   form.last_name = row.last_name
   form.is_active = String(row.is_active ?? '1')
-  // Optionally, you can load existing assignments here via an endpoint.
+  form.assignments = (row.assignments || []).map(a => ({
+    worker_id: a.worker_id,
+    role_id: a.role_id,
+    rate: a.rate,
+    _workerOptions: [],
+    _workerLoading: false,
+    _rolesForWorker: [],
+    _lastRoleDefault: null,
+  }))
+  // Para cada assignment, cargar worker y roles
+  for (const assignment of form.assignments) {
+    
+    await remoteSearchWorkers('', assignment) // carga worker options
+    if (assignment.worker_id) {
+      await onWorkerChange(assignment) // carga roles para ese worker
+      }
+      // Seleccionar el rol del assignment si existe en la lista
+      const foundRole = assignment._rolesForWorker.find(r => r.role_id === assignment.role_id)
+      if (foundRole) {
+        assignment.role_id = foundRole.role_id
+        if (foundRole.general_rate != null) {
+          assignment._lastRoleDefault = Number(foundRole.general_rate)
+        }
+      }
+    }
   state.showDialog = true
 }
 
@@ -303,9 +326,9 @@ async function remoteSearchWorkers(query, row) {
 }
 
 async function onWorkerChange(row) {
-  // clear role+rate
-  row.role_id = null
-  row.rate = null
+  // Solo limpiar si es cambio manual, no en inicialización de edición
+  // row.role_id = null
+  // row.rate = null
   row._lastRoleDefault = null
   row._rolesForWorker = []
 
@@ -320,8 +343,16 @@ async function onWorkerChange(row) {
     if (!data.success) throw new Error(data.data?.message || 'Roles load failed')
     row._rolesForWorker = data.data.roles || []
 
-    // If only one role, preselect it and default rate
-    if (row._rolesForWorker.length === 1) {
+    // Si el rol del assignment existe en la lista, seleccionarlo
+    const foundRole = row._rolesForWorker.find(r => r.role_id === row.role_id)
+    if (foundRole) {
+      row.role_id = foundRole.role_id
+      if (foundRole.general_rate != null) {
+        row._lastRoleDefault = Number(foundRole.general_rate)
+      }
+      // El rate ya viene del assignment, no lo sobreescribas
+    } else if (row._rolesForWorker.length === 1) {
+      // Si solo hay un rol, seleccionarlo y poner el rate por defecto
       const r = row._rolesForWorker[0]
       row.role_id = r.role_id
       if (r.general_rate != null) {
