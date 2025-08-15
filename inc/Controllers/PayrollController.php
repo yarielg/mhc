@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) exit;
 
 class PayrollController
 {
-    const NONCE_ACTION = 'mhc_payroll_nonce';
+    const NONCE_ACTION = 'mhc_ajax';
     const CAPABILITY   = 'manage_options'; // ajusta si usas otra cap
 
     /** Llama esto en tu bootstrap: \Mhc\Inc\Controllers\PayrollController::register(); */

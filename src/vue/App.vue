@@ -35,7 +35,12 @@
             <el-menu-item index="/">
               <el-icon><House /></el-icon><span>Dashboard</span>
             </el-menu-item>
-
+            <el-sub-menu index="/payrolls">
+              <template #title>
+                <el-icon><Wallet /></el-icon><span>Payrolls</span>
+              </template>
+              <el-menu-item index="/payrolls">All Payrolls</el-menu-item>
+            </el-sub-menu>
             <el-menu-item index="/workers">
               <el-icon><User /></el-icon><span>Workers</span>
             </el-menu-item>
@@ -70,6 +75,10 @@
       <el-drawer v-model="drawer" size="75%" direction="ltr" :with-header="false" class="mhc-drawer">
         <el-menu :default-active="route.path" router @select="closeDrawer">
           <el-menu-item index="/"><el-icon><House /></el-icon><span>Dashboard</span></el-menu-item>
+          <el-sub-menu index="/payrolls">
+            <template #title><el-icon><Wallet /></el-icon><span>Payrolls</span></template>
+            <el-menu-item index="/payrolls">All Payrolls</el-menu-item>
+          </el-sub-menu>
           <el-menu-item index="/workers"><el-icon><User /></el-icon><span>Workers</span></el-menu-item>
           <el-menu-item index="/patients"><el-icon><UserFilled /></el-icon><span>Patients</span></el-menu-item>
 

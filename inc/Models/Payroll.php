@@ -255,7 +255,7 @@ class Payroll
         $p = self::findById($id);
         if (!$p) return new WP_Error('not_found', 'Payroll no encontrado.');
 
-        $stats  = self::stats($id);
+      //  $stats  = self::stats($id);
         $totals = self::totals($id);
 
         // Breakdowns útiles para tabs/paneles
@@ -265,7 +265,6 @@ class Payroll
 
         return [
             'payroll' => $p,
-            'stats'   => $stats,
             'totals'  => $totals,
             'breakdowns' => [
                 'hours_by_role'    => $byRole,
