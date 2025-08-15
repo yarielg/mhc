@@ -3,11 +3,15 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import Workers from './pages/Workers.vue'
 import Patients from './pages/Patients.vue'
 import Dashboard from './pages/Dashboard.vue'
+import Roles from './pages/Roles.vue'
+import SpecialRates from './pages/SpecialRates.vue'
 
 const routes = [
     { path: '/', component: Dashboard, meta: { title: 'Dashboard' } },
     { path: '/workers', component: Workers, meta: { title: 'Workers' } },
     { path: '/patients', component: Patients, meta: { title: 'Patients' } },
+    { path: '/roles', component: Roles, meta: { title: 'Roles' } },
+    { path: '/special-rates', component: SpecialRates, meta: { title: 'Special Rates' } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 

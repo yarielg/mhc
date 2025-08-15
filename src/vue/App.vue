@@ -48,9 +48,13 @@
               <el-menu-item index="/payrolls">All Payrolls</el-menu-item>
               <el-menu-item index="/payrolls/new">New Payroll</el-menu-item>
             </el-sub-menu>
-            <el-menu-item index="/settings">
-              <el-icon><Setting /></el-icon><span>Settings</span>
-            </el-menu-item>
+            <el-sub-menu index="/settings"> 
+              <template #title>
+                <el-icon><Setting /></el-icon><span>Settings</span>
+              </template>
+              <el-menu-item index="/roles">Roles</el-menu-item>
+              <el-menu-item index="/special-rates">Special Rates</el-menu-item>
+            </el-sub-menu>
           </el-menu>
           <div class="mhc-collapse">
             <el-button text size="small" @click="collapsed = !collapsed">
@@ -78,7 +82,11 @@
             <el-menu-item index="/payrolls">All Payrolls</el-menu-item>
             <el-menu-item index="/payrolls/new">New Payroll</el-menu-item>
           </el-sub-menu>
-          <el-menu-item index="/settings"><el-icon><Setting /></el-icon><span>Settings</span></el-menu-item>
+          <el-sub-menu index="/settings">
+            <template #title><el-icon><Setting /></el-icon><span>Settings</span></template>
+            <el-menu-item index="/roles">Roles</el-menu-item>
+            <el-menu-item index="/special-rates">Special Rates</el-menu-item>
+          </el-sub-menu>
         </el-menu>
       </el-drawer>
     </el-container>
