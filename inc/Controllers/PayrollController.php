@@ -1,8 +1,11 @@
 <?php
+
 namespace Mhc\Inc\Controllers;
 
 use Mhc\Inc\Models\Payroll;
 use Mhc\Inc\Models\PatientPayroll;
+use Mhc\Inc\Models\HoursEntry;
+use Mhc\Inc\Models\WorkerPatientRole;
 
 if (!defined('ABSPATH')) exit;
 
@@ -12,7 +15,8 @@ class PayrollController
     const CAPABILITY   = 'manage_options'; // ajusta si usas otra cap
 
     /** Llama esto en tu bootstrap: \Mhc\Inc\Controllers\PayrollController::register(); */
-    public static function register() {
+    public static function register()
+    {
         // Payroll CRUD básico
         add_action('wp_ajax_mhc_payroll_list',        [__CLASS__, 'ajax_list']);
         add_action('wp_ajax_mhc_payroll_get',         [__CLASS__, 'ajax_get']);
@@ -26,11 +30,21 @@ class PayrollController
         add_action('wp_ajax_mhc_payroll_seed_patients',      [__CLASS__, 'ajax_seed_patients']); // opcional re-seed
         add_action('wp_ajax_mhc_payroll_patients',           [__CLASS__, 'ajax_list_patients']); // con filtro is_processed
         add_action('wp_ajax_mhc_patient_payroll_set_processed', [__CLASS__, 'ajax_set_processed']);
+
+        // Asignaciones (workers) por paciente en el payroll
+        add_action('wp_ajax_mhc_payroll_patient_workers', [__CLASS__, 'ajax_patient_workers']);
+        add_action('wp_ajax_mhc_payroll_patient_workers_add', [__CLASS__, 'ajax_patient_workers_add']);
+
+        // Horas por paciente en el payroll
+        add_action('wp_ajax_mhc_payroll_hours_list',   [__CLASS__, 'ajax_hours_list']);
+        add_action('wp_ajax_mhc_payroll_hours_upsert', [__CLASS__, 'ajax_hours_upsert']);
+        add_action('wp_ajax_mhc_payroll_hours_delete', [__CLASS__, 'ajax_hours_delete']);
     }
 
     /* ========================= Helpers ========================= */
 
-    private static function check_access_and_nonce() {
+    private static function check_access_and_nonce()
+    {
         if (!current_user_can(self::CAPABILITY)) {
             wp_send_json_error(['message' => 'Unauthorized'], 403);
         }
@@ -40,7 +54,8 @@ class PayrollController
         }
     }
 
-    private static function json_input(): array {
+    private static function json_input(): array
+    {
         $raw = file_get_contents('php://input');
         if ($raw) {
             $data = json_decode($raw, true);
@@ -49,7 +64,8 @@ class PayrollController
         return $_REQUEST;
     }
 
-    private static function sanitize_date($v) {
+    private static function sanitize_date($v)
+    {
         $v = (string)$v;
         return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : '';
     }
@@ -57,10 +73,11 @@ class PayrollController
     /* ========================= Payroll ========================= */
 
     // GET: lista de payrolls (respeta tu modelo: start_date_from/to, status, search, orderby, order, limit/offset)
-    public static function ajax_list() {
+    public static function ajax_list()
+    {
         self::check_access_and_nonce();
         $args = [];
-        foreach (['status','search','orderby','order'] as $k) {
+        foreach (['status', 'search', 'orderby', 'order'] as $k) {
             if (isset($_GET[$k])) $args[$k] = sanitize_text_field($_GET[$k]);
         }
         if (!empty($_GET['start_date_from'])) $args['start_date_from'] = self::sanitize_date($_GET['start_date_from']);
@@ -69,22 +86,24 @@ class PayrollController
         if (isset($_GET['offset'])) $args['offset'] = max(0, (int)$_GET['offset']);
 
         $rows = Payroll::findAll($args);
-        wp_send_json_success(['items'=>$rows]);
+        wp_send_json_success(['items' => $rows]);
     }
 
     // GET: un payroll (sólo el registro)
-    public static function ajax_get() {
+    public static function ajax_get()
+    {
         self::check_access_and_nonce();
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if ($id <= 0) wp_send_json_error(['message'=>'Missing id'], 400);
+        if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
         $row = Payroll::findById($id);
-        if (!$row) wp_send_json_error(['message'=>'Not found'], 404);
+        if (!$row) wp_send_json_error(['message' => 'Not found'], 404);
         wp_send_json_success($row);
     }
 
     // POST: start_date, end_date, (status, notes)
     // Crea payroll + SEED de pacientes activos (is_processed=0) + devuelve lista inicial y contadores
-    public static function ajax_create() {
+    public static function ajax_create()
+    {
         self::check_access_and_nonce();
         $data = self::json_input();
 
@@ -95,24 +114,24 @@ class PayrollController
             'notes'      => isset($data['notes'])  ? sanitize_text_field($data['notes'])  : '',
         ];
         if (!$payload['start_date'] || !$payload['end_date']) {
-            wp_send_json_error(['message'=>'start_date y end_date son requeridos'], 400);
+            wp_send_json_error(['message' => 'start_date y end_date son requeridos'], 400);
         }
         // (Opcional) Evitar solape de periodos
         if (method_exists(Payroll::class, 'hasOverlap') && Payroll::hasOverlap($payload['start_date'], $payload['end_date'])) {
-            wp_send_json_error(['message'=>'El rango de fechas se solapa con otro payroll'], 409);
+            wp_send_json_error(['message' => 'El rango de fechas se solapa con otro payroll'], 409);
         }
 
         $id = Payroll::create($payload);
         if ($id instanceof \WP_Error) {
-            wp_send_json_error(['message'=>$id->get_error_message()], 400);
+            wp_send_json_error(['message' => $id->get_error_message()], 400);
         }
-        if (!$id) wp_send_json_error(['message'=>'No se pudo crear el payroll'], 500);
+        if (!$id) wp_send_json_error(['message' => 'No se pudo crear el payroll'], 500);
 
         // SEED aquí (tal como pediste)
         $seeded = PatientPayroll::seedForPayroll((int)$id);
 
         // Lista inicial (todos) + contadores
-        $patients = PatientPayroll::findByPayroll((int)$id, ['is_processed'=>'all']);
+        $patients = PatientPayroll::findByPayroll((int)$id, ['is_processed' => 'all']);
         $counts   = PatientPayroll::countsByStatus((int)$id);
 
         // (Opcional) detalle completo del payroll (stats/totals) si ya tienes esos métodos
@@ -128,11 +147,12 @@ class PayrollController
     }
 
     // PATCH/POST: id, (start_date, end_date, status, notes)
-    public static function ajax_update() {
+    public static function ajax_update()
+    {
         self::check_access_and_nonce();
         $data = self::json_input();
         $id = isset($data['id']) ? (int)$data['id'] : 0;
-        if ($id <= 0) wp_send_json_error(['message'=>'Missing id'], 400);
+        if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
 
         $upd = [];
         if (isset($data['start_date'])) $upd['start_date'] = self::sanitize_date($data['start_date']);
@@ -141,56 +161,60 @@ class PayrollController
         if (isset($data['notes']))      $upd['notes']      = sanitize_text_field($data['notes']);
 
         $ok = Payroll::update($id, $upd);
-        if ($ok instanceof \WP_Error) wp_send_json_error(['message'=>$ok->get_error_message()], 400);
-        if (!$ok) wp_send_json_error(['message'=>'Update failed'], 500);
-        wp_send_json_success(['id'=>$id,'updated'=>true]);
+        if ($ok instanceof \WP_Error) wp_send_json_error(['message' => $ok->get_error_message()], 400);
+        if (!$ok) wp_send_json_error(['message' => 'Update failed'], 500);
+        wp_send_json_success(['id' => $id, 'updated' => true]);
     }
 
     // POST: id
-    public static function ajax_delete() {
+    public static function ajax_delete()
+    {
         self::check_access_and_nonce();
         $id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : 0;
-        if ($id <= 0) wp_send_json_error(['message'=>'Missing id'], 400);
+        if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
 
         $ok = Payroll::delete($id);
-        if ($ok instanceof \WP_Error) wp_send_json_error(['message'=>$ok->get_error_message()], 400);
-        if (!$ok) wp_send_json_error(['message'=>'Delete failed'], 500);
-        wp_send_json_success(['id'=>$id,'deleted'=>true]);
+        if ($ok instanceof \WP_Error) wp_send_json_error(['message' => $ok->get_error_message()], 400);
+        if (!$ok) wp_send_json_error(['message' => 'Delete failed'], 500);
+        wp_send_json_success(['id' => $id, 'deleted' => true]);
     }
 
     // POST: id
-    public static function ajax_finalize() {
+    public static function ajax_finalize()
+    {
         self::check_access_and_nonce();
         $id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : 0;
-        if ($id <= 0) wp_send_json_error(['message'=>'Missing id'], 400);
+        if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
 
         $ok = Payroll::finalize($id);
-        if ($ok instanceof \WP_Error) wp_send_json_error(['message'=>$ok->get_error_message()], 400);
-        wp_send_json_success(['id'=>$id,'finalized'=>true]);
+        if ($ok instanceof \WP_Error) wp_send_json_error(['message' => $ok->get_error_message()], 400);
+        wp_send_json_success(['id' => $id, 'finalized' => true]);
     }
 
     // POST: id
-    public static function ajax_reopen() {
+    public static function ajax_reopen()
+    {
         self::check_access_and_nonce();
         $id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : 0;
-        if ($id <= 0) wp_send_json_error(['message'=>'Missing id'], 400);
+        if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
 
         $ok = Payroll::reopen($id);
-        if ($ok instanceof \WP_Error) wp_send_json_error(['message'=>$ok->get_error_message()], 400);
-        wp_send_json_success(['id'=>$id,'reopened'=>true]);
+        if ($ok instanceof \WP_Error) wp_send_json_error(['message' => $ok->get_error_message()], 400);
+        wp_send_json_success(['id' => $id, 'reopened' => true]);
     }
 
     /* ==================== PatientPayroll (seed/list/toggle) ==================== */
 
     // POST: payroll_id  → re-seed (por si hay pacientes activos nuevos)
-    public static function ajax_seed_patients() {
+    public static function ajax_seed_patients()
+    {
         self::check_access_and_nonce();
         $payroll_id = isset($_REQUEST['payroll_id']) ? (int)$_REQUEST['payroll_id'] : 0;
-        if ($payroll_id <= 0) wp_send_json_error(['message'=>'Missing payroll_id'], 400);
+        if ($payroll_id <= 0) wp_send_json_error(['message' => 'Missing payroll_id'], 400);
 
         $added = PatientPayroll::seedForPayroll($payroll_id);
 
-        $patients = PatientPayroll::findByPayroll($payroll_id, ['is_processed'=>'all']);
+        $patients = PatientPayroll::findByPayroll($payroll_id, ['is_processed' => 'all']);
         $counts   = PatientPayroll::countsByStatus($payroll_id);
 
         wp_send_json_success([
@@ -201,14 +225,15 @@ class PayrollController
     }
 
     // GET/POST: payroll_id, is_processed = all|0|1  → lista pacientes del payroll con filtro
-    public static function ajax_list_patients() {
+    public static function ajax_list_patients()
+    {
         self::check_access_and_nonce();
 
         $payroll_id   = isset($_REQUEST['payroll_id']) ? (int)$_REQUEST['payroll_id'] : 0;
         $is_processed = $_REQUEST['is_processed'] ?? 'all'; // 'all' | '0' | '1'
-        if ($payroll_id <= 0) wp_send_json_error(['message'=>'Missing payroll_id'], 400);
+        if ($payroll_id <= 0) wp_send_json_error(['message' => 'Missing payroll_id'], 400);
 
-        $patients = PatientPayroll::findByPayroll($payroll_id, ['is_processed'=>$is_processed]);
+        $patients = PatientPayroll::findByPayroll($payroll_id, ['is_processed' => $is_processed]);
         $counts   = PatientPayroll::countsByStatus($payroll_id);
 
         wp_send_json_success([
@@ -220,25 +245,143 @@ class PayrollController
     }
 
     // POST: payroll_id, patient_id, is_processed (0|1) → toggle por paciente
-    public static function ajax_set_processed() {
+    public static function ajax_set_processed()
+    {
         self::check_access_and_nonce();
 
         $payroll_id  = isset($_POST['payroll_id']) ? (int)$_POST['payroll_id'] : 0;
         $patient_id  = isset($_POST['patient_id']) ? (int)$_POST['patient_id'] : 0;
-        $is_processed= isset($_POST['is_processed']) ? (int)$_POST['is_processed'] : 0;
+        $is_processed = isset($_POST['is_processed']) ? (int)$_POST['is_processed'] : 0;
 
         if ($payroll_id <= 0 || $patient_id <= 0) {
-            wp_send_json_error(['message'=>'payroll_id y patient_id son requeridos'], 400);
+            wp_send_json_error(['message' => 'payroll_id y patient_id son requeridos'], 400);
         }
 
         $ok = PatientPayroll::setProcessed($payroll_id, $patient_id, $is_processed);
-        if (!$ok) wp_send_json_error(['message'=>'No se pudo actualizar is_processed'], 500);
+        if (!$ok) wp_send_json_error(['message' => 'No se pudo actualizar is_processed'], 500);
 
         // respuesta útil para refrescar UI
         $counts = PatientPayroll::countsByStatus($payroll_id);
         wp_send_json_success([
-            'updated' => ['payroll_id'=>$payroll_id, 'patient_id'=>$patient_id, 'is_processed'=>$is_processed],
+            'updated' => ['payroll_id' => $payroll_id, 'patient_id' => $patient_id, 'is_processed' => $is_processed],
             'counts'  => $counts
+        ]);
+    }
+
+    // GET: payroll_id, patient_id
+    public static function ajax_patient_workers()
+    {
+        self::check_access_and_nonce();
+        $payroll_id = (int)($_REQUEST['payroll_id'] ?? 0);
+        $patient_id = (int)($_REQUEST['patient_id'] ?? 0);
+        if ($payroll_id <= 0 || $patient_id <= 0) wp_send_json_error(['message' => 'payroll_id y patient_id requeridos'], 400);
+
+        $items = WorkerPatientRole::listForPatientInPayroll($patient_id, $payroll_id);
+        wp_send_json_success(['items' => $items]);
+    }
+
+    // POST: payroll_id, patient_id, worker_id, role_id, rate? (opcional)
+    public static function ajax_patient_workers_add()
+    {
+        self::check_access_and_nonce();
+        $data = self::json_input();
+        $payroll_id = (int)($data['payroll_id'] ?? 0);
+        $patient_id = (int)($data['patient_id'] ?? 0);
+        $worker_id  = (int)($data['worker_id'] ?? 0);
+        $role_id    = (int)($data['role_id'] ?? 0);
+        $rate       = isset($data['rate']) ? (float)$data['rate'] : null;
+
+        if ($payroll_id <= 0 || $patient_id <= 0 || $worker_id <= 0 || $role_id <= 0)
+            wp_send_json_error(['message' => 'Campos requeridos: payroll_id, patient_id, worker_id, role_id'], 400);
+
+        $id = WorkerPatientRole::createTemporaryForPayroll($worker_id, $patient_id, $role_id, $payroll_id, $rate);
+        if ($id instanceof \WP_Error) wp_send_json_error(['message' => $id->get_error_message()], 400);
+
+        // devolver la lista actualizada (con effective_rate)
+        $items = WorkerPatientRole::listForPatientInPayroll($patient_id, $payroll_id);
+        wp_send_json_success(['created_id' => $id, 'items' => $items]);
+    }
+
+    /* ---------- HORAS (por paciente en el payroll) ---------- */
+
+    // GET: payroll_id, patient_id
+    public static function ajax_hours_list()
+    {
+        self::check_access_and_nonce();
+        $payroll_id = (int)($_REQUEST['payroll_id'] ?? 0);
+        $patient_id = (int)($_REQUEST['patient_id'] ?? 0);
+        if ($payroll_id <= 0 || $patient_id <= 0) wp_send_json_error(['message' => 'payroll_id y patient_id requeridos'], 400);
+
+        $rows = HoursEntry::listDetailedForPayroll($payroll_id, ['patient_id' => $patient_id]);
+        // Totales por paciente (para header de la tarjeta)
+        $totalsByPatient = HoursEntry::totalsByPatientForPayroll($payroll_id);
+        $tp = array_values(array_filter($totalsByPatient, fn($r) => (int)$r['patient_id'] === $patient_id));
+        $patientTotals = $tp[0] ?? ['total_hours' => 0, 'total_amount' => 0];
+        wp_send_json_success(['items' => $rows, 'totals' => $patientTotals]);
+    }
+
+    // POST: payroll_id, worker_patient_role_id, hours, used_rate? (si no viene, calculamos)
+    public static function ajax_hours_upsert()
+    {
+        self::check_access_and_nonce();
+        $data = self::json_input();
+        $payroll_id = (int)($data['payroll_id'] ?? 0);
+        $wpr_id     = (int)($data['worker_patient_role_id'] ?? 0);
+        $hours      = isset($data['hours']) ? (float)$data['hours'] : 0.0;
+        $used_rate  = isset($data['used_rate']) ? (float)$data['used_rate'] : null;
+        if ($payroll_id <= 0 || $wpr_id <= 0) wp_send_json_error(['message' => 'payroll_id y worker_patient_role_id requeridos'], 400);
+
+        // Resolve used_rate si no viene
+        if ($used_rate === null) {
+            $wpr = WorkerPatientRole::findById($wpr_id);
+            if (!$wpr) wp_send_json_error(['message' => 'Asignación (WPR) no encontrada'], 404);
+            $payroll = Payroll::findById($payroll_id);
+            if (!$payroll) wp_send_json_error(['message' => 'Payroll no encontrado'], 404);
+            $used_rate = WorkerPatientRole::resolveEffectiveRate($wpr, (array)$payroll);
+        }
+
+        // Guarda/actualiza horas (idempotente por (payroll_id, wpr_id))
+        $res = HoursEntry::setHours($payroll_id, $wpr_id, $hours, $used_rate, null);
+        if ($res instanceof \WP_Error) wp_send_json_error(['message' => $res->get_error_message()], 400);
+
+        // Responder con la lista y totales actualizados para ese paciente
+        $wprInfo = HoursEntry::getWprInfo($wpr_id); // trae patient_id
+        $rows = HoursEntry::listDetailedForPayroll($payroll_id, ['patient_id' => $wprInfo['patient_id']]);
+        $totalsByPatient = HoursEntry::totalsByPatientForPayroll($payroll_id);
+        $tp = array_values(array_filter($totalsByPatient, fn($r) => (int)$r['patient_id'] === $wprInfo['patient_id']));
+        $patientTotals = $tp[0] ?? ['total_hours' => 0, 'total_amount' => 0];
+
+        wp_send_json_success([
+            'saved'  => ['payroll_id' => $payroll_id, 'worker_patient_role_id' => $wpr_id, 'hours' => $hours, 'used_rate' => $used_rate],
+            'items'  => $rows,
+            'totals' => $patientTotals
+        ]);
+    }
+
+    // POST: id (hours_entry id)
+    public static function ajax_hours_delete()
+    {
+        self::check_access_and_nonce();
+        $id = (int)($_REQUEST['id'] ?? 0);
+        if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
+
+        $row = HoursEntry::findById($id);
+        if (!$row) wp_send_json_error(['message' => 'No encontrado'], 404);
+        $wprInfo = HoursEntry::getWprInfo((int)$row->worker_patient_role_id);
+
+        $ok = HoursEntry::delete($id);
+        if ($ok instanceof \WP_Error || !$ok) wp_send_json_error(['message' => 'No se pudo eliminar'], 500);
+
+        // Responder con lista y totales del paciente
+        $rows = HoursEntry::listDetailedForPayroll((int)$row->payroll_id, ['patient_id' => $wprInfo['patient_id']]);
+        $totalsByPatient = HoursEntry::totalsByPatientForPayroll((int)$row->payroll_id);
+        $tp = array_values(array_filter($totalsByPatient, fn($r) => (int)$r['patient_id'] === $wprInfo['patient_id']));
+        $patientTotals = $tp[0] ?? ['total_hours' => 0, 'total_amount' => 0];
+
+        wp_send_json_success([
+            'deleted' => (int)$id,
+            'items'  => $rows,
+            'totals' => $patientTotals
         ]);
     }
 }
