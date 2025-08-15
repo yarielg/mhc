@@ -5,11 +5,13 @@ import Patients from './pages/Patients.vue'
 import Dashboard from './pages/Dashboard.vue'
 import Roles from './pages/Roles.vue'
 import SpecialRates from './pages/SpecialRates.vue'
+import Payrolls from "./pages/Payrolls.vue";
 
 const routes = [
     { path: '/', component: Dashboard, meta: { title: 'Dashboard' } },
     { path: '/workers', component: Workers, meta: { title: 'Workers' } },
     { path: '/patients', component: Patients, meta: { title: 'Patients' } },
+    { path: '/payrolls', component: Payrolls, meta: { title: 'Payrolls' } },
     { path: '/roles', component: Roles, meta: { title: 'Roles' } },
     { path: '/special-rates', component: SpecialRates, meta: { title: 'Special Rates' } },
     { path: '/:pathMatch(.*)*', redirect: '/' },

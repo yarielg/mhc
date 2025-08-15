@@ -35,19 +35,14 @@
             <el-menu-item index="/">
               <el-icon><House /></el-icon><span>Dashboard</span>
             </el-menu-item>
+
             <el-menu-item index="/workers">
               <el-icon><User /></el-icon><span>Workers</span>
             </el-menu-item>
             <el-menu-item index="/patients">
               <el-icon><UserFilled /></el-icon><span>Patients</span>
             </el-menu-item>
-            <el-sub-menu index="/payrolls">
-              <template #title>
-                <el-icon><Wallet /></el-icon><span>Payrolls</span>
-              </template>
-              <el-menu-item index="/payrolls">All Payrolls</el-menu-item>
-              <el-menu-item index="/payrolls/new">New Payroll</el-menu-item>
-            </el-sub-menu>
+
             <el-sub-menu index="/settings"> 
               <template #title>
                 <el-icon><Setting /></el-icon><span>Settings</span>
@@ -77,11 +72,7 @@
           <el-menu-item index="/"><el-icon><House /></el-icon><span>Dashboard</span></el-menu-item>
           <el-menu-item index="/workers"><el-icon><User /></el-icon><span>Workers</span></el-menu-item>
           <el-menu-item index="/patients"><el-icon><UserFilled /></el-icon><span>Patients</span></el-menu-item>
-          <el-sub-menu index="/payrolls">
-            <template #title><el-icon><Wallet /></el-icon><span>Payrolls</span></template>
-            <el-menu-item index="/payrolls">All Payrolls</el-menu-item>
-            <el-menu-item index="/payrolls/new">New Payroll</el-menu-item>
-          </el-sub-menu>
+
           <el-sub-menu index="/settings">
             <template #title><el-icon><Setting /></el-icon><span>Settings</span></template>
             <el-menu-item index="/roles">Roles</el-menu-item>
