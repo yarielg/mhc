@@ -11,6 +11,9 @@ use Mhc\Inc\Models\Worker;
 
 class WorkersController {
 
+    const NONCE_ACTION = 'mhc_ajax';
+    const CAPABILITY   = 'manage_options'; // ajusta si usas otra cap
+
     public function register() {
         add_action('wp_ajax_mhc_workers_list',    [$this, 'list']);
         add_action('wp_ajax_mhc_workers_create',  [$this, 'create']);
@@ -33,12 +36,14 @@ class WorkersController {
         wp_send_json_success(['item' => $item]);
     }
 
-    protected static function check() {
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mhc_ajax')) {
-            wp_send_json_error(['message' => 'Invalid nonce'], 403);
+    private static function check()
+    {
+        if (!current_user_can(self::CAPABILITY)) {
+            wp_send_json_error(['message' => 'Unauthorized'], 403);
         }
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error(['message' => 'Permission denied'], 403);
+        $nonce = $_REQUEST['_wpnonce'] ?? ($_REQUEST['nonce'] ?? '');
+        if (!wp_verify_nonce($nonce, self::NONCE_ACTION)) {
+            wp_send_json_error(['message' => 'Invalid nonce'], 403);
         }
     }
 

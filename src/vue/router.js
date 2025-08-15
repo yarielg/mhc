@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.vue'
 import Roles from './pages/Roles.vue'
 import SpecialRates from './pages/SpecialRates.vue'
 import Payrolls from "./pages/Payrolls.vue";
+import PayrollDetail from "./pages/PayrollDetail.vue";
 
 const routes = [
     { path: '/', component: Dashboard, meta: { title: 'Dashboard' } },
@@ -15,6 +16,12 @@ const routes = [
     { path: '/roles', component: Roles, meta: { title: 'Roles' } },
     { path: '/special-rates', component: SpecialRates, meta: { title: 'Special Rates' } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
+    {
+        path: '/payrolls/:id(\\d+)',
+        name: 'PayrollDetail',
+        component: PayrollDetail,
+        props: route => ({ id: Number(route.params.id) }) // pass id as a prop
+    },
 ]
 
 const router = createRouter({

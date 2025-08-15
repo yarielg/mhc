@@ -11,7 +11,8 @@ use Mhc\Inc\Models\Role;
 
 class RolesController
 {
-
+    const NONCE_ACTION = 'mhc_ajax';
+    const CAPABILITY   = 'manage_options'; // ajusta si usas otra cap
 
     public function register()
     {
@@ -22,13 +23,14 @@ class RolesController
         add_action('wp_ajax_mhc_roles_get',    [$this, 'getById']);
     }
 
-    protected static function check()
+    private static function check()
     {
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mhc_ajax')) {
-            wp_send_json_error(['message' => 'Invalid nonce'], 403);
+        if (!current_user_can(self::CAPABILITY)) {
+            wp_send_json_error(['message' => 'Unauthorized'], 403);
         }
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error(['message' => 'Permission denied'], 403);
+        $nonce = $_REQUEST['_wpnonce'] ?? ($_REQUEST['nonce'] ?? '');
+        if (!wp_verify_nonce($nonce, self::NONCE_ACTION)) {
+            wp_send_json_error(['message' => 'Invalid nonce'], 403);
         }
     }
 

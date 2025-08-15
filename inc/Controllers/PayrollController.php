@@ -57,7 +57,7 @@ class PayrollController
 
     /* ========================= Helpers ========================= */
 
-    private static function check_access_and_nonce()
+    private static function check()
     {
         if (!current_user_can(self::CAPABILITY)) {
             wp_send_json_error(['message' => 'Unauthorized'], 403);
@@ -89,7 +89,7 @@ class PayrollController
     // GET: lista de payrolls (respeta tu modelo: start_date_from/to, status, search, orderby, order, limit/offset)
     public static function ajax_list()
     {
-        self::check_access_and_nonce();
+        self::check();
         $args = [];
         foreach (['status', 'search', 'orderby', 'order'] as $k) {
             if (isset($_GET[$k])) $args[$k] = sanitize_text_field($_GET[$k]);
@@ -106,7 +106,7 @@ class PayrollController
     // GET: un payroll (sólo el registro)
     public static function ajax_get()
     {
-        self::check_access_and_nonce();
+        self::check();
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
         $row = Payroll::findById($id);
@@ -118,7 +118,7 @@ class PayrollController
     // Crea payroll + SEED de pacientes activos (is_processed=0) + devuelve lista inicial y contadores
     public static function ajax_create()
     {
-        self::check_access_and_nonce();
+        self::check();
         $data = self::json_input();
 
         $payload = [
@@ -163,7 +163,7 @@ class PayrollController
     // PATCH/POST: id, (start_date, end_date, status, notes)
     public static function ajax_update()
     {
-        self::check_access_and_nonce();
+        self::check();
         $data = self::json_input();
         $id = isset($data['id']) ? (int)$data['id'] : 0;
         if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
@@ -183,7 +183,7 @@ class PayrollController
     // POST: id
     public static function ajax_delete()
     {
-        self::check_access_and_nonce();
+        self::check();
         $id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : 0;
         if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
 
@@ -196,7 +196,7 @@ class PayrollController
     // POST: id
     public static function ajax_finalize()
     {
-        self::check_access_and_nonce();
+        self::check();
         $id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : 0;
         if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
 
@@ -208,7 +208,7 @@ class PayrollController
     // POST: id
     public static function ajax_reopen()
     {
-        self::check_access_and_nonce();
+        self::check();
         $id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : 0;
         if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
 
@@ -222,7 +222,7 @@ class PayrollController
     // POST: payroll_id  → re-seed (por si hay pacientes activos nuevos)
     public static function ajax_seed_patients()
     {
-        self::check_access_and_nonce();
+        self::check();
         $payroll_id = isset($_REQUEST['payroll_id']) ? (int)$_REQUEST['payroll_id'] : 0;
         if ($payroll_id <= 0) wp_send_json_error(['message' => 'Missing payroll_id'], 400);
 
@@ -241,12 +241,11 @@ class PayrollController
     // GET/POST: payroll_id, is_processed = all|0|1  → lista pacientes del payroll con filtro
     public static function ajax_list_patients()
     {
-        self::check_access_and_nonce();
+        self::check();
 
         $payroll_id   = isset($_REQUEST['payroll_id']) ? (int)$_REQUEST['payroll_id'] : 0;
         $is_processed = $_REQUEST['is_processed'] ?? 'all'; // 'all' | '0' | '1'
         if ($payroll_id <= 0) wp_send_json_error(['message' => 'Missing payroll_id'], 400);
-
         $patients = PatientPayroll::findByPayroll($payroll_id, ['is_processed' => $is_processed]);
         $counts   = PatientPayroll::countsByStatus($payroll_id);
 
@@ -261,7 +260,7 @@ class PayrollController
     // POST: payroll_id, patient_id, is_processed (0|1) → toggle por paciente
     public static function ajax_set_processed()
     {
-        self::check_access_and_nonce();
+        self::check();
 
         $payroll_id  = isset($_POST['payroll_id']) ? (int)$_POST['payroll_id'] : 0;
         $patient_id  = isset($_POST['patient_id']) ? (int)$_POST['patient_id'] : 0;
@@ -285,7 +284,7 @@ class PayrollController
     // GET: payroll_id, patient_id
     public static function ajax_patient_workers()
     {
-        self::check_access_and_nonce();
+        self::check();
         $payroll_id = (int)($_REQUEST['payroll_id'] ?? 0);
         $patient_id = (int)($_REQUEST['patient_id'] ?? 0);
         if ($payroll_id <= 0 || $patient_id <= 0) wp_send_json_error(['message' => 'payroll_id y patient_id requeridos'], 400);
@@ -297,7 +296,7 @@ class PayrollController
     // POST: payroll_id, patient_id, worker_id, role_id, rate? (opcional)
     public static function ajax_patient_workers_add()
     {
-        self::check_access_and_nonce();
+        self::check();
         $data = self::json_input();
         $payroll_id = (int)($data['payroll_id'] ?? 0);
         $patient_id = (int)($data['patient_id'] ?? 0);
@@ -321,7 +320,7 @@ class PayrollController
     // GET: payroll_id, patient_id
     public static function ajax_hours_list()
     {
-        self::check_access_and_nonce();
+        self::check();
         $payroll_id = (int)($_REQUEST['payroll_id'] ?? 0);
         $patient_id = (int)($_REQUEST['patient_id'] ?? 0);
         if ($payroll_id <= 0 || $patient_id <= 0) wp_send_json_error(['message' => 'payroll_id y patient_id requeridos'], 400);
@@ -337,7 +336,7 @@ class PayrollController
     // POST: payroll_id, worker_patient_role_id, hours, used_rate? (si no viene, calculamos)
     public static function ajax_hours_upsert()
     {
-        self::check_access_and_nonce();
+        self::check();
         $data = self::json_input();
         $payroll_id = (int)($data['payroll_id'] ?? 0);
         $wpr_id     = (int)($data['worker_patient_role_id'] ?? 0);
@@ -375,7 +374,7 @@ class PayrollController
     // POST: id (hours_entry id)
     public static function ajax_hours_delete()
     {
-        self::check_access_and_nonce();
+        self::check();
         $id = (int)($_REQUEST['id'] ?? 0);
         if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
 

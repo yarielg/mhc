@@ -38,6 +38,8 @@ class PatientPayroll {
             ORDER BY p.last_name ASC, p.first_name ASC
         ";
 
+
+
         return $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
     }
 

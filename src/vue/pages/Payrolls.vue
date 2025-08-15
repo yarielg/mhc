@@ -192,6 +192,10 @@
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
+import { useRouter } from 'vue-router' // ✅ import
+
+const router = useRouter() // ✅ create instance
+
 /** ===== Ajax helpers (expects window.mhc.ajaxUrl & window.mhc.noncePayroll) ===== */
 const AJAX_URL = parameters.ajax_url;
 const NONCE    = parameters.nonce;
@@ -374,7 +378,7 @@ function onPage(p) {
 
 function goTo(row) {
   // Wire up when you add the detail route (e.g. `/payrolls/:id`)
-  // $router.push({ path: `/payrolls/${row.id}` })
+  router.push({ path: `/payrolls/${row.id}` })
   ElMessage.info(`Open payroll #${row.id} (stub)`)
 }
 
