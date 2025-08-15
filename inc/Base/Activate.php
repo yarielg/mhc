@@ -170,7 +170,7 @@ class Activate {
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             patient_id BIGINT UNSIGNED NOT NULL,
             payroll_id BIGINT UNSIGNED NOT NULL,
-            is_proceed TINYINT(1) NOT NULL DEFAULT 0,
+            is_processed TINYINT(1) NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),

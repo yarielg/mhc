@@ -11,8 +11,8 @@
       <el-col :span="8">
         <div class="mb-3">
           <el-input
-              v-model="state.search"
-              placeholder="Search by worker, role, or patient..."
+                v-model="state.search"
+                placeholder="Search by code, label, or CPT code..."
               clearable
               @clear="fetchData(1)"
               @keyup.enter.native="fetchData(1)"
