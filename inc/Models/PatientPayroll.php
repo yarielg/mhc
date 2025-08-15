@@ -1,3 +1,4 @@
+
 <?php
 namespace Mhc\Inc\Models;
 
@@ -138,5 +139,13 @@ class PatientPayroll {
             'processed' => $processed,
             'pending' => max(0, $total - $processed),
         ];
+    }
+
+        /**
+     * Stats para header de la vista de payroll
+     * - processed, pending, total
+     */
+    public static function stats($payroll_id) {
+        return self::countsByStatus($payroll_id);
     }
 }
