@@ -25,7 +25,8 @@ class Settings{
             $vue_routes = [
                 'workers',
                 'patients',
-                '',
+                'payrolls',
+                '/payrolls/new'
             ];
 
             // If the requested path matches a Vue route, load your plugin's root page
