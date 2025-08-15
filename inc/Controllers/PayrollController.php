@@ -6,6 +6,8 @@ use Mhc\Inc\Models\Payroll;
 use Mhc\Inc\Models\PatientPayroll;
 use Mhc\Inc\Models\HoursEntry;
 use Mhc\Inc\Models\WorkerPatientRole;
+use Mhc\Inc\Models\ExtraPayment;
+
 
 if (!defined('ABSPATH')) exit;
 
@@ -39,6 +41,18 @@ class PayrollController
         add_action('wp_ajax_mhc_payroll_hours_list',   [__CLASS__, 'ajax_hours_list']);
         add_action('wp_ajax_mhc_payroll_hours_upsert', [__CLASS__, 'ajax_hours_upsert']);
         add_action('wp_ajax_mhc_payroll_hours_delete', [__CLASS__, 'ajax_hours_delete']);
+
+        add_action('wp_ajax_mhc_payroll_workers',          [__CLASS__, 'ajax_workers']);          // resumen por trabajador
+        add_action('wp_ajax_mhc_payroll_worker_detail',    [__CLASS__, 'ajax_worker_detail']);    // detalle de la colilla por trabajador
+
+        // catálogo de special rates (para el selector de extras en el front)
+        add_action('wp_ajax_mhc_special_rates_list',       [__CLASS__, 'ajax_special_rates_list']);
+
+        // extras por trabajador en el payroll
+        add_action('wp_ajax_mhc_payroll_extras_list',      [__CLASS__, 'ajax_extras_list']);
+        add_action('wp_ajax_mhc_payroll_extras_create',    [__CLASS__, 'ajax_extras_create']);
+        add_action('wp_ajax_mhc_payroll_extras_update',    [__CLASS__, 'ajax_extras_update']);
+        add_action('wp_ajax_mhc_payroll_extras_delete',    [__CLASS__, 'ajax_extras_delete']);
     }
 
     /* ========================= Helpers ========================= */
@@ -383,5 +397,236 @@ class PayrollController
             'items'  => $rows,
             'totals' => $patientTotals
         ]);
+    }
+
+    public static function ajax_workers()
+    {
+        self::check();
+        $payroll_id = (int)($_POST['payroll_id'] ?? 0);
+        if ($payroll_id <= 0) wp_send_json_error(['message' => 'payroll_id requerido'], 400);
+
+        // Totales por trabajador (horas)
+        $hours = HoursEntry::totalsByWorkerForPayroll($payroll_id);
+        // $hours[] = ['worker_id','worker_name','total_hours','total_amount']
+
+        // Totales por trabajador (extras)
+        $extras = ExtraPayment::totalsByWorkerForPayroll($payroll_id);
+        // $extras[] = ['worker_id','total_amount','items']
+
+        // Indexar por worker_id y unificar
+        $map = [];
+        foreach ($hours as $h) {
+            $wid = (int)$h['worker_id'];
+            $map[$wid] = [
+                'worker_id'     => $wid,
+                'worker_name'   => $h['worker_name'] ?? '',
+                'hours_hours'   => (float)$h['total_hours'],
+                'hours_amount'  => (float)$h['total_amount'],
+                'extras_amount' => 0.0,
+                'extras_items'  => 0,
+            ];
+        }
+        foreach ($extras as $e) {
+            $wid = (int)$e['worker_id'];
+            if (!isset($map[$wid])) {
+                $map[$wid] = [
+                    'worker_id'     => $wid,
+                    'worker_name'   => '',
+                    'hours_hours'   => 0.0,
+                    'hours_amount'  => 0.0,
+                    'extras_amount' => 0.0,
+                    'extras_items'  => 0,
+                ];
+            }
+            $map[$wid]['extras_amount'] = (float)$e['total_amount'];
+            $map[$wid]['extras_items']  = (int)$e['items'];
+        }
+
+        // Rellenar nombres faltantes (trabajadores que solo tienen extras)
+        $missing = array_map('intval', array_keys(array_filter($map, fn($r) => $r['worker_name'] === '')));
+        if (!empty($missing)) {
+            global $wpdb;
+            $t = $wpdb->prefix . 'mhc_workers';
+            $rows = $wpdb->get_results("SELECT id, CONCAT(first_name,' ',last_name) AS name FROM {$t} WHERE id IN (" . implode(',', array_map('intval', $missing)) . ")", ARRAY_A);
+            $names = [];
+            foreach ($rows ?: [] as $r) $names[(int)$r['id']] = (string)$r['name'];
+            foreach ($missing as $wid) {
+                if (isset($names[$wid])) $map[$wid]['worker_name'] = $names[$wid];
+            }
+        }
+
+        // Formar salida final (gran_total) y ordenar por nombre
+        $items = array_values(array_map(function ($r) {
+            $r['grand_total'] = round($r['hours_amount'] + $r['extras_amount'], 2);
+            return $r;
+        }, $map));
+        usort($items, fn($a, $b) => strcasecmp($a['worker_name'], $b['worker_name']));
+
+        // Totales globales del payroll (para el footer)
+        $sum_hours_amount  = array_sum(array_column($items, 'hours_amount'));
+        $sum_extras_amount = array_sum(array_column($items, 'extras_amount'));
+        $sum_grand_total   = $sum_hours_amount + $sum_extras_amount;
+
+        wp_send_json_success([
+            'items' => $items,
+            'totals' => [
+                'hours_amount'  => round($sum_hours_amount, 2),
+                'extras_amount' => round($sum_extras_amount, 2),
+                'grand_total'   => round($sum_grand_total, 2),
+            ],
+        ]);
+    }
+
+    public static function ajax_worker_detail()
+    {
+        self::check();
+        $payroll_id = (int)($_POST['payroll_id'] ?? 0);
+        $worker_id  = (int)($_POST['worker_id'] ?? 0);
+        if ($payroll_id <= 0 || $worker_id <= 0) wp_send_json_error(['message' => 'payroll_id y worker_id requeridos'], 400);
+
+        // Horas detalladas de ese worker en el payroll (por paciente/rol)
+        $hours = HoursEntry::listDetailedForPayroll($payroll_id, ['worker_id' => $worker_id]);
+        // Extras detallados de ese worker en el payroll
+        $extras = ExtraPayment::listDetailedForPayroll($payroll_id, ['worker_id' => $worker_id]);
+
+        // Totales
+        $th = 0.0;
+        $ta = 0.0;
+        $te = 0.0;
+        foreach ($hours as $h) {
+            $th += (float)$h->hours;
+            $ta += (float)$h->total;
+        }
+        foreach ($extras as $e) {
+            $te += (float)$e->amount;
+        }
+
+        // nombre del worker
+        $worker_name = '';
+        if (!empty($hours)) $worker_name = $hours[0]->worker_name ?? '';
+        if ($worker_name === '') {
+            global $wpdb;
+            $t = $wpdb->prefix . 'mhc_workers';
+            $worker_name = (string)$wpdb->get_var($wpdb->prepare("SELECT CONCAT(first_name,' ',last_name) FROM {$t} WHERE id=%d", $worker_id));
+        }
+
+        wp_send_json_success([
+            'worker' => [
+                'worker_id'   => $worker_id,
+                'worker_name' => $worker_name,
+            ],
+            'hours'  => $hours,   // cada item: patient_name, role_code, hours, used_rate, total...
+            'extras' => $extras,  // cada item: code, label, unit_rate, amount, notes...
+            'totals' => [
+                'total_hours'   => round($th, 2),
+                'hours_amount'  => round($ta, 2),
+                'extras_amount' => round($te, 2),
+                'grand_total'   => round($ta + $te, 2),
+            ]
+        ]);
+    }
+
+    public static function ajax_special_rates_list()
+    {
+        self::check();
+        global $wpdb;
+        $t = $wpdb->prefix . 'mhc_special_rates';
+        $q = isset($_POST['q']) ? sanitize_text_field(wp_unslash($_POST['q'])) : '';
+
+        $sql = "SELECT id, code, label, cpt_code, unit_rate FROM {$t} WHERE is_active=1";
+        $params = [];
+        if ($q !== '') {
+            $sql .= " AND (code LIKE %s OR label LIKE %s)";
+            $like = '%' . $wpdb->esc_like($q) . '%';
+            $params = [$like, $like];
+        }
+        $sql .= " ORDER BY label ASC";
+
+        $items = $params ? $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A)
+            : $wpdb->get_results($sql, ARRAY_A);
+
+        // normaliza tipos
+        foreach ($items as &$i) $i['unit_rate'] = (float)$i['unit_rate'];
+        wp_send_json_success(['items' => $items]);
+    }
+
+    public static function ajax_extras_list()
+    {
+        self::check();
+        $payroll_id = (int)($_POST['payroll_id'] ?? 0);
+        $worker_id  = (int)($_POST['worker_id'] ?? 0); // opcional: si no llega, lista todos
+        if ($payroll_id <= 0) wp_send_json_error(['message' => 'payroll_id requerido'], 400);
+
+        $filters = ['payroll_id' => $payroll_id];
+        if ($worker_id > 0) $filters['worker_id'] = $worker_id;
+
+        $rows = ExtraPayment::listDetailedForPayroll($payroll_id, $filters);
+        wp_send_json_success(['items' => $rows]);
+    }
+
+    public static function ajax_extras_create()
+    {
+        self::check();
+        $payroll_id  = (int)($_POST['payroll_id'] ?? 0);
+        $worker_id   = (int)($_POST['worker_id'] ?? 0);
+        $rate_id     = (int)($_POST['special_rate_id'] ?? 0);
+        $amount      = isset($_POST['amount']) ? round((float)$_POST['amount'], 2) : null;
+        $patient_id  = isset($_POST['patient_id']) ? (int)$_POST['patient_id'] : null; // opcional
+        $supervised  = isset($_POST['supervised_worker_id']) ? (int)$_POST['supervised_worker_id'] : null; // opcional
+        $notes       = isset($_POST['notes']) ? sanitize_text_field(wp_unslash($_POST['notes'])) : '';
+
+        if ($payroll_id <= 0 || $worker_id <= 0 || $rate_id <= 0 || $amount === null)
+            wp_send_json_error(['message' => 'payroll_id, worker_id, special_rate_id y amount son requeridos'], 400);
+
+        $id = ExtraPayment::create([
+            'payroll_id'          => $payroll_id,
+            'worker_id'           => $worker_id,
+            'special_rate_id'     => $rate_id,
+            'amount'              => $amount,
+            'patient_id'          => $patient_id,
+            'supervised_worker_id' => $supervised,
+            'notes'               => $notes,
+        ]);
+        if ($id instanceof \WP_Error) wp_send_json_error(['message' => $id->get_error_message()], 400);
+
+        // devolver lista actualizada del worker
+        $rows = ExtraPayment::listDetailedForPayroll($payroll_id, ['worker_id' => $worker_id]);
+        wp_send_json_success(['id' => (int)$id, 'items' => $rows]);
+    }
+
+    public static function ajax_extras_update()
+    {
+        self::check();
+        $id          = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) wp_send_json_error(['message' => 'id requerido'], 400);
+
+        $upd = [];
+        foreach (['payroll_id', 'worker_id', 'patient_id', 'supervised_worker_id', 'special_rate_id'] as $k) {
+            if (isset($_POST[$k])) $upd[$k] = (int)$_POST[$k];
+        }
+        if (isset($_POST['amount'])) $upd['amount'] = round((float)$_POST['amount'], 2);
+        if (isset($_POST['notes']))  $upd['notes']  = sanitize_text_field(wp_unslash($_POST['notes']));
+
+        if (empty($upd)) wp_send_json_error(['message' => 'Nada para actualizar'], 400);
+
+        $ok = ExtraPayment::update($id, $upd);
+        if ($ok instanceof \WP_Error || !$ok) wp_send_json_error(['message' => 'No se pudo actualizar'], 500);
+
+        // devolver el registro actualizado
+        global $wpdb;
+        $t = $wpdb->prefix . 'mhc_extra_payments';
+        $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$t} WHERE id=%d", $id));
+        wp_send_json_success(['updated' => true, 'item' => $row]);
+    }
+
+    public static function ajax_extras_delete()
+    {
+        self::check();
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) wp_send_json_error(['message' => 'id requerido'], 400);
+
+        $ok = ExtraPayment::delete($id);
+        if ($ok instanceof \WP_Error || !$ok) wp_send_json_error(['message' => 'No se pudo eliminar'], 500);
+        wp_send_json_success(['deleted' => (int)$id]);
     }
 }
