@@ -196,8 +196,7 @@
                     empty-text="No extras"
                 >
                   <el-table-column prop="worker_name" label="Worker" min-width="160" show-overflow-tooltip />
-                  <el-table-column prop="code" label="Rate code" width="120" />
-                  <el-table-column prop="label" label="Rate label" min-width="160" show-overflow-tooltip />
+                  <el-table-column prop="label" label="Rate" min-width="160" show-overflow-tooltip />
                   <el-table-column prop="amount" label="Amount" width="120">
                     <template #default="{ row }">{{ money(row.amount) }}</template>
                   </el-table-column>
@@ -866,9 +865,11 @@ function openAddExtra() {
   modals.extra.form = {
     id: null,
     worker_id: null,
+    worker_name: null,
     special_rate_id: null,
     amount: null,
     patient_id: selectedPatient.value?.patient_id || null,
+    patient_name: selectedPatient.value?.patient_name || null,
     supervised_worker_id: null,
     notes: ''
   }
@@ -879,9 +880,11 @@ function editExtra(row) {
   modals.extra.form = {
     id: row.id,
     worker_id: row.worker_id,
+    worker_name: row.worker_name,
     special_rate_id: row.special_rate_id,
     amount: Number(row.amount || 0),
     patient_id: row.patient_id || null,
+    patient_name: row.patient_name || null,
     supervised_worker_id: row.supervised_worker_id || null,
     notes: row.notes || ''
   }
@@ -939,7 +942,7 @@ async function searchRates(q) {
   try {
     const res = await ajaxPostForm('mhc_special_rates_list', { q })
     ratesOptions.value = (res?.items || []).map(i => ({
-      value: i.id, label: `${i.code} — ${i.label} ($${Number(i.unit_rate).toFixed(2)})`
+      value: i.id, label: `${i.label} ($${Number(i.unit_rate).toFixed(2)})`
     }))
   } catch (_) {}
 }

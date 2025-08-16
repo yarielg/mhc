@@ -17,6 +17,16 @@ class ExtraPayment
         return $wpdb->prefix . 'mhc_special_rates';
     }
 
+    private static function tableW(): string {
+        global $wpdb;
+        return $wpdb->prefix . 'mhc_workers';
+    }
+
+    private static function tableP(): string {
+        global $wpdb;
+        return $wpdb->prefix . 'mhc_patients';
+    }
+
     private static function now(): string {
         return current_time('mysql');
     }
@@ -302,6 +312,8 @@ class ExtraPayment
         global $wpdb;
         $t  = self::table();
         $sr = self::tableSR();
+        $w = self::tableW();
+        $p = self::tableP();
         $where  = ["ep.payroll_id=%d"];
         $params = [$payrollId];
 
@@ -328,9 +340,11 @@ class ExtraPayment
 
         $sql = "
             SELECT ep.*,
-                   sr.code, sr.label, sr.unit_rate
+                   sr.code, sr.label, sr.unit_rate, CONCAT_WS(' ',w.first_name, w.last_name) as worker_name, CONCAT_WS(' ',p.first_name, p.last_name) as patient_name
             FROM {$t} ep
             JOIN {$sr} sr ON sr.id = ep.special_rate_id
+            JOIN {$w} w ON ep.worker_id = w.id
+             JOIN {$p} p ON ep.patient_id = p.id
             WHERE " . implode(' AND ', $where) . "
             ORDER BY ep.id DESC
         ";
