@@ -1,3 +1,12 @@
 body{
     padding: 0;
 }
+
+#wpadminbar{
+    display: none !important;
+}
+
+#vwp-plugin{
+    position: relative;
+    top: -34px;
+}

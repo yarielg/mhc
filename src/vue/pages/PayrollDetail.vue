@@ -308,16 +308,24 @@
     <el-dialog v-model="modals.extra.visible" :title="modals.extra.editing ? 'Edit extra' : 'Add extra'" width="620px" destroy-on-close>
       <el-form :model="modals.extra.form" label-width="160px">
         <el-form-item label="Worker">
-          <el-select-v2
+
+          <el-select
               v-model="modals.extra.form.worker_id"
-              placeholder="Search worker…"
-              style="width: 100%"
               filterable
               remote
+              clearable
+              placeholder="Type a name..."
+              :loading="loading.workers"
               :remote-method="searchWorkers"
-              :options="workersOptions"
-              :disabled="payroll.status === 'finalized'"
-          />
+              style="width:100%;"
+          >
+            <el-option
+                v-for="opt in workersOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="Special rate">
@@ -338,15 +346,25 @@
         </el-form-item>
 
         <el-form-item label="Patient (optional)">
+
           <el-select
               v-model="modals.extra.form.patient_id"
-              placeholder="(Optional) link to patient"
+              filterable
+              remote
               clearable
-              style="width: 100%"
-              :disabled="payroll.status === 'finalized'"
+              placeholder="Type a name..."
+              :loading="loading.patients"
+              :remote-method="searchPatients"
+              style="width:100%;"
           >
-            <el-option v-for="p in patients" :key="p.patient_id" :label="p.patient_name" :value="p.patient_id" />
+            <el-option
+                v-for="opt in patientsOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+            />
           </el-select>
+
         </el-form-item>
 
         <el-form-item label="Supervised worker (optional)">
@@ -528,6 +546,7 @@ const modals = reactive({
   },
   extra: {
     visible: false,
+    loading: false,
     editing: false,
     form: { id: null, worker_id: null, special_rate_id: null, amount: null, patient_id: null, supervised_worker_id: null, notes: '' },
   },
@@ -542,6 +561,7 @@ const modals = reactive({
 
 /* Lookups for remote selects (workers, rates, roles) */
 const workersOptions = ref([])  // [{value:id, label:name}]
+const patientsOptions = ref([])  // [{value:id, label:name}]
 const ratesOptions = ref([])
 const roles = ref([])
 
@@ -892,23 +912,19 @@ function editExtra(row) {
   if (row.worker_id) {
     // If worker_id is present, we assume it's a valid worker
     let label = row.worker_name
-    if (!label && row.first_name) label = row.first_name + (row.last_name ? (' ' + row.last_name) : '')
-    if (!label && row.last_name) label = row.last_name
-    if (!label) label = String(row.worker_id)
     workersOptions.value = [{ value: row.worker_id, label }]
   }
+
+
   // If patient_id is present, we assume it's a valid patient
   if (row.patient_id) {
+
     // Pre-fill patient select with correct label
     let label = row.patient_name
-    if (!label && row.first_name) label = row.first_name + (row.last_name ? (' ' + row.last_name) : '')
-    if (!label && row.last_name) label = row.last_name
-    if (!label) label = String(row.patient_id)
-    // Solo agregar si no está presente
-    if (!patients.value.some(p => p.patient_id === row.patient_id)) {
-      patients.value.push({ patient_id: row.patient_id, patient_name: label })
-    }
+    patientsOptions.value = [{ value: row.patient_id, label }]
   }
+
+
     // If supervised_worker_id is present, pre-fill with correct label
     if (row.supervised_worker_id) {
       let label = row.supervised_worker_name
@@ -977,11 +993,23 @@ async function searchRates(q) {
 }
 // Adjust this action name to your existing worker search endpoint.
 async function searchWorkers(q) {
+  loading.workers = true
   try {
     // Example expected response shape: { items: [{ id, name }] }
-    const res = await ajaxPostForm('mhc_workers_list', { q, limit: 20 }) // <-- change if needed
+    const res = await ajaxPostForm('mhc_workers_list', { 'search': q, limit: 20 }) // <-- change if needed
     workersOptions.value = (res?.items || []).map(w => ({ value: w.id, label: w.first_name + ' ' + w.last_name }))
   } catch (_) {}
+  loading.workers = false
+}
+
+async function searchPatients(q) {
+  try {
+    loading.patients = true;
+    // Example expected response shape: { items: [{ id, name }] }
+    const res = await ajaxPostForm('mhc_patients_list', { 'search': q, limit: 20 }) // <-- change if needed
+    patientsOptions.value = (res?.items || []).map(p => ({ value: p.id, label: p.first_name + ' ' + p.last_name }))
+  } catch (_) {}
+  loading.patients = false;
 }
 
 /* ======= Summary & slip ======= */
