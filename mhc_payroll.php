@@ -23,6 +23,13 @@ if( file_exists( dirname( __FILE__ ) . '/vendor/autoload.php') ){
     require_once  dirname( __FILE__ ) . '/vendor/autoload.php';
 }
 
+// global constants for AJAX controllers
+if (!defined('MHC_DEFAULT_CAPABILITY')) {
+    define('MHC_DEFAULT_CAPABILITY', 'manage_options');
+}
+if (!defined('MHC_DEFAULT_NONCE_ACTION')) {
+    define('MHC_DEFAULT_NONCE_ACTION', 'mhc_ajax');
+}
 define('MHC_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
 define('MHC_PLUGIN_URL' , plugin_dir_url(  __FILE__  ) );
 define('MHC_ADMIN_URL' , get_admin_url() );
