@@ -889,9 +889,38 @@ function editExtra(row) {
     notes: row.notes || ''
   }
   // Pre-fill dropdowns caches
-  if (row.worker_id && row.first_name) {
-    workersOptions.value = [{ value: row.worker_id, label: row.first_name }]
+  if (row.worker_id) {
+    // If worker_id is present, we assume it's a valid worker
+    let label = row.worker_name
+    if (!label && row.first_name) label = row.first_name + (row.last_name ? (' ' + row.last_name) : '')
+    if (!label && row.last_name) label = row.last_name
+    if (!label) label = String(row.worker_id)
+    workersOptions.value = [{ value: row.worker_id, label }]
   }
+  // If patient_id is present, we assume it's a valid patient
+  if (row.patient_id) {
+    // Pre-fill patient select with correct label
+    let label = row.patient_name
+    if (!label && row.first_name) label = row.first_name + (row.last_name ? (' ' + row.last_name) : '')
+    if (!label && row.last_name) label = row.last_name
+    if (!label) label = String(row.patient_id)
+    // Solo agregar si no está presente
+    if (!patients.value.some(p => p.patient_id === row.patient_id)) {
+      patients.value.push({ patient_id: row.patient_id, patient_name: label })
+    }
+  }
+    // If supervised_worker_id is present, pre-fill with correct label
+    if (row.supervised_worker_id) {
+      let label = row.supervised_worker_name
+      if (!label && row.supervised_first_name) label = row.supervised_first_name + (row.supervised_last_name ? (' ' + row.supervised_last_name) : '')
+      if (!label && row.supervised_last_name) label = row.supervised_last_name
+      if (!label) label = String(row.supervised_worker_id)
+      // Solo agregar si no está presente
+      if (!workersOptions.value.some(w => w.value === row.supervised_worker_id)) {
+        workersOptions.value.push({ value: row.supervised_worker_id, label })
+      }
+    }
+
   if (row.special_rate_id && row.label) {
     ratesOptions.value = [{ value: row.special_rate_id, label: `${row.code} — ${row.label}` }]
   }
