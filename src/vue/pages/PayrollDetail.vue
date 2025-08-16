@@ -2,7 +2,7 @@
   <div class="wp-wrap">
     <!-- Breadcrumb -->
     <el-breadcrumb separator="›" class="mb-3">
-      <el-breadcrumb-item @click="$router.push('/')" class="cursor">Payrolls</el-breadcrumb-item>
+      <el-breadcrumb-item @click="$router.push('/payrolls')" class="cursor">Payrolls</el-breadcrumb-item>
       <el-breadcrumb-item>#{{ id }}</el-breadcrumb-item>
     </el-breadcrumb>
 
