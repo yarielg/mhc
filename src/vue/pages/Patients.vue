@@ -388,6 +388,21 @@ async function submit() {
     return
   }
 
+  // Validación: debe haber al menos un worker con rol RBT y uno con rol BCBA
+  const assignments = (form.assignments || []).filter(a => a.worker_id && a.role_id)
+  const hasRBT = assignments.some(a => {
+    const role = a._rolesForWorker?.find(r => r.role_id === a.role_id)
+    return role && (role.role_code === 'RBT' || role.role_name === 'RBT')
+  })
+  const hasBCBA = assignments.some(a => {
+    const role = a._rolesForWorker?.find(r => r.role_id === a.role_id)
+    return role && (role.role_code === 'BCBA' || role.role_name === 'BCBA')
+  })
+  if (!hasRBT || !hasBCBA) {
+    ElMessage.error('You must assign at least one worker with role RBT and one with role BCBA.')
+    return
+  }
+
   try {
     state.saving = true
     const fd = new FormData()
@@ -405,13 +420,11 @@ async function submit() {
     fd.append('is_active', form.is_active)
 
     // Prepare assignments payload (new patients only for now)
-    const cleanAssignments = (form.assignments || [])
-        .filter(a => a.worker_id && a.role_id)
-        .map(a => ({
-          worker_id: Number(a.worker_id),
-          role_id: Number(a.role_id),
-          rate: a.rate != null ? Number(a.rate) : null,
-        }))
+    const cleanAssignments = assignments.map(a => ({
+      worker_id: Number(a.worker_id),
+      role_id: Number(a.role_id),
+      rate: a.rate != null ? Number(a.rate) : null,
+    }))
     fd.append('assignments', JSON.stringify(cleanAssignments))
 
     const { data } = await axios.post(parameters.ajax_url, fd)

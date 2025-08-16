@@ -9,10 +9,12 @@ namespace Mhc\Inc\Controllers;
 
 use Mhc\Inc\Models\Worker;
 
-class WorkersController {
+class WorkersController
+{
 
 
-    public function register() {
+    public function register()
+    {
         add_action('wp_ajax_mhc_workers_list',    [$this, 'list']);
         add_action('wp_ajax_mhc_workers_create',  [$this, 'create']);
         add_action('wp_ajax_mhc_workers_update',  [$this, 'update']);
@@ -25,7 +27,8 @@ class WorkersController {
         add_action('wp_ajax_mhc_worker_roles_by_worker', [$this, 'rolesForWorker']);
     }
 
-    public static function getById() {
+    public static function getById()
+    {
         self::check();
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) wp_send_json_error(['message' => 'Invalid id'], 400);
@@ -42,7 +45,8 @@ class WorkersController {
         mhc_check_ajax_access();
     }
 
-    public static function list() {
+    public static function list()
+    {
         self::check();
         $page     = max(1, intval($_POST['page'] ?? 1));
         $per_page = min(100, max(1, intval($_POST['per_page'] ?? 10)));
@@ -56,7 +60,8 @@ class WorkersController {
         ]);
     }
 
-    public static function create() {
+    public static function create()
+    {
         self::check();
         $data = [
             'first_name'   => sanitize_text_field(wp_unslash($_POST['first_name'] ?? '')),
@@ -84,7 +89,8 @@ class WorkersController {
         wp_send_json_success(['item' => $item]);
     }
 
-    public static function update() {
+    public static function update()
+    {
         self::check();
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) wp_send_json_error(['message' => 'Invalid id'], 400);
@@ -118,7 +124,8 @@ class WorkersController {
         wp_send_json_success(['item' => $item]);
     }
 
-    public static function delete() {
+    public static function delete()
+    {
         self::check();
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) wp_send_json_error(['message' => 'Invalid id'], 400);
@@ -129,7 +136,8 @@ class WorkersController {
         wp_send_json_success(['id' => $id]);
     }
 
-    public static function rolesForWorker() {
+    public static function rolesForWorker()
+    {
         self::check();
         global $wpdb;
         $pfx = $wpdb->prefix;
@@ -143,6 +151,7 @@ class WorkersController {
         $sql = "
       SELECT wr.role_id,
              r.name AS role_name,
+             r.code AS role_code,
              wr.general_rate
       FROM $wr AS wr
       INNER JOIN (
@@ -161,7 +170,8 @@ class WorkersController {
         wp_send_json_success(['roles' => $roles]);
     }
 
-    public static function searchForRole() {
+    public static function searchForRole()
+    {
         self::check();
         global $wpdb;
         $pfx = $wpdb->prefix;
@@ -174,7 +184,9 @@ class WorkersController {
         if ($term !== '') {
             $like = '%' . $wpdb->esc_like($term) . '%';
             $where .= " AND (first_name LIKE %s OR last_name LIKE %s OR CONCAT(first_name,' ',last_name) LIKE %s)";
-            $params[] = $like; $params[] = $like; $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
         }
 
         $rows = $wpdb->get_results(
@@ -186,7 +198,8 @@ class WorkersController {
     }
 
     // NEW: autocomplete for supervisors
-    public static function search() {
+    public static function search()
+    {
         self::check();
         $q         = isset($_POST['q']) ? sanitize_text_field(wp_unslash($_POST['q'])) : '';
         $excludeId = (int)($_POST['exclude_id'] ?? 0);
