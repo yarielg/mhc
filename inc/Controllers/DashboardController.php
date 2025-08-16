@@ -24,12 +24,10 @@ class DashboardController {
 
     /** Security */
     protected static function check() {
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mhc_ajax')) {
-            wp_send_json_error(['message' => 'Invalid nonce'], 403);
+        if (!function_exists('mhc_check_ajax_access')) {
+            require_once dirname(__DIR__, 2) . '/util/helpers.php';
         }
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error(['message' => 'Permission denied'], 403);
-        }
+        mhc_check_ajax_access();
     }
 
     /** Helpers */

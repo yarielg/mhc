@@ -11,8 +11,6 @@ use Mhc\Inc\Models\Worker;
 
 class WorkersController {
 
-    const NONCE_ACTION = 'mhc_ajax';
-    const CAPABILITY   = 'manage_options'; // ajusta si usas otra cap
 
     public function register() {
         add_action('wp_ajax_mhc_workers_list',    [$this, 'list']);
@@ -38,13 +36,10 @@ class WorkersController {
 
     private static function check()
     {
-        if (!current_user_can(self::CAPABILITY)) {
-            wp_send_json_error(['message' => 'Unauthorized'], 403);
+        if (!function_exists('mhc_check_ajax_access')) {
+            require_once dirname(__DIR__, 2) . '/util/helpers.php';
         }
-        $nonce = $_REQUEST['_wpnonce'] ?? ($_REQUEST['nonce'] ?? '');
-        if (!wp_verify_nonce($nonce, self::NONCE_ACTION)) {
-            wp_send_json_error(['message' => 'Invalid nonce'], 403);
-        }
+        mhc_check_ajax_access();
     }
 
     public static function list() {

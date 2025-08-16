@@ -13,10 +13,7 @@ if (!defined('ABSPATH')) exit;
 
 class PayrollController
 {
-    const NONCE_ACTION = 'mhc_ajax';
-    const CAPABILITY   = 'manage_options'; // ajusta si usas otra cap
-
-    /** Llama esto en tu bootstrap: \Mhc\Inc\Controllers\PayrollController::register(); */
+    
     public static function register()
     {
         // Payroll CRUD básico
@@ -59,13 +56,10 @@ class PayrollController
 
     private static function check()
     {
-        if (!current_user_can(self::CAPABILITY)) {
-            wp_send_json_error(['message' => 'Unauthorized'], 403);
+        if (!function_exists('mhc_check_ajax_access')) {
+            require_once dirname(__DIR__, 2) . '/util/helpers.php';
         }
-        $nonce = $_REQUEST['_wpnonce'] ?? ($_REQUEST['nonce'] ?? '');
-        if (!wp_verify_nonce($nonce, self::NONCE_ACTION)) {
-            wp_send_json_error(['message' => 'Invalid nonce'], 403);
-        }
+        mhc_check_ajax_access();
     }
 
     private static function json_input(): array
