@@ -344,13 +344,13 @@ class ExtraPayment
             SELECT ep.*,
                    sr.code, sr.label, sr.unit_rate,
                    CONCAT_WS(' ',w.first_name, w.last_name) as worker_name,
-                   CONCAT_WS(' ',p.first_name, p.last_name) as patient_name,
-                   CONCAT_WS(' ',sw.first_name, sw.last_name) as supervised_worker_name
+                   IFNULL(CONCAT_WS(' ',p.first_name, p.last_name), '') as patient_name,
+                   IFNULL(CONCAT_WS(' ',sw.first_name, sw.last_name), '') as supervised_worker_name
             FROM {$t} ep
             JOIN {$sr} sr ON sr.id = ep.special_rate_id
             JOIN {$w} w ON ep.worker_id = w.id
-            JOIN {$p} p ON ep.patient_id = p.id
-            LEFT JOIN {$sw} sw ON ep.supervised_worker_id = sw.id
+            LEFT JOIN {$p} p ON ep.patient_id = p.id AND ep.patient_id IS NOT NULL AND ep.patient_id != 0
+            LEFT JOIN {$sw} sw ON ep.supervised_worker_id = sw.id AND ep.supervised_worker_id IS NOT NULL AND ep.supervised_worker_id != 0
             WHERE " . implode(' AND ', $where) . "
             ORDER BY ep.id DESC
         ";

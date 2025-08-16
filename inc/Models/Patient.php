@@ -41,7 +41,7 @@ class Patient {
         );
         foreach ($rows as &$row) {
             $row['assignments'] = $wpdb->get_results(
-                $wpdb->prepare("SELECT worker_id, role_id, rate FROM $wpr WHERE patient_id=%d", $row['id']),
+                $wpdb->prepare("SELECT worker_id, role_id, rate FROM $wpr WHERE patient_id=%d AND end_date IS NULL", $row['id']),
                 ARRAY_A
             );
         }
