@@ -16,6 +16,7 @@ final class Init{
             Controllers\SpecialRatesController::class,
             Controllers\DashboardController::class,
             Controllers\PayrollController::class,
+            Controllers\PdfController::class,
 
             //Base\Ajax::class,
         ];
