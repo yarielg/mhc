@@ -146,7 +146,7 @@
                               size="small"
                               :disabled="payroll.status === 'finalized'"
                               @input="onHoursInput(row)"
-                          @change="onHoursChange(row)"
+                              @change="onHoursChange(row)"
                           />
                           <span v-if="wprSaving[getWprId(row)]" class="text-xs text-gray-600 ml-2">Saving…</span>
                           <span v-else-if="wprSavedTick[getWprId(row)]" class="text-xs" style="color:#16a34a">Saved</span>
@@ -353,7 +353,7 @@
         </el-form-item>
 
         <el-form-item label="Amount">
-          <el-input-number v-model="modals.extra.form.amount" :min="0" :step="1" :precision="2" style="width: 100%" :disabled="payroll.status === 'finalized'" />
+          <el-input-number v-model="modals.extra.form.amount" :min="0" :step="1" :precision="2" style="width: 100%" :disabled="payroll.status === 'finalized' || amountLocked" />
         </el-form-item>
 
         <el-form-item label="Patient (optional)">
@@ -441,7 +441,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, computed } from 'vue'
+import { onMounted, reactive, ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {User, Message,View, Delete, Edit} from "@element-plus/icons-vue";
 
@@ -578,6 +578,22 @@ const workersOptions = ref([])  // [{value:id, label:name}]
 const patientsOptions = ref([])  // [{value:id, label:name}]
 const ratesOptions = ref([])
 const roles = ref([])
+/* ======= Special rate → Amount auto/lock ======= */
+const selectedRate = computed(() => {
+  const rid = Number(modals.extra.form?.special_rate_id || 0)
+  return (ratesOptions.value || []).find(r => Number(r.value) === rid) || null
+})
+const amountLocked = computed(() => {
+  const r = selectedRate.value
+  return !!(r && Number(r.unit_rate || 0) !== 0)
+})
+watch(() => modals.extra.form?.special_rate_id, () => {
+  const r = selectedRate.value
+  if (r && Number(r.unit_rate || 0) !== 0) {
+    modals.extra.form.amount = Math.abs(Number(r.unit_rate) || 0) // force positive
+  }
+})
+
 
 /* ======= Utils ======= */
 function fmtDate(d) { return d ? d.toString().slice(0, 10) : '—' }
@@ -911,12 +927,13 @@ function openAddExtra() {
 }
 function editExtra(row) {
   modals.extra.editing = true
+
   modals.extra.form = {
     id: row.id,
     worker_id: row.worker_id,
     worker_name: row.worker_name,
     special_rate_id: row.special_rate_id,
-    amount: Number(row.amount || 0),
+    amount: Math.abs(Number(row.amount || 0)),
     patient_id: row.patient_id || null,
     patient_name: row.patient_name || null,
     supervised_worker_id: row.supervised_worker_id || null,
@@ -939,22 +956,23 @@ function editExtra(row) {
   }
 
 
-    // If supervised_worker_id is present, pre-fill with correct label
-    if (row.supervised_worker_id) {
-      let label = row.supervised_worker_name
-      if (!label && row.supervised_first_name) label = row.supervised_first_name + (row.supervised_last_name ? (' ' + row.supervised_last_name) : '')
-      if (!label && row.supervised_last_name) label = row.supervised_last_name
-      if (!label) label = String(row.supervised_worker_id)
-      // Solo agregar si no está presente
-      if (!workersOptions.value.some(w => w.value === row.supervised_worker_id)) {
-        workersOptions.value.push({ value: row.supervised_worker_id, label })
-      }
+  // If supervised_worker_id is present, pre-fill with correct label
+  if (row.supervised_worker_id) {
+    let label = row.supervised_worker_name
+    if (!label && row.supervised_first_name) label = row.supervised_first_name + (row.supervised_last_name ? (' ' + row.supervised_last_name) : '')
+    if (!label && row.supervised_last_name) label = row.supervised_last_name
+    if (!label) label = String(row.supervised_worker_id)
+    // Solo agregar si no está presente
+    if (!workersOptions.value.some(w => w.value === row.supervised_worker_id)) {
+      workersOptions.value.push({ value: row.supervised_worker_id, label })
     }
+  }
 
   if (row.special_rate_id && row.label) {
     ratesOptions.value = [{ value: row.special_rate_id, label: `${row.code} — ${row.label}` }]
   }
   modals.extra.visible = true
+
 }
 async function saveExtra() {
   const f = modals.extra.form
@@ -1001,7 +1019,10 @@ async function searchRates(q) {
   try {
     const res = await ajaxPostForm('mhc_special_rates_list', { q })
     ratesOptions.value = (res?.items || []).map(i => ({
-      value: i.id, label: `${i.label} ($${Number(i.unit_rate).toFixed(2)})`
+      value: Number(i.id),
+      label: `${i.label} ($${Number(i.unit_rate || 0).toFixed(2)})`,
+      unit_rate: Number(Math.abs(i.unit_rate) || 0),
+      code: i.code || null
     }))
   } catch (_) {}
 }
