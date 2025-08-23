@@ -250,15 +250,19 @@
                   </el-table-column>
                   <el-table-column label="Slip" width="120" fixed="right">
                     <template #default="{ row }">
-                      <el-button size="small" @click="openWorkerSlip(row)">
-                        <el-icon><View /></el-icon>
-                      </el-button>
-
-                      <el-button  size="small"
-                                  :loading="sendingSlip[row.worker_id]"
-                                  @click.stop="sendWorkerSlip(row)" >
-                        <el-icon class="mr-2"><Message /></el-icon>
-                      </el-button>
+                        <div style="display: flex; flex-direction: row; align-items: center;">
+                          <el-button size="small" @click="openWorkerSlip(row)">
+                            <el-icon><View /></el-icon>
+                          </el-button>
+                          <el-button  size="small"
+                                      :loading="sendingSlip[row.worker_id]"
+                                      @click.stop="sendWorkerSlip(row)" >
+                            <el-icon class=""><Message /></el-icon>
+                          </el-button>
+                          <el-button size="small" @click.stop="downloadWorkerSlip(row)">
+                            <el-icon class=""><Download /></el-icon>
+                          </el-button>
+                        </div>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -443,7 +447,7 @@
 <script setup>
 import { onMounted, reactive, ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {User, Message,View, Delete, Edit} from "@element-plus/icons-vue";
+import {User, Message,View, Delete, Edit, Download} from "@element-plus/icons-vue";
 
 const sendingSlip = reactive({});
 
@@ -1151,6 +1155,26 @@ async function sendWorkerSlip(row) {
     sendingSlip[wid] = false;
   }
 }
+
+function downloadWorkerSlip(row) {
+  const payrollId = typeof id !== 'undefined' ? id : (props?.id || null);
+  if (!payrollId || !row?.worker_id) return;
+  
+  const ajaxUrl = (typeof parameters !== 'undefined' && parameters?.ajax_url)
+    ? parameters.ajax_url
+    : (window.ajaxurl || '/wp-admin/admin-ajax.php');
+
+  const url = new URL(ajaxUrl, window.location.origin);
+  url.searchParams.set('action', 'mhc_worker_slip_pdf');
+  url.searchParams.set('payroll_id', payrollId);
+  url.searchParams.set('worker_id', row.worker_id);
+  if (typeof parameters !== 'undefined' && parameters?.nonce) {
+    url.searchParams.set('nonce', parameters.nonce);
+  }
+  
+  window.open(url.toString(), '_blank');
+}
+
 </script>
 
 <style scoped>
