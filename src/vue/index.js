@@ -5,7 +5,13 @@ import App from './App.vue'
 import router from './router'
 import TopMenu from './components/TopMenu.vue'
 
+import 'element-plus/theme-chalk/dark/css-vars.css'
+
 import './styles.css'
+
+
+
+document.documentElement.classList.add('dark') // force dark mode
 
 
 const app = createApp(App)

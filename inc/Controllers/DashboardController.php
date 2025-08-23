@@ -6,6 +6,15 @@ class DashboardController {
     /** Register AJAX routes */
     public function register() {
         add_action('wp_ajax_mhc_dashboard_get',   [$this, 'get']);
+
+
+        // === ADD inside register() ===
+        add_action('wp_ajax_mhc_dashboard_metrics', [__CLASS__, 'ajax_dashboard_metrics']);
+// If you need the charts for non-admin logged-in users, optionally expose nopriv:
+        add_action('wp_ajax_nopriv_mhc_dashboard_metrics', [__CLASS__, 'ajax_dashboard_metrics']);
+
+// Localize a nonce for the admin script that runs Dashboard.vue
+        add_action('admin_enqueue_scripts', [__CLASS__, 'localize_dashboard_nonce']);
     }
 
     /** Core handler: aggregated dashboard payload */
@@ -15,7 +24,6 @@ class DashboardController {
         $payload = [
             'generated_at' => current_time('mysql'),
             'stats'        => $this->stats(),
-            'alerts'       => $this->alerts(),
             'quick'        => $this->quick(),
             'recent'       => $this->recent(),
         ];
@@ -131,93 +139,7 @@ class DashboardController {
         return $out;
     }
 
-    /**
-     * Alerts:
-     *  - Over 30h same patient within latest payroll (if exists) or last 14d fallback.
-     *  - Negative extra payments (amount < 0) in that period.
-     */
-    protected function alerts() {
-        global $wpdb; $pfx = $wpdb->prefix;
 
-        $payrolls    = "{$pfx}mhc_payrolls";
-        $hours       = "{$pfx}mhc_hours_entries";
-        $extras      = "{$pfx}mhc_extra_payments";
-        $assignments = "{$pfx}mhc_patient_workers";
-        $patients    = "{$pfx}mhc_patients";
-        $workers     = "{$pfx}mhc_workers";
-
-        $alerts = ['over30h' => [], 'negAdjustments' => []];
-
-        $haveHours  = $this->tableExists($hours);
-        $haveExtras = $this->tableExists($extras);
-
-        if (!$haveHours && !$haveExtras) return $alerts;
-
-        $latestPayrollId = null;
-        if ($this->tableExists($payrolls)) {
-            $latestPayrollId = (int) $wpdb->get_var("SELECT id FROM {$payrolls} ORDER BY start_date DESC LIMIT 1");
-        }
-
-        // --- Over 30h (by worker & patient)
-        if ($haveHours) {
-            // We need to join hours -> assignments to fetch worker & patient names.
-            $joins = [];
-            $joins[] = "LEFT JOIN {$assignments} ap ON ap.id = h.worker_patient_role_id";
-            if ($this->tableExists($workers))  $joins[] = "LEFT JOIN {$workers}  w ON w.id = ap.worker_id";
-            if ($this->tableExists($patients)) $joins[] = "LEFT JOIN {$patients} pa ON pa.id = ap.patient_id";
-            $joinSql = implode("\n", $joins);
-
-            // Window filter: latest payroll OR last 14 days via created_at
-            $where = $latestPayrollId
-                ? $wpdb->prepare("h.payroll_id = %d", $latestPayrollId)
-                : "h.created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)";
-
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $over = $wpdb->get_results("
-                SELECT
-                  ap.worker_id,
-                  ap.patient_id,
-                  TRIM(CONCAT(COALESCE(w.first_name,''),' ',COALESCE(w.last_name,''))) AS worker_name,
-                  COALESCE(pa.first_name,'') AS patient_first,
-                  COALESCE(pa.last_name,'')  AS patient_last,
-                  SUM(h.hours) AS hours
-                FROM {$hours} h
-                {$joinSql}
-                WHERE {$where}
-                GROUP BY ap.worker_id, ap.patient_id, worker_name, patient_first, patient_last
-                HAVING SUM(h.hours) > 30
-                ORDER BY hours DESC
-            ", ARRAY_A) ?: [];
-
-            foreach ($over as $row) {
-                $alerts['over30h'][] = [
-                    'worker'  => $row['worker_name'] ?: ('Worker #'.$row['worker_id']),
-                    'patient' => trim(($row['patient_first'] ?? '').' '.($row['patient_last'] ?? '')) ?: ('Patient #'.$row['patient_id']),
-                    'hours'   => (float) $row['hours'],
-                ];
-            }
-        }
-
-        // --- Negative adjustments from extras
-        if ($haveExtras) {
-            $whereExtras = $latestPayrollId
-                ? $wpdb->prepare("e.payroll_id = %d", $latestPayrollId)
-                : "e.created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)";
-
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $neg = $wpdb->get_results("
-                SELECT e.id, e.worker_id, e.patient_id, e.amount, e.notes AS note
-                FROM {$extras} e
-                WHERE {$whereExtras} AND e.amount < 0
-                ORDER BY e.id DESC
-                LIMIT 20
-            ", ARRAY_A) ?: [];
-
-            $alerts['negAdjustments'] = $neg;
-        }
-
-        return $alerts;
-    }
 
     /** Quick metrics (cards) */
     protected function quick() {
@@ -320,7 +242,7 @@ class DashboardController {
                 ));
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                 $sum += (float) $wpdb->get_var($wpdb->prepare(
-                    "SELECT COALESCE(SUM(amount),0) FROM {$extras} WHERE payroll_id = %d", $pidmc
+                    "SELECT COALESCE(SUM(amount),0) FROM {$extras} WHERE payroll_id = %d", $pid
                 ));
             }
 
@@ -331,5 +253,118 @@ class DashboardController {
         }
 
         return $out;
+    }
+
+    public static function localize_dashboard_nonce(): void {
+        $handle = 'mhc-admin'; // change if your admin app uses a different script handle
+        if (wp_script_is($handle, 'enqueued') || wp_script_is($handle, 'registered')) {
+            wp_localize_script($handle, 'MHC_AJAX_NONCE', wp_create_nonce(self::NONCE_ACTION));
+        } else {
+            // Fallback: make it available anyway
+            $nonce = wp_create_nonce(self::NONCE_ACTION);
+            wp_add_inline_script('jquery-core', 'window.MHC_AJAX_NONCE = "'.$nonce.'";', 'before');
+        }
+    }
+
+    public static function ajax_dashboard_metrics(): void
+    {
+        if (!is_user_logged_in()) {
+            wp_send_json_error(['message' => 'Unauthorized'], 403);
+        }
+        self::check();
+
+        global $wpdb;
+        $pfx = $wpdb->prefix;
+
+        $t_payrolls       = $pfx . 'mhc_payrolls';
+        $t_hours_entries  = $pfx . 'mhc_hours_entries';
+        $t_extra_payments = $pfx . 'mhc_extra_payments';
+        $t_wpr            = $pfx . 'mhc_worker_patient_roles';
+        $t_workers        = $pfx . 'mhc_workers';
+        $t_roles          = $pfx . 'mhc_roles';
+        $t_special_rates  = $pfx . 'mhc_special_rates';
+
+        // 1) Last 10 payroll totals
+        $sql_payroll_totals = "
+        SELECT p.id, p.start_date, p.end_date,
+               COALESCE(SUM(he.total), 0) AS hours_total,
+               COALESCE((SELECT SUM(ep.amount) FROM {$t_extra_payments} ep WHERE ep.payroll_id = p.id), 0) AS extras_total
+        FROM {$t_payrolls} p
+        LEFT JOIN {$t_hours_entries} he ON he.payroll_id = p.id
+        GROUP BY p.id, p.start_date, p.end_date
+        ORDER BY p.id DESC
+        LIMIT 10
+    ";
+        $rows_totals = $wpdb->get_results($sql_payroll_totals, ARRAY_A) ?: [];
+
+        // 2) Stacked totals by role for those payrolls
+        $sql_role_totals = "
+        SELECT he.payroll_id, r.code AS role_code, COALESCE(SUM(he.total), 0) AS role_total
+        FROM {$t_hours_entries} he
+        JOIN {$t_wpr} wpr ON wpr.id = he.worker_patient_role_id
+        JOIN {$t_roles} r ON r.id = wpr.role_id
+        WHERE he.payroll_id IN (SELECT id FROM {$t_payrolls} ORDER BY id DESC LIMIT 10)
+        GROUP BY he.payroll_id, r.code
+    ";
+        $rows_role_totals = $wpdb->get_results($sql_role_totals, ARRAY_A) ?: [];
+
+        // 3) Top 5 workers (latest payroll)
+        $latest_payroll_id = (int) $wpdb->get_var("SELECT id FROM {$t_payrolls} ORDER BY id DESC LIMIT 1");
+        $rows_top_workers = [];
+        if ($latest_payroll_id) {
+            $sql_top_workers = $wpdb->prepare("
+            SELECT w.id AS worker_id,
+                   CONCAT(w.first_name, ' ', w.last_name) AS worker_name,
+                   COALESCE(SUM(he.hours), 0) AS hours
+            FROM {$t_hours_entries} he
+            JOIN {$t_wpr} wpr ON wpr.id = he.worker_patient_role_id
+            JOIN {$t_workers} w ON w.id = wpr.worker_id
+            WHERE he.payroll_id = %d
+            GROUP BY w.id, w.first_name, w.last_name
+            ORDER BY hours DESC
+            LIMIT 5
+        ", $latest_payroll_id);
+            $rows_top_workers = $wpdb->get_results($sql_top_workers, ARRAY_A) ?: [];
+        }
+
+        // 4) Pending adjustments (+ / −) per payroll (last 10)
+        $sql_pending = "
+        SELECT p.id AS payroll_id,
+               COALESCE(SUM(CASE WHEN ep.amount >= 0 THEN ep.amount ELSE 0 END), 0) AS pos_adjust,
+               COALESCE(SUM(CASE WHEN ep.amount <  0 THEN ep.amount ELSE 0 END), 0) AS neg_adjust
+        FROM {$t_payrolls} p
+        LEFT JOIN {$t_extra_payments} ep ON ep.payroll_id = p.id
+        GROUP BY p.id
+        ORDER BY p.id DESC
+        LIMIT 10
+    ";
+        $rows_pending = $wpdb->get_results($sql_pending, ARRAY_A) ?: [];
+
+        // Optional: assessments (adjust codes if you use different ones)
+        $rows_assess = [];
+        $exists_sr = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = %s",
+            $t_special_rates
+        ));
+        if ($exists_sr) {
+            $sql_assess = "
+            SELECT ep.payroll_id, sr.code AS rate_code, COUNT(*) AS cnt, COALESCE(SUM(ep.amount), 0) AS total
+            FROM {$t_extra_payments} ep
+            JOIN {$t_special_rates} sr ON sr.id = ep.special_rate_id
+            WHERE sr.code IN ('initial_assessment','reassessment')
+              AND ep.payroll_id IN (SELECT id FROM {$t_payrolls} ORDER BY id DESC LIMIT 10)
+            GROUP BY ep.payroll_id, sr.code
+        ";
+            $rows_assess = $wpdb->get_results($sql_assess, ARRAY_A) ?: [];
+        }
+
+        wp_send_json_success([
+            'payroll_totals'    => $rows_totals,
+            'role_totals'       => $rows_role_totals,
+            'top_workers'       => $rows_top_workers,
+            'pending_adjust'    => $rows_pending,
+            'assessments'       => $rows_assess,
+            'latest_payroll_id' => $latest_payroll_id,
+        ]);
     }
 }
