@@ -320,7 +320,7 @@ class DashboardController {
                 ));
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                 $sum += (float) $wpdb->get_var($wpdb->prepare(
-                    "SELECT COALESCE(SUM(amount),0) FROM {$extras} WHERE payroll_id = %d", $pid
+                    "SELECT COALESCE(SUM(amount),0) FROM {$extras} WHERE payroll_id = %d", $pidmc
                 ));
             }
 
