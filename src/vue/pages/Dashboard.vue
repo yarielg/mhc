@@ -20,7 +20,7 @@
 
     <!-- Top stats -->
     <el-row :gutter="16" class="mb-4">
-      <el-col :xs="24" :sm="12" :md="6">
+      <el-col :xs="24" :sm="12" :md="4">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-icon">
             <el-icon><User /></el-icon>
@@ -35,7 +35,7 @@
         </el-card>
       </el-col>
 
-      <el-col :xs="24" :sm="12" :md="6">
+      <el-col :xs="24" :sm="12" :md="4">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-icon">
             <el-icon><UserFilled /></el-icon>
@@ -50,22 +50,41 @@
         </el-card>
       </el-col>
 
-      <el-col :xs="24" :sm="12" :md="6">
+      <el-col :xs="24" :sm="12" :md="4">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-icon">
-            <el-icon><Collection /></el-icon>
+            <el-icon><Money /></el-icon>
           </div>
           <div class="stat-body">
-            <div class="stat-label">Assignments</div>
+            <div class="stat-label">Total Paid (last 60d)</div>
             <div class="stat-value">
               <el-skeleton v-if="loading" :rows="1" animated />
-              <template v-else>{{ stats?.assignments ?? 0 }}</template>
+              <template v-else>{{ formatMoney(stats?.payrolls_60d?.total_paid ?? 0) }}</template>
             </div>
+            <div class="text-xs text-gray-500">Payrolls: {{ stats?.payrolls_60d?.count ?? 0 }}</div>
           </div>
         </el-card>
       </el-col>
 
-      <el-col :xs="24" :sm="12" :md="6">
+      <el-col :xs="24" :sm="12" :md="4">
+        <el-card shadow="hover" class="stat-card">
+          <div class="stat-icon">
+            <el-icon><Timer /></el-icon>
+          </div>
+          <div class="stat-body">
+            <div class="stat-label">Hours Entered (last 14d)</div>
+            <div class="stat-value">
+              <el-skeleton v-if="loading" :rows="1" animated />
+              <template v-else>{{ quick?.hours_14d ?? 0 }}</template>
+            </div>
+            <div class="text-xs text-gray-500">Recent activity snapshot</div>
+          </div>
+        </el-card>
+      </el-col>
+
+
+
+      <el-col :xs="24" :sm="12" :md="8">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-icon">
             <el-icon><Calendar /></el-icon>
@@ -83,122 +102,9 @@
 
     <!-- Financial + activity quick -->
     <el-row :gutter="16" class="mb-4">
-      <el-col :xs="24" :sm="12" :md="8">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon">
-            <el-icon><Money /></el-icon>
-          </div>
-          <div class="stat-body">
-            <div class="stat-label">Total Paid (last 60d)</div>
-            <div class="stat-value">
-              <el-skeleton v-if="loading" :rows="1" animated />
-              <template v-else>{{ formatMoney(stats?.payrolls_60d?.total_paid ?? 0) }}</template>
-            </div>
-            <div class="text-xs text-gray-500">Payrolls: {{ stats?.payrolls_60d?.count ?? 0 }}</div>
-          </div>
-        </el-card>
-      </el-col>
 
-      <el-col :xs="24" :sm="12" :md="8">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon">
-            <el-icon><Timer /></el-icon>
-          </div>
-          <div class="stat-body">
-            <div class="stat-label">Hours Entered (last 14d)</div>
-            <div class="stat-value">
-              <el-skeleton v-if="loading" :rows="1" animated />
-              <template v-else>{{ quick?.hours_14d ?? 0 }}</template>
-            </div>
-            <div class="text-xs text-gray-500">Recent activity snapshot</div>
-          </div>
-        </el-card>
-      </el-col>
 
-      <el-col :xs="24" :sm="12" :md="8">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon warn">
-            <el-icon><Warning /></el-icon>
-          </div>
-          <div class="stat-body">
-            <div class="stat-label">Negative Adjustments (14d/latest)</div>
-            <div class="stat-value">
-              <el-skeleton v-if="loading" :rows="1" animated />
-              <template v-else>{{ quick?.neg_count ?? 0 }}</template>
-            </div>
-            <div class="text-xs text-gray-500">Investigate below in Alerts</div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="16" class="mb-4">
-      <!-- Alerts -->
-      <el-col :xs="24" :md="12">
-        <el-card shadow="never">
-          <template #header>
-            <div class="card-header">
-              <div class="title">
-                <el-icon class="mr-2"><BellFilled /></el-icon>
-                Alerts
-              </div>
-            </div>
-          </template>
-
-          <el-empty v-if="!hasAlerts" description="No alerts right now. Great job!" />
-
-          <template v-else>
-            <div class="mb-4" v-if="(alerts?.over30h?.length || 0) > 0">
-              <div class="section-title">Over 30 hours (same patient)</div>
-              <el-table
-                  :data="alerts?.over30h || []"
-                  size="small"
-                  border
-                  style="width: 100%"
-                  empty-text="No cases"
-              >
-                <el-table-column prop="worker" label="Worker" min-width="160" />
-                <el-table-column prop="patient" label="Patient" min-width="160" />
-                <el-table-column prop="hours" label="Hours" width="90" />
-                <el-table-column label="Actions" width="130">
-                  <template #default="{ row }">
-                    <el-button text size="small" @click="goWorkers">Open Worker</el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </div>
-
-            <div v-if="(alerts?.negAdjustments?.length || 0) > 0">
-              <div class="section-title">Negative Adjustments</div>
-              <el-table
-                  :data="alerts?.negAdjustments || []"
-                  size="small"
-                  border
-                  style="width: 100%"
-                  empty-text="No negative lines"
-              >
-                <el-table-column prop="id" label="Item ID" width="90" />
-                <el-table-column prop="worker_id" label="Worker" width="100" />
-                <el-table-column prop="patient_id" label="Patient" width="100" />
-                <el-table-column prop="amount" label="Amount" width="110">
-                  <template #default="{ row }">
-                    <span class="text-red-600">{{ formatMoney(row.amount) }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="note" label="Note" />
-                <el-table-column label="Actions" width="130">
-                  <template #default>
-                    <el-button text size="small" @click="goPayrolls">Open Payrolls</el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </div>
-          </template>
-        </el-card>
-      </el-col>
-
-      <!-- Recent payrolls -->
-      <el-col :xs="24" :md="12">
+      <el-col :md="24">
         <el-card shadow="never">
           <template #header>
             <div class="card-header">
@@ -235,23 +141,42 @@
           </el-table>
         </el-card>
       </el-col>
+
     </el-row>
 
-    <!-- Activity placeholder (kept for future charts) -->
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header">
-          <div class="title">Activity</div>
-          <el-tag size="small" effect="plain">coming soon</el-tag>
-        </div>
-      </template>
-      <el-empty description="Charts and trends will live here (weekly hours, top workers, etc.)." />
-    </el-card>
   </div>
+  <!-- === ADD: Charts === -->
+  <el-row :gutter="16" class="mb-4">
+    <el-col :xs="24" :md="12">
+      <el-card shadow="hover" :body-style="{padding:'12px'}" v-loading="chartsLoading">
+        <div class="card-title">Last 10 Payroll Totals</div>
+        <div ref="elLast10" class="mhc-chart"></div>
+      </el-card>
+    </el-col>
+
+  </el-row>
+
+
+
+  <el-row :gutter="16" class="mb-4">
+    <el-col :xs="24" :md="12">
+      <el-card shadow="hover" :body-style="{padding:'12px'}" v-loading="chartsLoading">
+        <div class="card-title">Top 5 Workers by Hours (Latest Payroll)</div>
+        <div ref="elTopWorkers" class="mhc-chart mhc-chart--short"></div>
+      </el-card>
+    </el-col>
+    <el-col :xs="24" :md="12">
+      <el-card shadow="hover" :body-style="{padding:'12px'}" v-loading="chartsLoading">
+        <div class="card-title">Pending Adjustments (+/–) by Payroll</div>
+        <div ref="elPending" class="mhc-chart mhc-chart--short"></div>
+      </el-card>
+    </el-col>
+  </el-row>
+  <!-- === /ADD === -->
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted,onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   UserFilled, User, Calendar, Plus, Search, Money, Warning, BellFilled,
@@ -260,7 +185,6 @@ import {
 
 const loading        = ref(false)
 const stats          = ref({ workers: { total: 0, active: 0 }, patients: { total: 0, active: 0 }, payrolls_60d: { count: 0, total_paid: 0 } })
-const alerts         = ref({ over30h: [], negAdjustments: [] })
 const quick          = ref({ hours_14d: 0, neg_count: 0 })
 const recent         = ref({ payrolls: [] })
 const lastRefreshed  = ref('')
@@ -268,7 +192,149 @@ const q              = ref({ search: '' })
 
 onMounted(() => {
   refreshAll()
+  initCharts()
+  window.addEventListener('resize', onResizeCharts)
 })
+
+
+
+const chartsLoading = ref(false)
+const chartsData = ref(null)
+
+// chart DOM refs
+const elLast10 = ref(null)
+const elRoles = ref(null)
+const elTopWorkers = ref(null)
+const elPending = ref(null)
+
+// echarts runtime + instances
+let echarts = null
+const chartInstances = []
+function disposeAllCharts() {
+  chartInstances.forEach(i => { try { i.dispose() } catch(e) {} })
+  chartInstances.length = 0
+}
+function mountChart(dom, option) {
+  if (!dom || !echarts) return null
+  const inst = echarts.init(dom)
+  inst.setOption(option)
+  chartInstances.push(inst)
+  return inst
+}
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResizeCharts)
+  disposeAllCharts()
+})
+function fmtMoney(v){ return Number(v||0).toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:2}) }
+
+// === ADD: dynamic loader (keeps your bundle lean) ===
+async function loadEchartsIfNeeded() {
+  if (window.echarts) { echarts = window.echarts; return }
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js'
+    s.onload = resolve
+    s.onerror = () => reject(new Error('Failed to load chart library'))
+    document.head.appendChild(s)
+  })
+  echarts = window.echarts
+}
+
+// === ADD: fetch metrics from WP AJAX (does not touch your existing APIs) ===
+async function fetchDashboardCharts() {
+  chartsLoading.value = true
+  try {
+    const params = new URLSearchParams({
+      action: 'mhc_dashboard_metrics',
+      nonce: parameters.nonce
+    })
+    const res = await fetch(parameters.ajax_url, {
+      method: 'POST',
+      headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+      body: params.toString()
+    })
+    const json = await res.json()
+    if (!json?.success) throw new Error(json?.data?.message || 'Error loading dashboard metrics')
+    chartsData.value = json.data
+  } catch (e) {
+    ElMessage.error(e.message || 'Failed to load dashboard metrics')
+  } finally {
+    chartsLoading.value = false
+  }
+}
+
+// === ADD: render the four charts ===
+function renderDashboardCharts() {
+  disposeAllCharts()
+  if (!chartsData.value || !echarts) return
+
+  // 1) Last 10 payroll totals
+  const last10 = [...(chartsData.value.payroll_totals || [])].reverse()
+  const lbl = last10.map(r => `#${r.id}\n${r.start_date} → ${r.end_date}`)
+  const totals = last10.map(r => Number(r.hours_total||0) + Number(r.extras_total||0))
+  mountChart(elLast10.value, {
+    tooltip: { trigger: 'axis', valueFormatter: v => fmtMoney(v) },
+    grid: { left: 60, right: 20, top: 30, bottom: 60 },
+    xAxis: { type: 'category', data: lbl, axisLabel: { interval: 0, rotate: 30 }},
+    yAxis: { type: 'value', name: 'Total ($)', axisLabel: { formatter: v => fmtMoney(v) }},
+    series: [{ type: 'bar', name: 'Payroll Total', data: totals }]
+  })
+
+  // 2) Stacked by role
+  const roleRows = chartsData.value.role_totals || []
+  const roleCodes = Array.from(new Set(roleRows.map(r => r.role_code))).sort()
+  const idOrder = last10.map(r => r.id)
+  const roleSeries = roleCodes.map(code => ({
+    name: (code||'').toUpperCase(),
+    type: 'bar',
+    stack: 'roles',
+    data: idOrder.map(pid => {
+      const row = roleRows.find(x => String(x.payroll_id)===String(pid) && x.role_code===code)
+      return row ? Number(row.role_total||0) : 0
+    })
+  }))
+  mountChart(elRoles.value, {
+    legend: {},
+    tooltip: { trigger: 'axis', valueFormatter: v => fmtMoney(v) },
+    grid: { left: 60, right: 20, top: 40, bottom: 60 },
+    xAxis: { type: 'category', data: lbl, axisLabel: { interval: 0, rotate: 30 }},
+    yAxis: { type: 'value', name: 'Total ($)', axisLabel: { formatter: v => fmtMoney(v) }},
+    series: roleSeries
+  })
+
+  // 3) Top 5 workers (latest payroll)
+  const tops = chartsData.value.top_workers || []
+  mountChart(elTopWorkers.value, {
+    tooltip: { trigger: 'axis' },
+    grid: { left: 140, right: 20, top: 20, bottom: 20 },
+    xAxis: { type: 'value', name: 'Hours' },
+    yAxis: { type: 'category', data: tops.map(r => r.worker_name || 'Worker') },
+    series: [{ type: 'bar', name: 'Hours', data: tops.map(r => Number(r.hours||0)) }]
+  })
+
+  // 4) Pending adjustments
+  const pend = [...(chartsData.value.pending_adjust || [])].reverse()
+  mountChart(elPending.value, {
+    legend: {},
+    tooltip: { trigger: 'axis', valueFormatter: v => fmtMoney(v) },
+    grid: { left: 60, right: 20, top: 40, bottom: 40 },
+    xAxis: { type: 'category', data: pend.map(r => `#${r.payroll_id}`) },
+    yAxis: { type: 'value', name: 'Adj ($)', axisLabel: { formatter: v => fmtMoney(v) }},
+    series: [
+      { type: 'bar', name: 'Positive', data: pend.map(r => Number(r.pos_adjust||0)) },
+      { type: 'bar', name: 'Negative', data: pend.map(r => Number(r.neg_adjust||0)) }
+    ]
+  })
+}
+
+// === ADD: lifecycle (hook into your existing onMounted if you already have one) ===
+async function initCharts() {
+  await loadEchartsIfNeeded()
+  await fetchDashboardCharts()
+  renderDashboardCharts()
+}
+function onResizeCharts(){ chartInstances.forEach(i => i && i.resize()) }
 
 async function refreshAll() {
   loading.value = true
@@ -287,7 +353,6 @@ async function refreshAll() {
 
     const payload = json.data || {}
     stats.value   = payload.stats   || stats.value
-    alerts.value  = payload.alerts  || alerts.value
     quick.value   = payload.quick   || quick.value
     recent.value  = payload.recent  || recent.value
 
@@ -300,11 +365,6 @@ async function refreshAll() {
     loading.value = false
   }
 }
-
-const hasAlerts = computed(() =>
-    (alerts.value?.over30h?.length || 0) > 0 ||
-    (alerts.value?.negAdjustments?.length || 0) > 0
-)
 
 function statusType(s) {
   if (!s) return ''
@@ -355,7 +415,6 @@ function goPayrolls() { $router.push('/payrolls') }
 .stat-icon {
   display: grid; place-items: center;
   width: 56px; height: 56px; border-radius: 16px;
-  background: #f5f7fa;
 }
 .stat-icon.warn { background: #fff7f5; }
 .stat-body { display: grid; gap: 4px; }
@@ -378,6 +437,7 @@ function goPayrolls() { $router.push('/payrolls') }
 
 /* light utilities (if Tailwind not present at build) */
 .flex { display: flex; }
+h2{ color: var(--el-text-color-primary); }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
 .gap-2 { gap: .5rem; }
@@ -386,4 +446,8 @@ function goPayrolls() { $router.push('/payrolls') }
 .text-gray-500 { color: #6b7280; }
 .mr-2 { margin-right: .5rem; }
 .text-red-600 { color: #dc2626; }
+.card-title{font-weight:600;font-size:14px;margin-bottom:8px;}
+.mhc-chart{width:100%;height:340px;}
+.mhc-chart--short{height:300px;}
+.mb-4{margin-bottom:16px;}
 </style>

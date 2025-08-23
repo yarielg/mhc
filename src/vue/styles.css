@@ -1,3 +1,11 @@
+@import "element-plus/theme-chalk/dark/css-vars.css";
+
+/* Optional: dark background for your WP wrap */
+html.dark, body.dark {
+    background-color: #1e1e1e;
+    color: #e5e5e5;
+}
+
 body{
     padding: 0;
 }
