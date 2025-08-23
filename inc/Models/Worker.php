@@ -64,7 +64,7 @@ class Worker {
                  WHERE w.id = %d",
                 $id
             ), ARRAY_A
-        );
+        ); // email ya incluido por SELECT w.*
         if (!$row) return null;
 
         if (!empty($row['supervisor_first_name']) || !empty($row['supervisor_last_name'])) {
@@ -117,7 +117,7 @@ class Worker {
                  LIMIT %d OFFSET %d",
                 array_merge($params, [$per_page, $offset])
             ), ARRAY_A
-        );
+        ); // email ya incluido por SELECT w.*
 
         // Attach roles to each worker
         $ids = array_map(fn($r) => (int)$r['id'], $rows);
@@ -164,7 +164,7 @@ class Worker {
 
         $fields = [];
         $fmts   = [];
-        foreach (["first_name","last_name","is_active","start_date","end_date","supervisor_id"] as $field) {
+        foreach (["first_name","last_name","email","is_active","start_date","end_date","supervisor_id"] as $field) {
             if (isset($data[$field])) {
                 $fields[$field] = $data[$field];
                 $fmts[] = in_array($field,["is_active","supervisor_id"],true)?'%d':'%s';
@@ -221,11 +221,16 @@ class Worker {
         $fmts   = [];
 
         // fields except supervisor_id first
-        foreach (["first_name","last_name","is_active","start_date","end_date"] as $field) {
+        foreach (["first_name","last_name","email","is_active","start_date","end_date"] as $field) {
             if (array_key_exists($field, $data)) {
                 $fields[$field] = $data[$field];
                 $fmts[] = ($field === "is_active") ? '%d' : '%s';
             }
+        }
+        // Siempre actualiza updated_at si hay cambios
+        if ($fields) {
+            $fields['updated_at'] = current_time('mysql');
+            $fmts[] = '%s';
         }
 
         $wpdb->query('START TRANSACTION');

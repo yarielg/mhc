@@ -90,24 +90,7 @@
               Reopen
             </el-button>
 
-            <el-popconfirm
-                :title="`Delete payroll #${row.id}? This cannot be undone.`"
-                confirm-button-text="Delete"
-                cancel-button-text="Cancel"
-                confirm-button-type="danger"
-                @confirm="remove(row)"
-            >
-              <template #reference>
-                <el-button
-                    type="danger"
-                    plain
-                    size="small"
-                    :loading="loading.actionId === row.id && loading.actionType === 'delete'"
-                >
-                  Delete
-                </el-button>
-              </template>
-            </el-popconfirm>
+            <!-- Delete payroll removed -->
           </template>
         </el-table-column>
       </el-table>
@@ -422,21 +405,7 @@ async function reopen(row) {
   }
 }
 
-async function remove(row) {
-  loading.actionId = row.id
-  loading.actionType = 'delete'
-  try {
-    await ajaxPost('mhc_payroll_delete', { id: row.id }, false)
-    items.value = items.value.filter(r => r.id !== row.id)
-    total.value = Math.max(0, total.value - 1)
-    ElMessage.success(`Payroll #${row.id} deleted`)
-  } catch (e) {
-    ElMessage.error(e.message || 'Failed to delete')
-  } finally {
-    loading.actionId = null
-    loading.actionType = null
-  }
-}
+// Delete payroll removed 
 
 onMounted(fetchList)
 </script>

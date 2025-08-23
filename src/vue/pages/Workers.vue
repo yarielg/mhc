@@ -33,9 +33,10 @@
         size="small"
         empty-text="No workers found"
     >
-      <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="first_name" label="First Name" width="200" show-overflow-tooltip />
-      <el-table-column prop="last_name" label="Last Name" width="200" show-overflow-tooltip />
+  <el-table-column prop="id" label="ID" width="70" />
+  <el-table-column prop="first_name" label="First Name" width="200" show-overflow-tooltip />
+  <el-table-column prop="last_name" label="Last Name" width="200" show-overflow-tooltip />
+  <el-table-column prop="email" label="Email" width="240" show-overflow-tooltip />
 
       <!-- New: Supervisor -->
       <el-table-column label="Supervisor" min-width="220" show-overflow-tooltip>
@@ -112,6 +113,10 @@
 
         <el-form-item label="Last Name" prop="last_name">
           <el-input v-model="form.last_name" />
+        </el-form-item>
+
+        <el-form-item label="Email" prop="email">
+          <el-input v-model="form.email" type="email" />
         </el-form-item>
 
         <!-- New: Supervisor (remote autocomplete) -->
@@ -245,6 +250,7 @@ const formRef = ref(null)
 const form = reactive({
   first_name: '',
   last_name: '',
+  email: '',
   is_active: '1',
   supervisor_id: null,        // NEW
   worker_roles: []            // [{ uid, role_id:Number, general_rate:Number }]
@@ -254,6 +260,7 @@ const form = reactive({
 const rules = {
   first_name: [{ required: true, message: 'First name is required', trigger: 'blur' }],
   last_name: [{ required: true, message: 'Last name is required', trigger: 'blur' }],
+  email: [{ required: true, type: 'email', message: 'Valid email is required', trigger: 'blur' }],
 }
 
 /** HELPERS (roles table) */
@@ -318,6 +325,7 @@ async function searchSupervisors(query) {
       value: Number(w.id),
       label: w.full_name || `${w.first_name || ''} ${w.last_name || ''}`.trim()
     }))
+    fd.append('email', form.email)
   } catch (e) {
     console.error(e)
     ElMessage.error(e.message || 'Error searching supervisors')
@@ -330,6 +338,7 @@ async function searchSupervisors(query) {
 function mapRowToForm(row) {
   form.first_name = row.first_name || ''
   form.last_name  = row.last_name || ''
+  form.email      = row.email || ''
   form.is_active  = String(row.is_active ?? '1')
   form.supervisor_id = row.supervisor_id != null ? Number(row.supervisor_id) : null
 
@@ -360,6 +369,7 @@ function mapRowToForm(row) {
 function resetForm() {
   form.first_name = ''
   form.last_name = ''
+  form.email = ''
   form.is_active = '1'
   form.supervisor_id = null
   form.worker_roles = []
@@ -432,6 +442,7 @@ async function submit() {
     fd.append('first_name', form.first_name)
     fd.append('last_name', form.last_name)
     fd.append('is_active', form.is_active)
+    fd.append('email', form.email)
 
     if (form.supervisor_id != null && form.supervisor_id !== '') {
       fd.append('supervisor_id', String(form.supervisor_id))

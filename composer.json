@@ -10,7 +10,8 @@
             "email": "aristidesgp@gmail.com"
         }
     ],
-    "require": {        
+    "require": {
+        "tecnickcom/tcpdf": "^6.10"
     },
     "autoload": {
         "psr-4": { "Mhc\\Inc\\": "./inc"
