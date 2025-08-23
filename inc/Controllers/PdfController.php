@@ -44,21 +44,6 @@ class PdfController
             exit;
         }
 
-        // get worker hours and extras
-        $hours = \Mhc\Inc\Models\HoursEntry::listDetailedForPayroll($payroll_id, ['worker_id' => $worker_id]);
-        $extras = \Mhc\Inc\Models\ExtraPayment::listDetailedForPayroll($payroll_id, ['worker_id' => $worker_id]);
-
-        $th = 0.0;
-        $ta = 0.0;
-        $te = 0.0;
-        foreach ($hours as $h) {
-            $th += (float)$h->hours;
-            $ta += (float)$h->total;
-        }
-        foreach ($extras as $e) {
-            $te += (float)$e->amount;
-        }
-
         $worker_name = '';
         if (!empty($hours)) $worker_name = $hours[0]->worker_name ?? '';
         if ($worker_name === '') {
@@ -69,24 +54,19 @@ class PdfController
 
         // Generate PDF with the data
         $pdfPath = self::generateWorkerSlipPdf([
+            'payroll_id' => $payroll_id,
             'worker_id' => $worker_id,
             'worker_name' => $worker_name,
-            'hours' => $hours,
-            'extras' => $extras,
-            'totals' => [
-                'total_hours'   => round($th, 2),
-                'hours_amount'  => round($ta, 2),
-                'extras_amount' => round($te, 2),
-                'grand_total'   => round($ta + $te, 2),
-            ]
         ]);
         if (!file_exists($pdfPath)) {
             status_header(500);
             echo 'Error generando PDF';
             exit;
         }
+        
+        $download_name = basename($pdfPath);
         header('Content-Type: application/pdf');
-        header('Content-Disposition: inline; filename="worker_slip.pdf"');
+        header('Content-Disposition: inline; filename="' . $download_name . '"');
         readfile($pdfPath);
         unlink($pdfPath);
         exit;
@@ -176,7 +156,7 @@ class PdfController
                 $pdf->MultiCell(50, 8, 'Code: ' . ($e->code ?? ''), 0, 'L', false, 0);
                 $pdf->MultiCell(60, 8, 'Label: ' . ($e->label ?? ''), 0, 'L', false, 0);
                 $pdf->MultiCell(30, 8, 'Amount: $' . number_format($e->amount ?? 0, 2), 0, 'L', false, 0);
-                $pdf->MultiCell(30, 8, 'Rate: $' . number_format($e->unit_rate ?? 0, 2), 0, 'L', false, 0);
+                //$pdf->MultiCell(30, 8, 'Rate: $' . number_format($e->unit_rate ?? 0, 2), 0, 'L', false, 0);
                 $pdf->MultiCell(0, 8, 'Notes: ' . ($e->notes ?? ''), 0, 'L', false, 1);
             }
         } else {
@@ -194,7 +174,15 @@ class PdfController
         $pdf->Cell(50, 8, 'Extras Amount: $' . number_format($totals['extras_amount'] ?? 0, 2), 0, 0, 'L');
         $pdf->Cell(0, 8, 'Grand Total: $' . number_format($totals['grand_total'] ?? 0, 2), 0, 1, 'L');
 
-        $tmp = tempnam(sys_get_temp_dir(), 'slipdf_') . '.pdf';
+        // Obtener fechas del payroll y nombre del worker
+        $payroll = isset($data['payroll_id']) ? \Mhc\Inc\Models\Payroll::findById($data['payroll_id']) : null;
+        $start = $payroll->start_date ?? date('Y-m-d');
+        $end = $payroll->end_date ?? date('Y-m-d');
+        $worker_name = $data['worker_name'] ?? 'worker';
+        // Limpiar el nombre para archivo
+        $worker_name_clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $worker_name);
+        $filename = $worker_name_clean . '_' . $start . '-' . $end . '.pdf';
+        $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $filename;
         $pdf->Output($tmp, 'F');
         return $tmp;
     }
