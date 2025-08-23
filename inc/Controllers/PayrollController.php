@@ -565,6 +565,7 @@ class PayrollController
     public static function ajax_extras_create()
     {
         self::check();
+
         $payroll_id  = (int)($_POST['payroll_id'] ?? 0);
         $worker_id   = (int)($_POST['worker_id'] ?? 0);
         $rate_id     = (int)($_POST['special_rate_id'] ?? 0);
@@ -575,6 +576,12 @@ class PayrollController
 
         if ($payroll_id <= 0 || $worker_id <= 0 || $rate_id <= 0 || $amount === null)
             wp_send_json_error(['message' => 'payroll_id, worker_id, special_rate_id y amount son requeridos'], 400);
+
+        // Obtener el código del special rate
+        $special_rate = \Mhc\Inc\Models\SpecialRate::findById($rate_id);
+        if ($special_rate && isset($special_rate['code']) && $special_rate['code'] === 'pending_negative' && $amount > 0) {
+            $amount = -1 * $amount;
+        }
 
         $id = ExtraPayment::create([
             'payroll_id'          => $payroll_id,
@@ -689,7 +696,6 @@ class PayrollController
             'worker_id' => $worker_id,
             'worker_name' => $name
         ]);
-
         if (!file_exists($pdfPath)) \wp_send_json_error(['message' => 'PDF generation failed'], 500);
         $subject = 'Your Payroll Slip';
         $body = 'Hello ' . \esc_html($name) . ",\nAttached is your payroll slip PDF.";
