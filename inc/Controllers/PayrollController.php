@@ -605,12 +605,27 @@ class PayrollController
         $id          = (int)($_POST['id'] ?? 0);
         if ($id <= 0) wp_send_json_error(['message' => 'id requerido'], 400);
 
+
         $upd = [];
         foreach (['payroll_id', 'worker_id', 'patient_id', 'supervised_worker_id', 'special_rate_id'] as $k) {
             if (isset($_POST[$k])) $upd[$k] = (int)$_POST[$k];
         }
         if (isset($_POST['amount'])) $upd['amount'] = round((float)$_POST['amount'], 2);
         if (isset($_POST['notes']))  $upd['notes']  = sanitize_text_field(wp_unslash($_POST['notes']));
+
+        // Si el special_rate_id está en el update, úsalo; si no, busca el actual
+        $rate_id = isset($upd['special_rate_id']) ? $upd['special_rate_id'] : null;
+        if ($rate_id === null) {
+            // Buscar el rate_id actual en la BD
+            global $wpdb;
+            $t = $wpdb->prefix . 'mhc_extra_payments';
+            $rate_id = (int)$wpdb->get_var($wpdb->prepare("SELECT special_rate_id FROM {$t} WHERE id=%d", $id));
+        }
+        // Obtener el código del special rate
+        $special_rate = \Mhc\Inc\Models\SpecialRate::findById($rate_id);
+        if ($special_rate && isset($special_rate['code']) && $special_rate['code'] === 'pending_negative' && isset($upd['amount']) && $upd['amount'] > 0) {
+            $upd['amount'] = -1 * $upd['amount'];
+        }
 
         if (empty($upd)) wp_send_json_error(['message' => 'Nada para actualizar'], 400);
 
