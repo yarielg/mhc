@@ -51,7 +51,7 @@ class PayrollController
         add_action('wp_ajax_mhc_payroll_extras_update',    [__CLASS__, 'ajax_extras_update']);
         add_action('wp_ajax_mhc_payroll_extras_delete',    [__CLASS__, 'ajax_extras_delete']);
 
-        
+
         // PDF generation
         add_action('wp_ajax_mhc_payroll_send_all_slips', [__CLASS__, 'ajax_send_all_slips']);
         add_action('wp_ajax_mhc_payroll_send_worker_slip', [__CLASS__, 'ajax_send_worker_slip']);
@@ -658,12 +658,12 @@ class PayrollController
     {
         self::check();
         $payroll_id = (int)($_POST['payroll_id'] ?? 0);
-        if ($payroll_id <= 0) \wp_send_json_error(['message' => 'payroll_id required'], 400);
+        if ($payroll_id <= 0) wp_send_json_error(['message' => 'payroll_id required'], 400);
 
         global $wpdb;
         $t = $wpdb->prefix . 'mhc_workers';
-        $workers = $wpdb->get_results($wpdb->prepare("SELECT w.id, w.email, CONCAT(w.first_name,' ',w.last_name) AS name FROM {$t} w WHERE w.is_active=1 AND w.email <> ''"), \ARRAY_A);
-        if (!$workers) \wp_send_json_error(['message' => 'No workers found'], 404);
+        $workers = $wpdb->get_results($wpdb->prepare("SELECT w.id, w.email, CONCAT(w.first_name,' ',w.last_name) AS name FROM {$t} w WHERE w.is_active=1 AND w.email <> ''"), ARRAY_A);
+        if (!$workers) wp_send_json_error(['message' => 'No workers found'], 404);
 
         $sent = [];
         foreach ($workers as $worker) {
@@ -677,15 +677,20 @@ class PayrollController
                 'worker_name' => $name
             ]);
             if (!file_exists($pdfPath)) continue;
-            $subject = 'Your Payroll Slip';
-            $body = 'Hello ' . \esc_html($name) . ",\nAttached is your payroll slip PDF.";
-            $headers = ['Content-Type: text/plain; charset=UTF-8'];
-            $attachments = [$pdfPath];
-            $result = \wp_mail($email, $subject, $body, $headers, $attachments);
+            
+            $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
+            $result = mhc_send_email(
+                $email,
+                'Hello ' . esc_html($name),
+                'Your Payroll Slip',
+                'Attached is your payroll slip PDF.',
+                [$pdfPath],
+                $logo_path
+            );
             if ($result) $sent[] = $worker_id;
             unlink($pdfPath);
         }
-        \wp_send_json_success(['sent' => $sent, 'total' => count($sent)]);
+        wp_send_json_success(['sent' => $sent, 'total' => count($sent)]);
     }
 
     /**
@@ -697,12 +702,12 @@ class PayrollController
         self::check();
         $payroll_id = (int)($_POST['payroll_id'] ?? 0);
         $worker_id  = (int)($_POST['worker_id'] ?? 0);
-        if ($payroll_id <= 0 || $worker_id <= 0) \wp_send_json_error(['message' => 'payroll_id and worker_id required'], 400);
+        if ($payroll_id <= 0 || $worker_id <= 0) wp_send_json_error(['message' => 'payroll_id and worker_id required'], 400);
 
         global $wpdb;
         $t = $wpdb->prefix . 'mhc_workers';
-        $worker = $wpdb->get_row($wpdb->prepare("SELECT email, CONCAT(first_name,' ',last_name) AS name FROM {$t} WHERE id=%d AND is_active=1 AND email <> ''", $worker_id), \ARRAY_A);
-        if (!$worker) \wp_send_json_error(['message' => 'Worker not found or no email'], 404);
+        $worker = $wpdb->get_row($wpdb->prepare("SELECT email, CONCAT(first_name,' ',last_name) AS name FROM {$t} WHERE id=%d AND is_active=1 AND email <> ''", $worker_id), ARRAY_A);
+        if (!$worker) wp_send_json_error(['message' => 'Worker not found or no email'], 404);
         $email = $worker['email'];
         $name = $worker['name'];
         // PDF generation is centralized in PdfController
@@ -711,17 +716,22 @@ class PayrollController
             'worker_id' => $worker_id,
             'worker_name' => $name
         ]);
-        if (!file_exists($pdfPath)) \wp_send_json_error(['message' => 'PDF generation failed'], 500);
-        $subject = 'Your Payroll Slip';
-        $body = 'Hello ' . \esc_html($name) . ",\nAttached is your payroll slip PDF.";
-        $headers = ['Content-Type: text/plain; charset=UTF-8'];
-        $attachments = [$pdfPath];
-        $result = \wp_mail($email, $subject, $body, $headers, $attachments);
+        if (!file_exists($pdfPath)) wp_send_json_error(['message' => 'PDF generation failed'], 500);
+        
+        $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
+        $result = mhc_send_email(
+            $email,
+            'Hello ' . esc_html($name),
+            'Your Payroll Slip',
+            'Attached is your payroll slip PDF.',
+            [$pdfPath],
+            $logo_path
+        );
         unlink($pdfPath);
         if ($result) {
-            \wp_send_json_success(['sent' => true, 'worker_id' => $worker_id]);
+            wp_send_json_success(['sent' => true, 'worker_id' => $worker_id]);
         } else {
-            \wp_send_json_error(['message' => 'Email sending failed'], 500);
+            wp_send_json_error(['message' => 'Email sending failed'], 500);
         }
     }
 }
