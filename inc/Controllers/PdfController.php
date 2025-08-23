@@ -99,6 +99,40 @@ class PdfController
      */
     public static function generateWorkerSlipPdf($data = [])
     {
+
+        // get worker hours and extras
+        $hours = \Mhc\Inc\Models\HoursEntry::listDetailedForPayroll($data['payroll_id'], ['worker_id' => $data['worker_id']]);
+        $extras = \Mhc\Inc\Models\ExtraPayment::listDetailedForPayroll($data['payroll_id'], ['worker_id' => $data['worker_id']]);
+
+        $th = 0.0;
+        $ta = 0.0;
+        $te = 0.0;
+        foreach ($hours as $h) {
+            $th += (float)$h->hours;
+            $ta += (float)$h->total;
+        }
+        foreach ($extras as $e) {
+            $te += (float)$e->amount;
+        }
+
+        $worker_name = '';
+        if (!empty($hours)) $worker_name = $hours[0]->worker_name ?? '';
+        if ($worker_name === '') {
+            global $wpdb;
+            $t = $wpdb->prefix . 'mhc_workers';
+            $worker_name = (string)$wpdb->get_var($wpdb->prepare("SELECT CONCAT(first_name,' ',last_name) FROM {$t} WHERE id=%d", $worker_id));
+        }
+
+        $data['hours'] = $hours;
+        $data['extras'] = $extras;
+        $data['totals'] = [
+            'total_hours'   => round($th, 2),
+            'hours_amount'  => round($ta, 2),
+            'extras_amount' => round($te, 2),
+            'grand_total'   => round($ta + $te, 2),
+        ];
+
+
         $logo = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
         $pdf = new \TCPDF();
         $pdf->SetCreator('MHC Payroll');
@@ -114,6 +148,7 @@ class PdfController
         $pdf->SetFont('helvetica', '', 12);
         $pdf->Cell(0, 10, 'Worker: ' . ($data['worker_name'] ?? '---'), 0, 1, 'L');
         $pdf->Ln(4);
+
 
         // Hours
         $pdf->SetFont('helvetica', 'B', 13);

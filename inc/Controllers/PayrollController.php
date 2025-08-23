@@ -689,6 +689,7 @@ class PayrollController
             'worker_id' => $worker_id,
             'worker_name' => $name
         ]);
+
         if (!file_exists($pdfPath)) \wp_send_json_error(['message' => 'PDF generation failed'], 500);
         $subject = 'Your Payroll Slip';
         $body = 'Hello ' . \esc_html($name) . ",\nAttached is your payroll slip PDF.";

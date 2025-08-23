@@ -205,7 +205,9 @@
 
                   <el-table-column label="Actions" width="200" fixed="right">
                     <template #default="{ row }">
-                      <el-button size="small" plain :disabled="payroll.status === 'finalized'" @click="editExtra(row)">Edit</el-button>
+                      <el-button size="small" plain :disabled="payroll.status === 'finalized'" @click="editExtra(row)">
+                        <el-icon><Edit /></el-icon>
+                      </el-button>
                       <el-popconfirm
                           title="Delete this extra?"
                           confirm-button-text="Delete"
@@ -213,8 +215,9 @@
                           confirm-button-type="danger"
                           @confirm="deleteExtra(row)"
                       >
+
                         <template #reference>
-                          <el-button size="small" type="danger" plain :disabled="payroll.status === 'finalized'">Delete</el-button>
+                          <el-button size="small" type="danger" plain :disabled="payroll.status === 'finalized'"><el-icon><Delete /></el-icon></el-button>
                         </template>
                       </el-popconfirm>
                     </template>
@@ -247,7 +250,15 @@
                   </el-table-column>
                   <el-table-column label="Slip" width="120" fixed="right">
                     <template #default="{ row }">
-                      <el-button size="small" @click="openWorkerSlip(row)">View</el-button>
+                      <el-button size="small" @click="openWorkerSlip(row)">
+                        <el-icon><View /></el-icon>
+                      </el-button>
+
+                      <el-button  size="small"
+                                  :loading="sendingSlip[row.worker_id]"
+                                  @click.stop="sendWorkerSlip(row)" >
+                        <el-icon class="mr-2"><Message /></el-icon>
+                      </el-button>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -432,6 +443,9 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {User, Message,View, Delete, Edit} from "@element-plus/icons-vue";
+
+const sendingSlip = reactive({});
 
 /* ======= WP ajax setup ======= */
 const props = defineProps({ id: { type: Number, required: true } })
@@ -1080,6 +1094,42 @@ onMounted(async () => {
   await loadHeader()
   await loadPatients()
 })
+
+async function sendWorkerSlip(row) {
+  const payrollId = typeof id !== 'undefined' ? id : (props?.id || null);
+  if (!payrollId || !row?.worker_id) return;
+
+  const wid = row.worker_id;
+  sendingSlip[wid] = true;
+
+  try {
+    const ajaxUrl = (typeof parameters !== 'undefined' && parameters?.ajax_url)
+        ? parameters.ajax_url
+        : (window.ajaxurl || '/wp-admin/admin-ajax.php');
+
+    const form = new FormData();
+    form.append('action', 'mhc_payroll_send_worker_slip'); // maps to controller's ajax_send_worker_slip
+    form.append('payroll_id', payrollId);
+    form.append('worker_id', wid);
+    if (typeof parameters !== 'undefined' && parameters?.nonce) {
+      form.append('nonce', parameters.nonce);
+    }
+
+    const res = await fetch(ajaxUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: form
+    });
+    const json = await res.json();
+
+    if (!json?.success) throw new Error(json?.data?.message || 'Send failed');
+    ElMessage.success('Slip emailed successfully');
+  } catch (e) {
+    ElMessage.error(e?.message || 'Failed to send slip');
+  } finally {
+    sendingSlip[wid] = false;
+  }
+}
 </script>
 
 <style scoped>
