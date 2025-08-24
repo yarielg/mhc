@@ -4,35 +4,26 @@
       <h2 class="text-xl font-semibold">Special Rates</h2>
     </div>
 
-    <el-row :gutter="20">
-      <el-col :span="16">
-        <el-button type="primary" @click="openCreate">Add Special Rate</el-button>
-      </el-col>
-      <el-col :span="8">
-        <div class="mb-3">
-          <el-input
-                v-model="state.search"
-                placeholder="Search by code, label, or CPT code..."
-              clearable
-              @clear="fetchData(1)"
-              @keyup.enter.native="fetchData(1)"
-          >
-            <template #append>
-              <el-button @click="fetchData(1)">Search</el-button>
-            </template>
-          </el-input>
-        </div>
-      </el-col>
-    </el-row>
+    <div class="mb-20">
+      <el-row :gutter="20">
+        <el-col :span="16">
+          <el-button type="primary" @click="openCreate">Add Special Rate</el-button>
+        </el-col>
+        <el-col :span="8">
+          <div class="mb-3">
+            <el-input v-model="state.search" placeholder="Search by code, label, or CPT code..." clearable
+              @clear="fetchData(1)" @keyup.enter.native="fetchData(1)">
+              <template #append>
+                <el-button @click="fetchData(1)">Search</el-button>
+              </template>
+            </el-input>
+          </div>
+        </el-col>
+      </el-row>
+    </div>
 
-    <el-table
-        :data="state.items"
-        v-loading="state.loading"
-        border
-        style="width:100%"
-        size="small"
-        empty-text="No special rates found"
-    >
+    <el-table :data="state.items" v-loading="state.loading" border style="width:100%" size="small"
+      empty-text="No special rates found">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="code" label="Code" width="120" />
       <el-table-column prop="label" label="Label" width="180" />
@@ -53,23 +44,13 @@
     </el-table>
 
     <div class="mt-4 flex justify-end">
-      <el-pagination
-          background
-          layout="prev, pager, next, jumper, ->, total"
-          :total="state.total"
-          :page-size="state.per_page"
-          :current-page="state.page"
-          @current-change="fetchData"
-      />
+      <el-pagination background layout="prev, pager, next, jumper, ->, total" :total="state.total"
+        :page-size="state.per_page" :current-page="state.page" @current-change="fetchData" />
     </div>
 
     <!-- Dialog: Add/Edit Special Rate -->
-    <el-dialog
-        :title="state.editing ? 'Edit Special Rate' : 'Add Special Rate'"
-        v-model="state.showDialog"
-        width="700px"
-        :close-on-click-modal="false"
-    >
+    <el-dialog :title="state.editing ? 'Edit Special Rate' : 'Add Special Rate'" v-model="state.showDialog"
+      width="700px" :close-on-click-modal="false">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="140px">
         <el-form-item label="Code" prop="code">
           <el-input v-model="form.code" />
@@ -162,7 +143,7 @@ async function fetchData(page = state.page) {
     state.loading = true
     state.page = page
     const fd = new FormData()
-  fd.append('action', 'mhc_special_rates_list')
+    fd.append('action', 'mhc_special_rates_list')
     fd.append('nonce', parameters.nonce)
     fd.append('page', state.page)
     fd.append('per_page', state.per_page)
@@ -231,7 +212,7 @@ async function submit() {
 async function remove(row) {
   try {
     const fd = new FormData()
-  fd.append('action', 'mhc_special_rates_delete')
+    fd.append('action', 'mhc_special_rates_delete')
     fd.append('nonce', parameters.nonce)
     fd.append('id', row.id)
 
@@ -253,6 +234,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.wp-wrap { padding: 0.5rem; }
-.el-pagination { margin-top: 20px; }
+.wp-wrap {
+  padding: 0.5rem;
+}
+
+.el-pagination {
+  margin-top: 20px;
+}
 </style>

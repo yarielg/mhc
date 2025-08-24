@@ -238,7 +238,7 @@
                     empty-text="No data"
                 >
                   <el-table-column prop="worker_name" label="Worker" min-width="180" show-overflow-tooltip />
-                  <el-table-column prop="hours_hours" label="Hours" width="110" />
+                  <el-table-column prop="hours_hours" label="Hours" width="90" />
                   <el-table-column prop="hours_amount" label="Hours $" width="120">
                     <template #default="{ row }">{{ money(row.hours_amount) }}</template>
                   </el-table-column>
@@ -248,7 +248,7 @@
                   <el-table-column prop="grand_total" label="Total $" width="130">
                     <template #default="{ row }"><b>{{ money(row.grand_total) }}</b></template>
                   </el-table-column>
-                  <el-table-column label="Slip" width="120" fixed="right">
+                  <el-table-column label="Slip" width="150" fixed="right">
                     <template #default="{ row }">
                         <div style="display: flex; flex-direction: row; align-items: center;">
                           <el-button size="small" @click="openWorkerSlip(row)">

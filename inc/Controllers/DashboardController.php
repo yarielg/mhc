@@ -367,4 +367,7 @@ class DashboardController {
             'latest_payroll_id' => $latest_payroll_id,
         ]);
     }
+
+    // Nonce action for dashboard AJAX
+    public const NONCE_ACTION = 'mhc_dashboard_ajax';
 }

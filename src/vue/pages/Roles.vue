@@ -4,35 +4,26 @@
       <h2 class="text-xl font-semibold">Roles</h2>
     </div>
 
-    <el-row :gutter="20">
-      <el-col :span="16">
-        <el-button type="primary" @click="openCreate">Add Role</el-button>
-      </el-col>
-      <el-col :span="8">
-        <div class="mb-3">
-          <el-input
-              v-model="state.search"
-              placeholder="Search by name/code..."
-              clearable
-              @clear="fetchData(1)"
-              @keyup.enter.native="fetchData(1)"
-          >
-            <template #append>
-              <el-button @click="fetchData(1)">Search</el-button>
-            </template>
-          </el-input>
-        </div>
-      </el-col>
-    </el-row>
+    <div class="mb-20">
+      <el-row :gutter="20">
+        <el-col :span="16">
+          <el-button type="primary" @click="openCreate">Add Role</el-button>
+        </el-col>
+        <el-col :span="8">
+          <div class="mb-3">
+            <el-input v-model="state.search" placeholder="Search by name/code..." clearable @clear="fetchData(1)"
+              @keyup.enter.native="fetchData(1)">
+              <template #append>
+                <el-button @click="fetchData(1)">Search</el-button>
+              </template>
+            </el-input>
+          </div>
+        </el-col>
+      </el-row>
+    </div>
 
-    <el-table
-        :data="state.items"
-        v-loading="state.loading"
-        border
-        style="width:100%"
-        size="small"
-        empty-text="No roles found"
-    >
+    <el-table :data="state.items" v-loading="state.loading" border style="width:100%" size="small"
+      empty-text="No roles found">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="code" label="Code" width="160" />
       <el-table-column prop="name" label="Name" width="220" />
@@ -52,23 +43,13 @@
     </el-table>
 
     <div class="mt-4 flex justify-end">
-      <el-pagination
-          background
-          layout="prev, pager, next, jumper, ->, total"
-          :total="state.total"
-          :page-size="state.per_page"
-          :current-page="state.page"
-          @current-change="fetchData"
-      />
+      <el-pagination background layout="prev, pager, next, jumper, ->, total" :total="state.total"
+        :page-size="state.per_page" :current-page="state.page" @current-change="fetchData" />
     </div>
 
     <!-- Dialog: Add/Edit Role -->
-    <el-dialog
-        :title="state.editing ? 'Edit Role' : 'Add Role'"
-        v-model="state.showDialog"
-        width="600px"
-        :close-on-click-modal="false"
-    >
+    <el-dialog :title="state.editing ? 'Edit Role' : 'Add Role'" v-model="state.showDialog" width="600px"
+      :close-on-click-modal="false">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
         <el-form-item label="Code" prop="code">
           <el-input v-model="form.code" />
@@ -243,6 +224,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.wp-wrap { padding: 0.5rem; }
-.el-pagination { margin-top: 20px; }
+.wp-wrap {
+  padding: 0.5rem;
+}
+
+.el-pagination {
+  margin-top: 20px;
+}
 </style>

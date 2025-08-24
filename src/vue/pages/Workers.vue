@@ -4,39 +4,32 @@
       <h2 class="text-xl font-semibold">Workers</h2>
     </div>
 
-    <el-row :gutter="20">
-      <el-col :span="16">
-        <el-button type="primary" @click="openCreate">Add Worker</el-button>
-      </el-col>
-      <el-col :span="8">
-        <div class="mb-3">
-          <el-input
-              v-model="state.search"
-              placeholder="Search by name..."
-              clearable
-              @clear="fetchData(1)"
-              @keyup.enter.native="fetchData(1)"
-          >
-            <template #append>
-              <el-button @click="fetchData(1)">Search</el-button>
-            </template>
-          </el-input>
-        </div>
-      </el-col>
-    </el-row>
 
-    <el-table
-        :data="state.items"
-        v-loading="state.loading"
-        border
-        style="width:100%"
-        size="small"
-        empty-text="No workers found"
-    >
-  <el-table-column prop="id" label="ID" width="70" />
-  <el-table-column prop="first_name" label="First Name" width="200" show-overflow-tooltip />
-  <el-table-column prop="last_name" label="Last Name" width="200" show-overflow-tooltip />
-  <el-table-column prop="email" label="Email" width="240" show-overflow-tooltip />
+    <div class="mb-20">
+      <el-row :gutter="20">
+        <el-col :span="16">
+          <el-button type="primary" @click="openCreate">Add Worker</el-button>
+        </el-col>
+        <el-col :span="8">
+          <div class="mb-3">
+            <el-input v-model="state.search" placeholder="Search by name..." clearable @clear="fetchData(1)"
+              @keyup.enter.native="fetchData(1)">
+              <template #append>
+                <el-button @click="fetchData(1)">Search</el-button>
+              </template>
+            </el-input>
+          </div>
+        </el-col>
+      </el-row>
+    </div>
+
+
+    <el-table :data="state.items" v-loading="state.loading" border style="width:100%" size="small"
+      empty-text="No workers found">
+      <el-table-column prop="id" label="ID" width="70" />
+      <el-table-column prop="first_name" label="First Name" width="200" show-overflow-tooltip />
+      <el-table-column prop="last_name" label="Last Name" width="200" show-overflow-tooltip />
+      <el-table-column prop="email" label="Email" width="240" show-overflow-tooltip />
 
       <!-- New: Supervisor -->
       <el-table-column label="Supervisor" min-width="220" show-overflow-tooltip>
@@ -52,11 +45,8 @@
       <el-table-column label="Roles" min-width="280">
         <template #default="{ row }">
           <div class="flex flex-wrap gap-1">
-            <el-tag
-                v-for="rr in (row.worker_roles || [])"
-                :key="(rr.id ?? rr.role_id) + '-' + (rr.general_rate ?? '')"
-                size="small"
-            >
+            <el-tag v-for="rr in (row.worker_roles || [])" :key="(rr.id ?? rr.role_id) + '-' + (rr.general_rate ?? '')"
+              size="small">
               {{ roleLabelById.get(Number(rr.role_id)) || rr.role_id }} — ${{ rr.general_rate ?? 0 }}
             </el-tag>
           </div>
@@ -74,12 +64,8 @@
       <el-table-column label="Actions" width="180" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openEdit(row)">Edit</el-button>
-          <el-popconfirm
-              title="Delete this worker?"
-              confirm-button-text="Yes"
-              cancel-button-text="No"
-              @confirm="remove(row)"
-          >
+          <el-popconfirm title="Delete this worker?" confirm-button-text="Yes" cancel-button-text="No"
+            @confirm="remove(row)">
             <template #reference>
               <el-button size="small" type="danger">Delete</el-button>
             </template>
@@ -89,23 +75,13 @@
     </el-table>
 
     <div class="mt-4 flex justify-end">
-      <el-pagination
-          background
-          layout="prev, pager, next, jumper, ->, total"
-          :total="state.total"
-          :page-size="state.per_page"
-          :current-page="state.page"
-          @current-change="fetchData"
-      />
+      <el-pagination background layout="prev, pager, next, jumper, ->, total" :total="state.total"
+        :page-size="state.per_page" :current-page="state.page" @current-change="fetchData" />
     </div>
 
     <!-- Dialog: Add/Edit Worker + Roles & Rates -->
-    <el-dialog
-        :title="state.editing ? 'Edit Worker' : 'Add Worker'"
-        v-model="state.showDialog"
-        width="860px"
-        :close-on-click-modal="false"
-    >
+    <el-dialog :title="state.editing ? 'Edit Worker' : 'Add Worker'" v-model="state.showDialog" width="860px"
+      :close-on-click-modal="false">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="140px">
         <el-form-item label="First Name" prop="first_name">
           <el-input v-model="form.first_name" />
@@ -121,22 +97,9 @@
 
         <!-- New: Supervisor (remote autocomplete) -->
         <el-form-item label="Supervisor">
-          <el-select
-              v-model="form.supervisor_id"
-              filterable
-              remote
-              clearable
-              placeholder="Type a name..."
-              :remote-method="searchSupervisors"
-              :loading="state.loadingSupers"
-              style="width:100%;"
-          >
-            <el-option
-                v-for="opt in supervisorOptions"
-                :key="opt.value"
-                :label="opt.label"
-                :value="opt.value"
-            />
+          <el-select v-model="form.supervisor_id" filterable remote clearable placeholder="Type a name..."
+            :remote-method="searchSupervisors" :loading="state.loadingSupers" style="width:100%;">
+            <el-option v-for="opt in supervisorOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>
 
@@ -145,34 +108,17 @@
             <el-table :data="form.worker_roles" border size="small" style="width:100%;">
               <el-table-column label="Role" width="300">
                 <template #default="{ row }">
-                  <el-select
-                      v-model="row.role_id"
-                      filterable
-                      placeholder="Select role"
-                      :loading="state.loadingRoles"
-                      style="width:100%;"
-                  >
-                    <el-option
-                        v-for="opt in rolesOptions"
-                        :key="opt.value"
-                        :label="opt.label"
-                        :value="opt.value"
-                    />
+                  <el-select v-model="row.role_id" filterable placeholder="Select role" :loading="state.loadingRoles"
+                    style="width:100%;">
+                    <el-option v-for="opt in rolesOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
                   </el-select>
                 </template>
               </el-table-column>
 
               <el-table-column label="Rate" width="140">
                 <template #default="{ row }">
-                  <el-input-number
-                      v-model="row.general_rate"
-                      :min="0"
-                      :step="0.5"
-                      :precision="2"
-                      placeholder="Rate"
-                      controls-position="right"
-                      style="width:100%;"
-                  />
+                  <el-input-number v-model="row.general_rate" :min="0" :step="0.5" :precision="2" placeholder="Rate"
+                    controls-position="right" style="width:100%;" />
                 </template>
               </el-table-column>
 
@@ -264,21 +210,21 @@ const rules = {
 }
 
 /** HELPERS (roles table) */
-function newRoleRow () {
+function newRoleRow() {
   return {
     uid: Math.random().toString(36).slice(2),
     role_id: null,
     general_rate: null,
   }
 }
-function addRoleRow () {
+function addRoleRow() {
   form.worker_roles.push(newRoleRow())
 }
-function removeRoleRow (row) {
+function removeRoleRow(row) {
   const i = form.worker_roles.findIndex(r => r.uid === row.uid)
   if (i >= 0) form.worker_roles.splice(i, 1)
 }
-function validateRoleRows () {
+function validateRoleRows() {
   for (const r of form.worker_roles) {
     if (r.role_id == null) throw new Error('Each role row needs a Role.')
     if (r.general_rate === null || r.general_rate === '' || isNaN(Number(r.general_rate))) {
@@ -298,8 +244,8 @@ async function fetchRoles() {
     if (!data.success) throw new Error(data.data?.message || 'Failed to load roles')
     const items = Array.isArray(data.data?.items) ? data.data.items : []
     rolesOptions.value = items
-        .filter(r => String(r.is_active) === '1')
-        .map(r => ({ value: Number(r.id), label: `${r.code || 'ROLE'}` }))
+      .filter(r => String(r.is_active) === '1')
+      .map(r => ({ value: Number(r.id), label: `${r.code || 'ROLE'}` }))
   } catch (e) {
     console.error(e)
     ElMessage.error(e.message || 'Error loading roles')
@@ -337,26 +283,26 @@ async function searchSupervisors(query) {
 /** MAP row -> form (for edit) */
 function mapRowToForm(row) {
   form.first_name = row.first_name || ''
-  form.last_name  = row.last_name || ''
-  form.email      = row.email || ''
-  form.is_active  = String(row.is_active ?? '1')
+  form.last_name = row.last_name || ''
+  form.email = row.email || ''
+  form.is_active = String(row.is_active ?? '1')
   form.supervisor_id = row.supervisor_id != null ? Number(row.supervisor_id) : null
 
   // ensure current supervisor shows as selected label in the remote select
   if (form.supervisor_id) {
     const label =
-        row.supervisor_full_name ||
-        `${row.supervisor_first_name || ''} ${row.supervisor_last_name || ''}`.trim()
+      row.supervisor_full_name ||
+      `${row.supervisor_first_name || ''} ${row.supervisor_last_name || ''}`.trim()
     if (label && !supervisorOptions.value.find(o => o.value === form.supervisor_id)) {
       supervisorOptions.value.push({ value: form.supervisor_id, label })
     }
   }
 
   const incoming = Array.isArray(row.worker_roles)
-      ? row.worker_roles
-      : Array.isArray(row.roles_assignments)
-          ? row.roles_assignments
-          : []
+    ? row.worker_roles
+    : Array.isArray(row.roles_assignments)
+      ? row.roles_assignments
+      : []
 
   form.worker_roles = incoming.map((r) => ({
     uid: Math.random().toString(36).slice(2),
@@ -506,10 +452,27 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.wp-wrap { padding: 0.5rem; }
-.el-pagination { margin-top: 20px; }
-.flex { display: flex; }
-.flex-wrap { flex-wrap: wrap; }
-.gap-1 { gap: 0.25rem; }
-.text-gray-400 { color: #a0aec0; }
+.wp-wrap {
+  padding: 0.5rem;
+}
+
+.el-pagination {
+  margin-top: 20px;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.gap-1 {
+  gap: 0.25rem;
+}
+
+.text-gray-400 {
+  color: #a0aec0;
+}
 </style>

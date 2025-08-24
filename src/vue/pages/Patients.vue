@@ -4,35 +4,26 @@
       <h2 class="text-xl font-semibold">Patients</h2>
     </div>
 
-    <el-row :gutter="20">
-      <el-col :span="20">
-        <el-button type="primary" @click="openCreate">Add Patient</el-button>
-      </el-col>
-      <el-col :span="4">
-        <div class="mb-3">
-          <el-input
-              v-model="state.search"
-              placeholder="Search by name..."
-              clearable
-              @clear="fetchData(1)"
-              @keyup.enter.native="fetchData(1)"
-          >
-            <template #append>
-              <el-button @click="fetchData(1)">Search</el-button>
-            </template>
-          </el-input>
-        </div>
-      </el-col>
-    </el-row>
+    <div class="mb-20">
+      <el-row :gutter="20">
+        <el-col :span="20">
+          <el-button type="primary" @click="openCreate">Add Patient</el-button>
+        </el-col>
+        <el-col :span="4">
+          <div class="mb-3">
+            <el-input v-model="state.search" placeholder="Search by name..." clearable @clear="fetchData(1)"
+              @keyup.enter.native="fetchData(1)">
+              <template #append>
+                <el-button @click="fetchData(1)">Search</el-button>
+              </template>
+            </el-input>
+          </div>
+        </el-col>
+      </el-row>
+    </div>
 
-    <el-table
-        :data="state.items"
-        v-loading="state.loading"
-        border
-        style="width: 100%"
-        size="small"
-        empty-text="No patients found"
-    >
+    <el-table :data="state.items" v-loading="state.loading" border style="width: 100%" size="small"
+      empty-text="No patients found">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="first_name" label="First Name" />
       <el-table-column prop="last_name" label="Last Name" />
@@ -46,12 +37,8 @@
       <el-table-column label="Actions" width="180" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openEdit(row)">Edit</el-button>
-          <el-popconfirm
-              title="Delete this patient?"
-              confirm-button-text="Yes"
-              cancel-button-text="No"
-              @confirm="remove(row)"
-          >
+          <el-popconfirm title="Delete this patient?" confirm-button-text="Yes" cancel-button-text="No"
+            @confirm="remove(row)">
             <template #reference>
               <el-button size="small" type="danger">Delete</el-button>
             </template>
@@ -61,22 +48,12 @@
     </el-table>
 
     <div class="mt-4 flex justify-end">
-      <el-pagination
-          background
-          layout="prev, pager, next, jumper, ->, total"
-          :total="state.total"
-          :page-size="state.per_page"
-          :current-page="state.page"
-          @current-change="fetchData"
-      />
+      <el-pagination background layout="prev, pager, next, jumper, ->, total" :total="state.total"
+        :page-size="state.per_page" :current-page="state.page" @current-change="fetchData" />
     </div>
 
-    <el-dialog
-        :title="state.editing ? 'Edit Patient' : 'Add Patient'"
-        v-model="state.showDialog"
-        width="820px"
-        :close-on-click-modal="false"
-    >
+    <el-dialog :title="state.editing ? 'Edit Patient' : 'Add Patient'" v-model="state.showDialog" width="820px"
+      :close-on-click-modal="false">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="130px">
         <el-form-item label="First Name" prop="first_name">
           <el-input v-model="form.first_name" />
@@ -95,72 +72,34 @@
 
         <!-- Assignments -->
         <el-divider>Assignments (Worker → Role → Rate)</el-divider>
-        <el-alert
-            type="info"
-            show-icon
-            :closable="false"
-            class="mb-3"
-            description="Add one or more worker-role assignments for this patient. Role options are filtered by the selected worker. Rate defaults to the worker's role rate but can be adjusted."
-        />
+        <el-alert type="info" show-icon :closable="false" class="mb-3"
+          description="Add one or more worker-role assignments for this patient. Role options are filtered by the selected worker. Rate defaults to the worker's role rate but can be adjusted." />
         <div class="assignments">
-          <el-table
-              :data="form.assignments"
-              border
-              style="width: 100%"
-              size="small"
-              empty-text="No assignments yet"
-          >
+          <el-table :data="form.assignments" border style="width: 100%" size="small" empty-text="No assignments yet">
             <el-table-column label="Worker">
               <template #default="{ row }">
-                <el-select
-                    v-model="row.worker_id"
-                    filterable
-                    remote
-                    reserve-keyword
-                    placeholder="Search worker…"
-                    :remote-method="q => remoteSearchWorkers(q, row)"
-                    :loading="row._workerLoading === true"
-                    style="width: 100%"
-                    @change="() => onWorkerChange(row)"
-                >
-                  <el-option
-                      v-for="w in row._workerOptions || []"
-                      :key="w.id"
-                      :label="`${w.first_name} ${w.last_name}${w.is_active==1?'':' (inactive)'}`"
-                      :value="w.id"
-                  />
+                <el-select v-model="row.worker_id" filterable remote reserve-keyword placeholder="Search worker…"
+                  :remote-method="q => remoteSearchWorkers(q, row)" :loading="row._workerLoading === true"
+                  style="width: 100%" @change="() => onWorkerChange(row)">
+                  <el-option v-for="w in row._workerOptions || []" :key="w.id"
+                    :label="`${w.first_name} ${w.last_name}${w.is_active == 1 ? '' : ' (inactive)'}`" :value="w.id" />
                 </el-select>
               </template>
             </el-table-column>
 
             <el-table-column label="Role" width="260">
               <template #default="{ row }">
-                <el-select
-                    v-model="row.role_id"
-                    placeholder="Select role"
-                    :disabled="!row.worker_id"
-                    style="width: 100%"
-                    @change="() => onRoleChange(row)"
-                >
-                  <el-option
-                      v-for="r in row._rolesForWorker || []"
-                      :key="r.role_id"
-                      :label="r.role_name"
-                      :value="r.role_id"
-                  />
+                <el-select v-model="row.role_id" placeholder="Select role" :disabled="!row.worker_id"
+                  style="width: 100%" @change="() => onRoleChange(row)">
+                  <el-option v-for="r in row._rolesForWorker || []" :key="r.role_id" :label="r.role_name"
+                    :value="r.role_id" />
                 </el-select>
               </template>
             </el-table-column>
 
             <el-table-column label="Rate" width="160">
               <template #default="{ row }">
-                <el-input-number
-                    v-model="row.rate"
-                    :precision="2"
-                    :step="1"
-                    :min="0"
-                    style="width: 140px"
-                />
+                <el-input-number v-model="row.rate" :precision="2" :step="1" :min="0" style="width: 140px" />
               </template>
             </el-table-column>
 
@@ -252,20 +191,20 @@ async function openEdit(row) {
   }))
   // Para cada assignment, cargar worker y roles
   for (const assignment of form.assignments) {
-    
+
     await remoteSearchWorkers('', assignment) // carga worker options
     if (assignment.worker_id) {
       await onWorkerChange(assignment) // carga roles para ese worker
-      }
-      // Seleccionar el rol del assignment si existe en la lista
-      const foundRole = assignment._rolesForWorker.find(r => r.role_id === assignment.role_id)
-      if (foundRole) {
-        assignment.role_id = foundRole.role_id
-        if (foundRole.general_rate != null) {
-          assignment._lastRoleDefault = Number(foundRole.general_rate)
-        }
+    }
+    // Seleccionar el rol del assignment si existe en la lista
+    const foundRole = assignment._rolesForWorker.find(r => r.role_id === assignment.role_id)
+    if (foundRole) {
+      assignment.role_id = foundRole.role_id
+      if (foundRole.general_rate != null) {
+        assignment._lastRoleDefault = Number(foundRole.general_rate)
       }
     }
+  }
   state.showDialog = true
 }
 
@@ -474,7 +413,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.wp-wrap { padding: 0.5rem; }
-.el-pagination { margin-top: 20px; }
-.assignments :deep(.el-table__empty-block) { min-height: 48px; }
+.wp-wrap {
+  padding: 0.5rem;
+}
+
+.el-pagination {
+  margin-top: 20px;
+}
+
+.assignments :deep(.el-table__empty-block) {
+  min-height: 48px;
+}
 </style>
