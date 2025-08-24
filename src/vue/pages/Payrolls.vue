@@ -421,4 +421,5 @@ onMounted(fetchList)
 .text-gray-500 { color: #6b7280; }
 .text-xs { font-size: 12px; }
 .font-medium { font-weight: 600; }
+h2{ color: var(--el-text-color-primary); }
 </style>

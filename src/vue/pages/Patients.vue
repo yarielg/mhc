@@ -424,4 +424,6 @@ onMounted(() => {
 .assignments :deep(.el-table__empty-block) {
   min-height: 48px;
 }
+
+h2{ color: var(--el-text-color-primary); }
 </style>

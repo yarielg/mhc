@@ -475,4 +475,6 @@ onMounted(() => {
 .text-gray-400 {
   color: #a0aec0;
 }
+
+h2{ color: var(--el-text-color-primary); }
 </style>

@@ -172,7 +172,7 @@
               </el-tab-pane>
 
               <el-tab-pane name="extras" label="Extras">
-                <div class="mb-2 flex gap-2">
+                <div class="mb-20 flex gap-2">
                   <!-- Worker filter (optional) -->
                   <el-select-v2
                       v-model="extrasFilter.worker"

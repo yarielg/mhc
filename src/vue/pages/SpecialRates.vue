@@ -241,4 +241,8 @@ onMounted(() => {
 .el-pagination {
   margin-top: 20px;
 }
+
+h2 {
+  color: var(--el-text-color-primary);
+}
 </style>
