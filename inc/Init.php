@@ -17,6 +17,7 @@ final class Init{
             Controllers\DashboardController::class,
             Controllers\PayrollController::class,
             Controllers\PdfController::class,
+            Controllers\SeedController::class,
 
             //Base\Ajax::class,
         ];

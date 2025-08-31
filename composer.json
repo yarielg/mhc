@@ -11,7 +11,8 @@
         }
     ],
     "require": {
-        "tecnickcom/tcpdf": "^6.10"
+        "tecnickcom/tcpdf": "^6.10",
+        "fakerphp/faker": "^1.24"
     },
     "autoload": {
         "psr-4": { "Mhc\\Inc\\": "./inc"
