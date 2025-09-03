@@ -27,13 +27,13 @@
     <el-table :data="state.items" v-loading="state.loading" border style="width:100%" size="small"
       empty-text="No workers found">
       <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="first_name" label="First Name" width="200" show-overflow-tooltip />
-      <el-table-column prop="last_name" label="Last Name" width="200" show-overflow-tooltip />
-      <el-table-column prop="email" label="Email" width="240" show-overflow-tooltip />
+      <el-table-column prop="first_name" label="First Name" width="150" show-overflow-tooltip />
+      <el-table-column prop="last_name" label="Last Name" width="150" show-overflow-tooltip />
+      <el-table-column prop="email" label="Email" width="210" show-overflow-tooltip />
       <el-table-column prop="company" label="Company" width="200" show-overflow-tooltip />
 
       <!-- New: Supervisor -->
-      <el-table-column label="Supervisor" min-width="220" show-overflow-tooltip>
+      <el-table-column label="Supervisor" min-width="210" show-overflow-tooltip>
         <template #default="{ row }">
           <span v-if="row.supervisor_id">
             {{ row.supervisor_full_name || (row.supervisor_first_name + ' ' + row.supervisor_last_name).trim() }}
@@ -43,7 +43,7 @@
       </el-table-column>
 
       <!-- Roles with labels + rates -->
-      <el-table-column label="Roles" min-width="280">
+      <el-table-column label="Roles" min-width="100">
         <template #default="{ row }">
           <div class="flex flex-wrap gap-1">
             <el-tag v-for="rr in (row.worker_roles || [])" :key="(rr.id ?? rr.role_id) + '-' + (rr.general_rate ?? '')"
@@ -54,7 +54,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="Active" width="110">
+      <el-table-column label="Active" width="80">
         <template #default="{ row }">
           <el-tag :type="String(row.is_active) === '1' ? 'success' : 'info'">
             {{ String(row.is_active) === '1' ? 'Active' : 'Inactive' }}
@@ -62,15 +62,9 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="Actions" width="180" fixed="right">
+      <el-table-column label="Actions" width="80" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="openEdit(row)">Edit</el-button>
-          <el-popconfirm title="Delete this worker?" confirm-button-text="Yes" cancel-button-text="No"
-            @confirm="remove(row)">
-            <template #reference>
-              <el-button size="small" type="danger">Delete</el-button>
-            </template>
-          </el-popconfirm>
+          <el-button size="small" @click="openEdit(row)">Edit</el-button>          
         </template>
       </el-table-column>
     </el-table>
