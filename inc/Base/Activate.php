@@ -214,14 +214,14 @@ class Activate {
             $wpdb->insert("{$pfx}mhc_special_rates", [
                 'code' => 'initial_assessment',
                 'label' => 'Initial Assessment',
-                'cpt_code' => '97151',
+                'cpt_code' => '97151 (24U)',
                 'unit_rate' => 457.20,
                 'is_active' => 1,
             ]);
             $wpdb->insert("{$pfx}mhc_special_rates", [
                 'code' => 'reassessment',
                 'label' => 'Reassessment',
-                'cpt_code' => '97151',
+                'cpt_code' => '97151TS (18U)',
                 'unit_rate' => 342.90,
                 'is_active' => 1,
             ]);

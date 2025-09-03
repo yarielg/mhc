@@ -134,35 +134,57 @@ class PdfController
         $pdf->SetFont('helvetica', 'B', 13);
         $pdf->Cell(0, 10, 'Hours', 0, 1, 'L');
         $pdf->SetFont('helvetica', '', 11);
-        if (!empty($data['hours'])) {
-            foreach ($data['hours'] as $h) {
-                $pdf->Cell(60, 8, 'Patient: ' . ($h->patient_name ?? ''), 0, 0, 'L');
-                $pdf->Cell(30, 8, 'Role: ' . ($h->role_code ?? ''), 0, 0, 'L');
-                $pdf->Cell(25, 8, 'Hours: ' . ($h->hours ?? 0), 0, 0, 'L');
-                $pdf->Cell(30, 8, 'Rate: $' . number_format($h->used_rate ?? 0, 2), 0, 0, 'L');
-                $pdf->Cell(30, 8, 'Total: $' . number_format($h->total ?? 0, 2), 0, 1, 'L');
+            if (!empty($data['hours'])) {
+                // Encabezados de la tabla
+                $pdf->SetFont('helvetica', 'B', 11);
+                $pdf->Cell(60, 8, 'Patient', 1, 0, 'L');
+                $pdf->Cell(30, 8, 'Role', 1, 0, 'L');
+                $pdf->Cell(25, 8, 'Hours', 1, 0, 'L');
+                $pdf->Cell(30, 8, 'Rate', 1, 0, 'L');
+                $pdf->Cell(30, 8, 'Total', 1, 1, 'L');
+                $pdf->SetFont('helvetica', '', 11);
+                foreach ($data['hours'] as $h) {
+                    $pdf->Cell(60, 8, ($h->patient_name ?? ''), 1, 0, 'L');
+                    $pdf->Cell(30, 8, ($h->role_code ?? ''), 1, 0, 'L');
+                    $pdf->Cell(25, 8, ($h->hours ?? 0), 1, 0, 'L');
+                    $pdf->Cell(30, 8, '$' . number_format($h->used_rate ?? 0, 2), 1, 0, 'L');
+                    $pdf->Cell(30, 8, '$' . number_format($h->total ?? 0, 2), 1, 1, 'L');
+                }
+            } else {
+                $pdf->Cell(0, 8, 'No hours registered.', 0, 1, 'L');
             }
-        } else {
-            $pdf->Cell(0, 8, 'No hours registered.', 0, 1, 'L');
-        }
-        $pdf->Ln(4);
+            $pdf->Ln(4);
 
         // Extras
-        $pdf->SetFont('helvetica', 'B', 13);
-        $pdf->Cell(0, 10, 'Extras', 0, 1, 'L');
-        $pdf->SetFont('helvetica', '', 11);
         if (!empty($data['extras'])) {
+            $pdf->SetFont('helvetica', 'B', 13);
+            $pdf->Cell(0, 10, 'Extras', 0, 1, 'L');
+            $pdf->SetFont('helvetica', 'B', 11);
+            $pdf->Cell(55, 8, 'Label', 1, 0, 'L');
+            $pdf->Cell(35, 8, 'Code', 1, 0, 'L');
+            $pdf->Cell(35, 8, 'Worker/Patient', 1, 0, 'L');
+            $pdf->Cell(20, 8, 'Amount', 1, 0, 'L');
+            $pdf->Cell(40, 8, 'Notes', 1, 1, 'L');
+            $pdf->SetFont('helvetica', '', 11);
             foreach ($data['extras'] as $e) {
-                $pdf->MultiCell(50, 8, 'Code: ' . ($e->code ?? ''), 0, 'L', false, 0);
-                $pdf->MultiCell(60, 8, 'Label: ' . ($e->label ?? ''), 0, 'L', false, 0);
-                $pdf->MultiCell(30, 8, 'Amount: $' . number_format($e->amount ?? 0, 2), 0, 'L', false, 0);
-                //$pdf->MultiCell(30, 8, 'Rate: $' . number_format($e->unit_rate ?? 0, 2), 0, 'L', false, 0);
-                $pdf->MultiCell(0, 8, 'Notes: ' . ($e->notes ?? ''), 0, 'L', false, 1);
+                // Calcular la altura necesaria para la celda Notes
+                $notes = $e->notes ?? '';
+                $notesHeight = $pdf->getStringHeight(40, $notes);
+                $rowHeight = max(8, $notesHeight);
+                $pdf->Cell(55, $rowHeight, ($e->label ?? ''), 1, 0, 'L');
+                $pdf->Cell(35, $rowHeight, ($e->cpt_code ?? ''), 1, 0, 'L');
+                $entity_name = '';
+                if (!empty($e->supervised_worker_name)) {
+                    $entity_name = $e->supervised_worker_name;
+                } elseif (!empty($e->patient_name)) {
+                    $entity_name = $e->patient_name;
+                } 
+                $pdf->Cell(35, $rowHeight, $entity_name, 1, 0, 'L');
+                $pdf->Cell(20, $rowHeight, '$' . number_format($e->amount ?? 0, 2), 1, 0, 'L');
+                $pdf->MultiCell(40, $rowHeight, $notes, 1, 'L', false, 1);
             }
-        } else {
-            $pdf->Cell(0, 8, 'No extras registered.', 0, 1, 'L');
+            $pdf->Ln(4);
         }
-        $pdf->Ln(4);
 
         // Totals
         $pdf->SetFont('helvetica', 'B', 13);
