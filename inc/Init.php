@@ -16,6 +16,7 @@ final class Init{
             Controllers\SpecialRatesController::class,
             Controllers\DashboardController::class,
             Controllers\PayrollController::class,
+            Controllers\PayrollSegmentController::class,
             Controllers\PdfController::class,
             Controllers\SeedController::class,
 
