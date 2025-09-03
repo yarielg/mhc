@@ -31,11 +31,13 @@ class SeedController {
         for ($i = 0; $i < 10; $i++) {
             $first = $faker->firstName;
             $last = $faker->lastName;
+            $company = $faker->company;
             $email = strtolower($first . '.' . $last . rand(1,99) . '@example.com');
             $wpdb->insert("{$pfx}mhc_workers", [
                 'first_name' => $first,
                 'last_name' => $last,
                 'email' => $email,
+                'company' => $company,
                 'is_active' => 1,
                 'start_date' => date('Y-m-d', strtotime('-1 year')),
             ]);
