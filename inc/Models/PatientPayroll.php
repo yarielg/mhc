@@ -12,7 +12,7 @@ class PatientPayroll {
     }
 
     // Lista de pacientes por payroll, con join a pacientes y filtro opcional de is_processed
-    public static function findByPayroll($payroll_id, $args = []) {
+    public static function findByPayroll($payroll_id, $args = [], $search = '') {
         global $wpdb;
         $pfx = $wpdb->prefix;
 
@@ -24,21 +24,27 @@ class PatientPayroll {
             $params[] = (int)$args['is_processed'];
         }
 
+        // 🔹 Nuevo: búsqueda por nombre
+        if (!empty($args['search'])) {
+            $where[] = "(p.first_name LIKE %s OR p.last_name LIKE %s)";
+            $search = '%' . $wpdb->esc_like($args['search']) . '%';
+            $params[] = $search;
+            $params[] = $search;
+        }
+
         $sql = "
-            SELECT
-                pp.id,
-                pp.payroll_id,
-                pp.patient_id,
-                pp.is_processed,
-                p.first_name,
-                p.last_name
-            FROM {$pfx}mhc_patient_payrolls pp
-            INNER JOIN {$pfx}mhc_patients p ON p.id = pp.patient_id
-            WHERE " . implode(' AND ', $where) . "
-            ORDER BY p.last_name ASC, p.first_name ASC
-        ";
-
-
+        SELECT
+            pp.id,
+            pp.payroll_id,
+            pp.patient_id,
+            pp.is_processed,
+            p.first_name,
+            p.last_name
+        FROM {$pfx}mhc_patient_payrolls pp
+        INNER JOIN {$pfx}mhc_patients p ON p.id = pp.patient_id
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY p.last_name ASC, p.first_name ASC
+    ";
 
         return $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
     }

@@ -50,11 +50,24 @@
           <el-card shadow="never" class="h-full">
             <template #header>
               <div class="flex items-center justify-between">
-                <div class="font-semibold">Patients in payroll</div>
+                <div class="font-semibold">Patients</div>
+
+
                 <el-segmented v-model="patientsFilter" :options="patientFilters" size="small" @change="loadPatients" />
               </div>
             </template>
-
+            <el-input
+                v-model="patientSearch"
+                placeholder="Search patient..."
+                clearable
+                size="small"
+                @input="loadPatients"
+                style="width: 200px"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
             <el-table
                 :data="patients"
                 size="small"
@@ -228,6 +241,19 @@
               <el-tab-pane name="summary" label="Workers summary">
                 <div class="mb-2 text-sm text-gray-600">
                   Totals per worker (hours + extras).
+
+                  <el-input
+                      v-model="workerSearch"
+                      placeholder="Search worker..."
+                      clearable
+                      size="small"
+                      @input="loadSummary"
+                      style="width: 200px;float: right"
+                  >
+                    <template #prefix>
+                      <el-icon><Search /></el-icon>
+                    </template>
+                  </el-input>
                 </div>
 
                 <el-table
@@ -447,7 +473,7 @@
 <script setup>
 import { onMounted, reactive, ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {User, Message,View, Delete, Edit, Download} from "@element-plus/icons-vue";
+import {User, Message,View, Delete, Edit, Download,Search} from "@element-plus/icons-vue";
 
 const sendingSlip = reactive({});
 
@@ -463,6 +489,9 @@ const hoursEntryId = reactive({})      // { [wprId]: hours_entry.id } (if exists
 const wprSaving = reactive({})         // { [wprId]: true|false }
 const wprSavedTick = reactive({})      // { [wprId]: timestamp }
 const debouncers = {}
+
+const patientSearch = ref("")
+const workerSearch = ref("")
 
 function getWprId(row) {
   return row.worker_patient_role_id || row.id || row.wpr_id
@@ -624,7 +653,7 @@ async function loadPatients() {
 
   loading.patients = true
   try {
-    const data = await ajaxGet('mhc_payroll_patients', { payroll_id: id, is_processed: patientsFilter.value })
+    const data = await ajaxGet('mhc_payroll_patients', { payroll_id: id, is_processed: patientsFilter.value, search: patientSearch.value })
     patients.value = data?.patients || []
     counts.value   = data?.counts || null
   } catch (e) {
@@ -1055,7 +1084,7 @@ async function searchPatients(q) {
 async function loadSummary() {
   loading.summary = true
   try {
-    const res = await ajaxPostForm('mhc_payroll_workers', { payroll_id: id })
+    const res = await ajaxPostForm('mhc_payroll_workers', { payroll_id: id, search: workerSearch.value  })
     summary.items = res?.items || []
     summary.totals = res?.totals || null
   } catch (e) {

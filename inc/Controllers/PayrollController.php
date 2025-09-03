@@ -244,8 +244,9 @@ class PayrollController
 
         $payroll_id   = isset($_REQUEST['payroll_id']) ? (int)$_REQUEST['payroll_id'] : 0;
         $is_processed = $_REQUEST['is_processed'] ?? 'all'; // 'all' | '0' | '1'
+        $search = $_REQUEST['search'] ?? '';
         if ($payroll_id <= 0) wp_send_json_error(['message' => 'Missing payroll_id'], 400);
-        $patients = PatientPayroll::findByPayroll($payroll_id, ['is_processed' => $is_processed]);
+        $patients = PatientPayroll::findByPayroll($payroll_id, ['is_processed' => $is_processed, 'search' => $search]);;
         $counts   = PatientPayroll::countsByStatus($payroll_id);
 
         wp_send_json_success([
@@ -401,6 +402,7 @@ class PayrollController
     {
         self::check();
         $payroll_id = (int)($_POST['payroll_id'] ?? 0);
+        $search     = sanitize_text_field($_POST['search'] ?? ''); // ✅ capture correctly
         if ($payroll_id <= 0) wp_send_json_error(['message' => 'payroll_id requerido'], 400);
 
         // Totales por trabajador (horas)
@@ -445,7 +447,9 @@ class PayrollController
         if (!empty($missing)) {
             global $wpdb;
             $t = $wpdb->prefix . 'mhc_workers';
-            $rows = $wpdb->get_results("SELECT id, CONCAT(first_name,' ',last_name) AS name FROM {$t} WHERE id IN (" . implode(',', array_map('intval', $missing)) . ")", ARRAY_A);
+            // ✅ fix: remove stray AND in WHERE
+            $ids = implode(',', array_map('intval', $missing));
+            $rows = $wpdb->get_results("SELECT id, CONCAT(first_name,' ',last_name) AS name FROM {$t} WHERE id IN ($ids)", ARRAY_A);
             $names = [];
             foreach ($rows ?: [] as $r) $names[(int)$r['id']] = (string)$r['name'];
             foreach ($missing as $wid) {
@@ -453,14 +457,24 @@ class PayrollController
             }
         }
 
-        // Formar salida final (gran_total) y ordenar por nombre
+        // Formar salida base con grand_total
         $items = array_values(array_map(function ($r) {
-            $r['grand_total'] = round($r['hours_amount'] + $r['extras_amount'], 2);
+            $r['grand_total'] = round((float)$r['hours_amount'] + (float)$r['extras_amount'], 2);
             return $r;
         }, $map));
+
+        // 🔎 Aplicar búsqueda por nombre (case-insensitive) antes de ordenar y sumar
+        if ($search !== '') {
+            $needle = mb_strtolower($search);
+            $items = array_values(array_filter($items, function ($row) use ($needle) {
+                return mb_stripos($row['worker_name'] ?? '', $needle) !== false;
+            }));
+        }
+
+        // Ordenar por nombre
         usort($items, fn($a, $b) => strcasecmp($a['worker_name'], $b['worker_name']));
 
-        // Totales globales del payroll (para el footer)
+        // Totales globales del payroll (de la lista ya filtrada)
         $sum_hours_amount  = array_sum(array_column($items, 'hours_amount'));
         $sum_extras_amount = array_sum(array_column($items, 'extras_amount'));
         $sum_grand_total   = $sum_hours_amount + $sum_extras_amount;
