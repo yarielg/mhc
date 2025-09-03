@@ -36,13 +36,7 @@
       </el-table-column>
       <el-table-column label="Actions" width="180" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="openEdit(row)">Edit</el-button>
-          <el-popconfirm title="Delete this patient?" confirm-button-text="Yes" cancel-button-text="No"
-            @confirm="remove(row)">
-            <template #reference>
-              <el-button size="small" type="danger">Delete</el-button>
-            </template>
-          </el-popconfirm>
+          <el-button size="small" @click="openEdit(row)">Edit</el-button>          
         </template>
       </el-table-column>
     </el-table>
