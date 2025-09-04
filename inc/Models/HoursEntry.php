@@ -385,7 +385,8 @@ class HoursEntry
                    wpr.worker_id, wpr.patient_id, wpr.role_id,
                    CONCAT(w.first_name,' ',w.last_name) AS worker_name,
                    CONCAT(p.first_name,' ',p.last_name) AS patient_name,
-                   r.code AS role_code, r.name AS role_name
+                   r.code AS role_code, r.name AS role_name,
+                   seg.id AS segment_id, seg.segment_start AS segment_start, seg.segment_end AS segment_end
             FROM {$t} he
             JOIN {$wpr} wpr ON wpr.id = he.worker_patient_role_id
             JOIN {$wk} w ON w.id = wpr.worker_id

@@ -63,7 +63,7 @@ class PdfController
             echo 'Error generando PDF';
             exit;
         }
-        
+
         $download_name = basename($pdfPath);
         header('Content-Type: application/pdf');
         header('Content-Disposition: inline; filename="' . $download_name . '"');
@@ -132,37 +132,44 @@ class PdfController
 
         // Hours
         $pdf->SetFont('helvetica', 'B', 13);
-        $pdf->Cell(0, 10, 'Hours', 0, 1, 'L');
+        $pdf->Cell(0, 10, 'Regular Payments', 0, 1, 'L');
         $pdf->SetFont('helvetica', '', 11);
-            if (!empty($data['hours'])) {
-                // Encabezados de la tabla
-                $pdf->SetFont('helvetica', 'B', 11);
-                $pdf->Cell(60, 8, 'Patient', 1, 0, 'L');
-                $pdf->Cell(30, 8, 'Role', 1, 0, 'L');
-                $pdf->Cell(25, 8, 'Hours', 1, 0, 'L');
-                $pdf->Cell(30, 8, 'Rate', 1, 0, 'L');
-                $pdf->Cell(30, 8, 'Total', 1, 1, 'L');
-                $pdf->SetFont('helvetica', '', 11);
-                foreach ($data['hours'] as $h) {
-                    $pdf->Cell(60, 8, ($h->patient_name ?? ''), 1, 0, 'L');
-                    $pdf->Cell(30, 8, ($h->role_code ?? ''), 1, 0, 'L');
-                    $pdf->Cell(25, 8, ($h->hours ?? 0), 1, 0, 'L');
-                    $pdf->Cell(30, 8, '$' . number_format($h->used_rate ?? 0, 2), 1, 0, 'L');
-                    $pdf->Cell(30, 8, '$' . number_format($h->total ?? 0, 2), 1, 1, 'L');
-                }
-            } else {
-                $pdf->Cell(0, 8, 'No hours registered.', 0, 1, 'L');
+        if (!empty($data['hours'])) {
+            // Encabezados de la tabla
+            $pdf->SetFont('helvetica', 'B', 11);
+            $pdf->Cell(45, 8, 'Patient', 1, 0, 'L');
+            $pdf->Cell(30, 8, 'Role', 1, 0, 'L');
+            $pdf->Cell(25, 8, 'Hours', 1, 0, 'L');
+            $pdf->Cell(30, 8, 'Rate', 1, 0, 'L');
+            //add segment info
+            $pdf->Cell(30, 8, 'Week', 1, 0, 'L');
+            $pdf->Cell(30, 8, 'Total', 1, 1, 'L');
+            $pdf->SetFont('helvetica', '', 11);
+            foreach ($data['hours'] as $h) {
+                // Calcular la altura necesaria para la celda Week (segment)
+                $week_text = ($h->segment_start ?? '') . ' - ' . ($h->segment_end ?? '');
+                $weekHeight = $pdf->getStringHeight(30, $week_text);
+                $rowHeight = max(8, $weekHeight);
+                $pdf->Cell(45, $rowHeight, ($h->patient_name ?? ''), 1, 0, 'L');
+                $pdf->Cell(30, $rowHeight, ($h->role_code ?? ''), 1, 0, 'L');
+                $pdf->Cell(25, $rowHeight, ($h->hours ?? 0), 1, 0, 'L');
+                $pdf->Cell(30, $rowHeight, '$' . number_format($h->used_rate ?? 0, 2), 1, 0, 'L');
+                $pdf->MultiCell(30, $rowHeight, $week_text, 1, 'L', false, 0);
+                $pdf->Cell(30, $rowHeight, '$' . number_format($h->total ?? 0, 2), 1, 1, 'L');
             }
-            $pdf->Ln(4);
+        } else {
+            $pdf->Cell(0, 8, 'No hours registered.', 0, 1, 'L');
+        }
+        $pdf->Ln(4);
 
         // Extras
         if (!empty($data['extras'])) {
             $pdf->SetFont('helvetica', 'B', 13);
-            $pdf->Cell(0, 10, 'Extras', 0, 1, 'L');
+            $pdf->Cell(0, 10, 'Additional Payments', 0, 1, 'L');
             $pdf->SetFont('helvetica', 'B', 11);
             $pdf->Cell(55, 8, 'Label', 1, 0, 'L');
             $pdf->Cell(35, 8, 'Code', 1, 0, 'L');
-            $pdf->Cell(35, 8, 'Worker/Patient', 1, 0, 'L');
+            $pdf->Cell(45, 8, 'To (Worker/Patient)', 1, 0, 'L');
             $pdf->Cell(20, 8, 'Amount', 1, 0, 'L');
             $pdf->Cell(40, 8, 'Notes', 1, 1, 'L');
             $pdf->SetFont('helvetica', '', 11);
@@ -178,8 +185,8 @@ class PdfController
                     $entity_name = $e->supervised_worker_name;
                 } elseif (!empty($e->patient_name)) {
                     $entity_name = $e->patient_name;
-                } 
-                $pdf->Cell(35, $rowHeight, $entity_name, 1, 0, 'L');
+                }
+                $pdf->Cell(45, $rowHeight, $entity_name, 1, 0, 'L');
                 $pdf->Cell(20, $rowHeight, '$' . number_format($e->amount ?? 0, 2), 1, 0, 'L');
                 $pdf->MultiCell(40, $rowHeight, $notes, 1, 'L', false, 1);
             }
@@ -191,9 +198,9 @@ class PdfController
         $pdf->Cell(0, 10, 'Totals', 0, 1, 'L');
         $pdf->SetFont('helvetica', '', 11);
         $totals = $data['totals'] ?? [];
-        $pdf->Cell(50, 8, 'Total Hours: ' . number_format($totals['total_hours'] ?? 0, 2), 0, 0, 'L');
-        $pdf->Cell(50, 8, 'Hours Amount: $' . number_format($totals['hours_amount'] ?? 0, 2), 0, 0, 'L');
-        $pdf->Cell(50, 8, 'Extras Amount: $' . number_format($totals['extras_amount'] ?? 0, 2), 0, 0, 'L');
+        $pdf->Cell(40, 8, 'Total Hours: ' . number_format($totals['total_hours'] ?? 0, 2), 0, 0, 'L');
+        $pdf->Cell(50, 8, 'Regular Amount: $' . number_format($totals['hours_amount'] ?? 0, 2), 0, 0, 'L');
+        $pdf->Cell(55, 8, 'Additional Amount: $' . number_format($totals['extras_amount'] ?? 0, 2), 0, 0, 'L');
         $pdf->Cell(0, 8, 'Grand Total: $' . number_format($totals['grand_total'] ?? 0, 2), 0, 1, 'L');
 
         // Obtener fechas del payroll y nombre del worker
@@ -201,6 +208,10 @@ class PdfController
         $start = $payroll->start_date ?? date('Y-m-d');
         $end = $payroll->end_date ?? date('Y-m-d');
         $worker_name = $data['worker_name'] ?? 'worker';
+        // Mostrar fechas de payroll en el PDF
+        $pdf->SetFont('helvetica', '', 11);
+        $pdf->Cell(0, 8, 'Payroll Period: ' . $start . ' to ' . $end, 0, 1, 'L');
+        $pdf->Ln(2);
         // Limpiar el nombre para archivo
         $worker_name_clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $worker_name);
         $filename = $worker_name_clean . '_' . $start . '-' . $end . '.pdf';
