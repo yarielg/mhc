@@ -204,7 +204,7 @@
                       <el-table-column
                         v-for="seg in segments"
                         :key="'segcol-' + seg.id"
-                        :label="seg.segment_start + ' to ' + seg.segment_end"
+                        :label="formatWeekRange(seg.segment_start, seg.segment_end)"
                         width="180"
                       >
                         <template #default="{ row }">
