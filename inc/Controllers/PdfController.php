@@ -103,7 +103,7 @@ class PdfController
         $company_name = '';
         if (!empty($hours)) {
             $worker_name  = $hours[0]->worker_name ?? '';
-            $company_name = $hours[0]->company ?? '';
+            $company_name = $hours[0]->worker_company ?? '';
         }
         if ($worker_name === '') {
             $t = $wpdb->prefix . 'mhc_workers';
@@ -111,7 +111,7 @@ class PdfController
                 "SELECT CONCAT(first_name,' ',last_name) AS name, company FROM {$t} WHERE id=%d",
                 $data['worker_id']
             ));
-            if ($row) {
+            if ($row) {                
                 $worker_name  = (string)$row->name;
                 $company_name = (string)$row->company;
             }
@@ -160,7 +160,7 @@ class PdfController
     <table style="border:none;">
       <tr>
         <td style="width:70%; border:none;">
-          ' . (file_exists($logo_path) ? '<img src="' . $logo_path . '" width="70" />' : '') . '
+          ' . (file_exists($logo_path) ? '<img src="' . $logo_path . '" width="100" />' : '') . '
         </td>
         <td style="width:30%; text-align:right; border:none;">
           <h2>Worker Payroll Slip</h2>
@@ -223,7 +223,7 @@ class PdfController
     <thead>
       <tr>
         <th>Label</th>
-        <th>Worker/Client</th>
+        <th>Applies To</th>
         <th>Amount</th>
         <th>Notes</th>
       </tr>
