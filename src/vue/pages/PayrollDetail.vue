@@ -751,6 +751,54 @@ function ensureDefaultHoursForAllWpr() {
   }
 }
 
+function prefillSegHoursFromWorkers(items = []) {
+  items.forEach(row => {
+    const wprId = getWprId(row)
+    if (!wprId) return
+
+    // ensure bucket
+    if (!segHours[wprId]) segHours[wprId] = {}
+
+    // Accept any of these shapes:
+    //   row.segments = [{ segment_id, hours, entry_id? }, ...]
+    //   row.segment_hours = [{ segment_id, hours, entry_id? }, ...]
+    //   row.hours_by_segment = [{ segment_id, hours, entry_id? }, ...]
+    const list =
+        row.segments ||
+        row.segment_hours ||
+        row.hours_by_segment ||
+        []
+
+    list.forEach(s => {
+      const segId =
+          Number(s.segment_id ?? s.id ?? s.segmentId ?? 0)
+      if (!segId) return
+
+      const hrs =
+          Number(s.hours ?? s.value ?? s.qty ?? 0)
+      segHours[wprId][segId] = hrs
+
+      const hid =
+          Number(s.entry_id ?? s.hours_entry_id ?? s.entryId ?? 0)
+      if (hid) segEntryId[keySeg(wprId, segId)] = hid
+    })
+  })
+
+  // Fill any missing segment cells with 0 so inputs are controlled
+  ensureSegBucketsForRows(items)
+}
+
+function ensureSegBucketsForRows(rows = []) {
+  rows.forEach(row => {
+    const wprId = getWprId(row)
+    if (!wprId) return
+    if (!segHours[wprId]) segHours[wprId] = {}
+    segments.value.forEach(seg => {
+      if (typeof segHours[wprId][seg.id] !== 'number') segHours[wprId][seg.id] = 0
+    })
+  })
+}
+
 async function loadPatientWorkers() {
   if (!selectedPatient.value) return
   loading.patientWorkers = true
@@ -759,6 +807,8 @@ async function loadPatientWorkers() {
       payroll_id: id, patient_id: selectedPatient.value.patient_id
     })
     patientWorkers.value = res?.items || []
+    // ⬅️ NEW: prefill inputs with the hours your API returns
+    prefillSegHoursFromWorkers(patientWorkers.value)
   } catch (e) {
     ElMessage.error(e.message || 'Failed to load assigned workers')
   } finally {

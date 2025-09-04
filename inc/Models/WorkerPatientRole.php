@@ -45,32 +45,109 @@ class WorkerPatientRole
      */
     public static function listForPatientInPayroll(int $patientId, int $payrollId): array {
         global $wpdb;
-        $t = self::tWPR(); $tw=self::tW(); $tr=self::tR(); $tp=self::tP(); $tpr=self::tPR();
 
+        $t   = self::tWPR();
+        $tw  = self::tW();
+        $tr  = self::tR();
+        $tpr = self::tPR();
+
+        // new tables
+        $tseg = $wpdb->prefix . 'mhc_payroll_segments';
+        $th   = $wpdb->prefix . 'mhc_hours_entries';
+
+        // 1) Payroll header
         $payroll = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$tpr} WHERE id=%d", $payrollId), ARRAY_A);
         if (!$payroll) return [];
 
-        $s = $payroll['start_date']; $e = $payroll['end_date'];
+        $s = $payroll['start_date'];
+        $e = $payroll['end_date'];
 
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT wpr.*, w.first_name AS w_fn, w.last_name AS w_ln, r.code AS role_code, r.name AS role_name
-               FROM {$t} wpr
-               JOIN {$tw} w ON w.id = wpr.worker_id
-               JOIN {$tr} r ON r.id = wpr.role_id
+        // 2) Segments for this payroll (ordered)
+        $segments = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, segment_start, segment_end 
+               FROM {$tseg}
+              WHERE payroll_id = %d
+              ORDER BY segment_start ASC, id ASC",
+                $payrollId
+            ),
+            ARRAY_A
+        ) ?: [];
+
+        // 3) Assigned worker-patient-roles within payroll period
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT wpr.*,
+                    w.first_name AS w_fn, w.last_name AS w_ln,
+                    r.code AS role_code, r.name AS role_name
+               FROM {$t}   AS wpr
+               JOIN {$tw}  AS w   ON w.id  = wpr.worker_id
+               JOIN {$tr}  AS r   ON r.id  = wpr.role_id
               WHERE wpr.patient_id=%d
                 AND (
-                    wpr.end_date IS NULL
-                    OR (wpr.start_date <= %s AND (wpr.end_date IS NULL OR wpr.end_date >= %s))
+                      wpr.end_date IS NULL
+                   OR (wpr.start_date <= %s AND (wpr.end_date IS NULL OR wpr.end_date >= %s))
                 )
               ORDER BY w_ln ASC, w_fn ASC, r.name ASC",
-            $patientId, $e, $s
-        ), ARRAY_A) ?: [];
+                $patientId, $e, $s
+            ),
+            ARRAY_A
+        ) ?: [];
 
-        // completa tarifa efectiva
+        if (empty($rows)) return [];
+
+        // 4) Compute effective names/rates
         foreach ($rows as &$row) {
-            $row['worker_name'] = trim(($row['w_fn'] ?? '').' '.($row['w_ln'] ?? ''));
+            $row['worker_name']    = trim(($row['w_fn'] ?? '') . ' ' . ($row['w_ln'] ?? ''));
             $row['effective_rate'] = self::resolveEffectiveRate($row, $payroll);
         }
+        unset($row);
+
+        // 5) Map hours entries by (wpr_id, segment_id) for this payroll
+        $wprIds = array_map('intval', array_column($rows, 'id'));
+        $segIds = array_map('intval', array_column($segments, 'id'));
+
+        $byKey = []; // "$wprId:$segId" => hours row
+        if (!empty($wprIds) && !empty($segIds)) {
+            $wprPh = implode(',', array_fill(0, count($wprIds), '%d'));
+            $segPh = implode(',', array_fill(0, count($segIds), '%d'));
+
+            // Only pull entries that belong to segments of this payroll
+            $sql = "SELECT he.id, he.worker_patient_role_id, he.segment_id, he.hours, he.used_rate, he.total
+                  FROM {$th} AS he
+                 WHERE he.worker_patient_role_id IN ($wprPh)
+                   AND he.segment_id IN ($segPh)";
+
+            $params = array_merge($wprIds, $segIds);
+            $hoursRows = $wpdb->get_results($wpdb->prepare($sql, $params), ARRAY_A) ?: [];
+
+            foreach ($hoursRows as $hr) {
+                $k = ((int)$hr['worker_patient_role_id']) . ':' . ((int)$hr['segment_id']);
+                $byKey[$k] = $hr;
+            }
+        }
+
+        // 6) Attach per-segment values to each WPR row
+        foreach ($rows as &$row) {
+            $wprId = (int)$row['id'];
+            $row['segments'] = [];
+
+            foreach ($segments as $seg) {
+                $segId = (int)$seg['id'];
+                $k     = $wprId . ':' . $segId;
+                $hr    = $byKey[$k] ?? null;
+
+                $row['segments'][] = [
+                    'segment_id'    => $segId,
+                    'segment_start' => $seg['segment_start'],
+                    'segment_end'   => $seg['segment_end'],
+                    'hours'         => isset($hr['hours']) ? (float)$hr['hours'] : 0.0,
+                    'entry_id'      => isset($hr['id']) ? (int)$hr['id'] : null,
+                ];
+            }
+        }
+        unset($row);
+
         return $rows;
     }
 
