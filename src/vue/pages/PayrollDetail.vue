@@ -216,7 +216,11 @@
                   <el-table-column prop="amount" label="Amount" width="120">
                     <template #default="{ row }">{{ money(row.amount) }}</template>
                   </el-table-column>
-                  <el-table-column prop="patient_name" label="Client" min-width="140" show-overflow-tooltip />
+                  <el-table-column label="Applies To" min-width="140" show-overflow-tooltip>
+                    <template #default="{ row }">
+                      {{ row.patient_name || row.supervised_worker_name || '—' }}
+                    </template>
+                  </el-table-column>
                   <el-table-column prop="notes" label="Notes" min-width="160" show-overflow-tooltip />
 
                   <el-table-column label="Actions" width="200" fixed="right">
