@@ -339,6 +339,7 @@ class PayrollController
         self::check();
         $data = self::json_input();
         $payroll_id = (int)($data['payroll_id'] ?? 0);
+        $segment_id = (int)($data['segment_id'] ?? 0);
         $wpr_id     = (int)($data['worker_patient_role_id'] ?? 0);
         $hours      = isset($data['hours']) ? (float)$data['hours'] : 0.0;
         $used_rate  = isset($data['used_rate']) ? (float)$data['used_rate'] : null;
@@ -354,7 +355,7 @@ class PayrollController
         }
 
         // Guarda/actualiza horas (idempotente por (payroll_id, wpr_id))
-        $res = HoursEntry::setHours($payroll_id, $wpr_id, $hours, $used_rate, null);
+        $res = HoursEntry::setHours($segment_id, $wpr_id, $hours, $used_rate, null);
         if ($res instanceof \WP_Error) wp_send_json_error(['message' => $res->get_error_message()], 400);
 
         // Responder con la lista y totales actualizados para ese paciente

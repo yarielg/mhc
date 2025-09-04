@@ -140,7 +140,7 @@
                         v-loading="loading.patientWorkers"
                         empty-text="No workers assigned yet"
                     >
-                      <el-table-column prop="worker_name" label="Worker" min-width="160" show-overflow-tooltip />
+                      <el-table-column prop="worker_name" label="Worker" min-width="120" show-overflow-tooltip />
                       <el-table-column prop="role_code" label="Role" width="120" />
                       <el-table-column label="Rate" width="110">
                         <template #default="{ row }">
@@ -149,20 +149,23 @@
                       </el-table-column>
 
                       <!-- NEW: inline hours entry -->
-                      <el-table-column label="Hours" width="200">
+                      <el-table-column
+                          v-for="seg in segments"
+                          :key="'segcol-' + seg.id"
+                          :label="seg.segment_start + ' to ' + seg.segment_end"
+                          width="180"
+                      >
                         <template #default="{ row }">
                           <el-input-number
-                              v-model="wprHours[getWprId(row)]"
+                              :model-value="segVal(row, seg)"
+                              @update:model-value="val => setSegVal(row, seg, val)"
+                              @change="val => onSegHoursChange(row, seg, val)"
                               :min="0"
                               :step="0.25"
                               :precision="2"
                               size="small"
                               :disabled="payroll.status === 'finalized'"
-                              @input="onHoursInput(row)"
-                              @change="onHoursChange(row)"
                           />
-                          <span v-if="wprSaving[getWprId(row)]" class="text-xs text-gray-600 ml-2">Saving…</span>
-                          <span v-else-if="wprSavedTick[getWprId(row)]" class="text-xs" style="color:#16a34a">Saved</span>
                         </template>
                       </el-table-column>
 
@@ -497,6 +500,53 @@ function getWprId(row) {
   return row.worker_patient_role_id || row.id || row.wpr_id
 }
 
+const segHours = reactive({})
+
+const keySeg = (wprId, segId) => `${wprId}_${segId}`
+
+function segVal(row, seg) {
+  const wprId = getWprId(row)
+  return Number(segHours[wprId]?.[seg.id] ?? 0)
+}
+
+function setSegVal(row, seg, val) {
+  const wprId = getWprId(row)
+  if (!segHours[wprId]) segHours[wprId] = {}
+  segHours[wprId][seg.id] = Number(val) || 0
+}
+
+async function onSegHoursChange(row, seg, newVal) {
+  if (payroll.status === 'finalized') return
+  const wprId = getWprId(row)
+  const key = keySeg(wprId, seg.id)
+  const hours = Number(newVal ?? segHours[wprId]?.[seg.id] ?? 0)
+
+  try {
+    segSaving[key] = true
+    delete segSavedTick[key]
+
+    const existingId = segEntryId[key] // if you track existing entry IDs
+    if (hours === 0 && existingId) {
+      const res = await ajaxPostForm('mhc_payroll_hours_delete', { id: existingId })
+      hydrateFromHoursResponse(res)
+      delete segEntryId[key]
+    } else {
+      const res = await ajaxPostForm('mhc_payroll_hours_upsert', {
+        payroll_id: id,
+        worker_patient_role_id: wprId,
+        segment_id: seg.id,
+        hours,
+      })
+      hydrateFromHoursResponse(res)
+    }
+
+    segSavedTick[key] = true
+  } finally {
+    delete segSaving[key]
+    setTimeout(() => { delete segSavedTick[key] }, 1200)
+  }
+}
+
 async function ajaxGet(action, params = {}) {
   const url = new URL(AJAX_URL, window.location.origin)
   url.searchParams.set('action', action)
@@ -545,6 +595,7 @@ const loading = reactive({
 
   patients: false,
   patientWorkers: false,
+  segments: false,
   hours: false,
   savingId: null,
 
@@ -572,8 +623,12 @@ function badge(n) { return typeof n === 'number' ? ` (${n})` : '' }
 /* Selected patient and its data */
 const selectedPatient = ref(null)
 const patientWorkers = ref([])
+const segments = ref([])
 const hours = ref([])
 const hoursTotals = ref(null)
+const segSaving = reactive({}) // { [`${wprId}_${segmentId}`]: true|false }
+const segSavedTick = reactive({}) // { [`${wprId}_${segmentId}`]: true|false }
+const segEntryId = reactive({}) // { [`${wprId}_${segmentId}`]: entryId }
 
 /* Tabs */
 const tabs = reactive({ active: 'process' })
@@ -663,6 +718,21 @@ async function loadPatients() {
   }
 }
 
+async function loadSegments() {
+  segments.value = []
+
+  loading.segments = true
+  try {
+    const data = await ajaxGet('mhc_segment_list', { id: id })
+    console.log(data)
+    segments.value = data
+  } catch (e) {
+    ElMessage.error(e.message || 'Failed to load segments')
+  } finally {
+    loading.segments = false
+  }
+}
+
 async function selectPatient(row) {
   selectedPatient.value = row || null
   tabs.active = 'process'
@@ -703,6 +773,7 @@ function onHoursInput(row) {
   if (debouncers[wprId]) clearTimeout(debouncers[wprId])
   debouncers[wprId] = setTimeout(() => saveHoursForRow(row), 600)
 }
+
 
 function onHoursChange(row) {
   // Safety net for browsers that don't fire 'input' the same
@@ -1147,6 +1218,7 @@ async function onTab(name) {
 onMounted(async () => {
   await loadHeader()
   await loadPatients()
+  await loadSegments()
 })
 
 async function sendWorkerSlip(row) {
@@ -1188,7 +1260,7 @@ async function sendWorkerSlip(row) {
 function downloadWorkerSlip(row) {
   const payrollId = typeof id !== 'undefined' ? id : (props?.id || null);
   if (!payrollId || !row?.worker_id) return;
-  
+
   const ajaxUrl = (typeof parameters !== 'undefined' && parameters?.ajax_url)
     ? parameters.ajax_url
     : (window.ajaxurl || '/wp-admin/admin-ajax.php');
@@ -1200,7 +1272,7 @@ function downloadWorkerSlip(row) {
   if (typeof parameters !== 'undefined' && parameters?.nonce) {
     url.searchParams.set('nonce', parameters.nonce);
   }
-  
+
   window.open(url.toString(), '_blank');
 }
 
