@@ -105,6 +105,21 @@ class WorkersController
         if (isset($_POST['is_active']))  $data['is_active']  = (int)$_POST['is_active'] ? 1 : 0;
         $data['worker_roles'] = isset($_POST['worker_roles']) ? wp_unslash($_POST['worker_roles']) : '[]';
 
+        // Validación: si se intenta poner inactivo, verificar asignaciones a pacientes
+        if (isset($_POST['is_active']) && (int)$_POST['is_active'] === 0) {
+            global $wpdb;
+            $pfx = $wpdb->prefix;
+            $count = (int)$wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$pfx}mhc_worker_patient_roles WHERE worker_id = %d",
+                $id
+            ));
+            if ($count > 0) {
+                wp_send_json_error([
+                    'message' => 'Este trabajador está asignado a uno o más pacientes. Asigne otro trabajador a los pacientes antes de inactivarlo.'
+                ], 400);
+            }
+        }
+
         // NEW: supervisor_id validation (cannot be self)
         if (array_key_exists('supervisor_id', $_POST)) {
             $raw = wp_unslash($_POST['supervisor_id']);

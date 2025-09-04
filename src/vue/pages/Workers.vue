@@ -64,7 +64,7 @@
 
       <el-table-column label="Actions" width="80" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="openEdit(row)">Edit</el-button>          
+          <el-button size="small" @click="openEdit(row)">Edit</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -423,9 +423,19 @@ async function submit() {
 
     state.showDialog = false
     ElMessage.success('Saved')
-  } catch (e) {
-    console.error(e)
-    ElMessage.error(e.message || 'Error saving')
+  } catch (e) {    
+    const msg =
+      e?.response?.data?.data?.message ||
+      e?.message ||
+      'Error saving'
+    if (
+      msg.includes('Asigne otro trabajador a los pacientes antes de inactivarlo')
+    ) {
+      ElMessage.warning(msg)
+    } else {
+      console.error(e)
+      ElMessage.error(msg)
+    }
   } finally {
     state.saving = false
   }
@@ -482,5 +492,7 @@ onMounted(() => {
   color: #a0aec0;
 }
 
-h2{ color: var(--el-text-color-primary); }
+h2 {
+  color: var(--el-text-color-primary);
+}
 </style>
