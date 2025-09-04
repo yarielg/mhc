@@ -213,7 +213,9 @@ class PdfController
 
         $html .= '
     </tbody>
-  </table>
+  </table>';
+        if (!empty($extras)) {
+            $html .= '
 
   <!-- Additional Payments -->
   <div class="section-title">Additional Payments</div>
@@ -228,7 +230,7 @@ class PdfController
     </thead>
     <tbody>';
 
-        if (!empty($extras)) {
+
             $j = 0;
             foreach ($extras as $e) {
                 $j++;
@@ -246,14 +248,13 @@ class PdfController
               <td>' . htmlspecialchars($e->notes) . '</td>
             </tr>';
             }
-        } else {
-            // ¡ojo! en tu HTML original ponías colspan="5" pero la tabla tiene 4 columnas:
-            $html .= '<tr><td colspan="4" align="center">No additional payments.</td></tr>';
-        }
 
-        $html .= '
+
+            $html .= '
     </tbody>
-  </table>
+  </table>';
+        }
+        $html .= '
 
   <!-- Totals -->
   <div class="section-title">Totals</div>
@@ -280,7 +281,7 @@ class PdfController
 
   <!-- Footer -->
   <div class="footer">
-    Colilla generada automáticamente - Agency of Mental Health Services © ' . date("Y") . '
+    Slip generated automatically - Agency of Mental Health Services © ' . date("Y") . '
   </div>
 </div>';
 
