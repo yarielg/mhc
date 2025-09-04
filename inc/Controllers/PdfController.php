@@ -164,7 +164,7 @@ class PdfController
         </td>
         <td style="width:30%; text-align:right; border:none;">
           <h2>Worker Payroll Slip</h2>
-          <div style="font-size:10px;">Company: Agency of Mental Health Services</div>
+          <div style="font-size:10px; margin-top: 1rem;">Agency of Mental Health Services</div>
         </td>
       </tr>
     </table>
