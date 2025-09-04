@@ -60,6 +60,7 @@
               <template #title>
                 <el-icon><Setting /></el-icon><span>Settings</span>
               </template>
+              <el-menu-item index="/settings">Settings</el-menu-item>
               <el-menu-item index="/roles">Roles</el-menu-item>
               <el-menu-item index="/special-rates">Special Rates</el-menu-item>
             </el-sub-menu>
@@ -90,8 +91,9 @@
           <el-menu-item index="/workers"><el-icon><User /></el-icon><span>Workers</span></el-menu-item>
           <el-menu-item index="/patients"><el-icon><UserFilled /></el-icon><span>Clients</span></el-menu-item>
 
-          <el-sub-menu index="/settings">
+          <el-sub-menu index="/settings"> 
             <template #title><el-icon><Setting /></el-icon><span>Settings</span></template>
+            <el-menu-item index="/settings">Settings</el-menu-item>
             <el-menu-item index="/roles">Roles</el-menu-item>
             <el-menu-item index="/special-rates">Special Rates</el-menu-item>
           </el-sub-menu>
