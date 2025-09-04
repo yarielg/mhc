@@ -5,7 +5,10 @@
 
 namespace Mhc\Inc\Controllers;
 
-require_once(dirname(__DIR__, 2) . '/vendor/tecnickcom/tcpdf/tcpdf.php');
+use Mpdf\Mpdf;
+use Mpdf\Output\Destination;
+
+
 
 /**
  * Controller for generating payroll and worker slip PDFs using TCPDF.
@@ -79,9 +82,10 @@ class PdfController
      */
     public static function generateWorkerSlipPdf($data = [])
     {
+        global $wpdb;
 
-        // get worker hours and extras
-        $hours = \Mhc\Inc\Models\HoursEntry::listDetailedForPayroll($data['payroll_id'], ['worker_id' => $data['worker_id']]);
+        // Datos (igual que ya lo haces)
+        $hours  = \Mhc\Inc\Models\HoursEntry::listDetailedForPayroll($data['payroll_id'], ['worker_id' => $data['worker_id']]);
         $extras = \Mhc\Inc\Models\ExtraPayment::listDetailedForPayroll($data['payroll_id'], ['worker_id' => $data['worker_id']]);
 
         $th = 0.0;
@@ -95,15 +99,25 @@ class PdfController
             $te += (float)$e->amount;
         }
 
-        $worker_name = '';
-        if (!empty($hours)) $worker_name = $hours[0]->worker_name ?? '';
+        $worker_name  = '';
+        $company_name = '';
+        if (!empty($hours)) {
+            $worker_name  = $hours[0]->worker_name ?? '';
+            $company_name = $hours[0]->worker_company ?? '';
+        }
         if ($worker_name === '') {
-            global $wpdb;
             $t = $wpdb->prefix . 'mhc_workers';
-            $worker_name = (string)$wpdb->get_var($wpdb->prepare("SELECT CONCAT(first_name,' ',last_name) FROM {$t} WHERE id=%d", $worker_id));
+            $row = $wpdb->get_row($wpdb->prepare(
+                "SELECT CONCAT(first_name,' ',last_name) AS name, company FROM {$t} WHERE id=%d",
+                $data['worker_id']
+            ));
+            if ($row) {                
+                $worker_name  = (string)$row->name;
+                $company_name = (string)$row->company;
+            }
         }
 
-        $data['hours'] = $hours;
+        $data['hours']  = $hours;
         $data['extras'] = $extras;
         $data['totals'] = [
             'total_hours'   => round($th, 2),
@@ -112,113 +126,192 @@ class PdfController
             'grand_total'   => round($ta + $te, 2),
         ];
 
+        // Payroll info
+        $payroll = isset($data['payroll_id']) ? \Mhc\Inc\Models\Payroll::findById($data['payroll_id']) : null;
+        $start = $payroll->start_date ?? date('Y-m-d');
+        $end   = $payroll->end_date   ?? date('Y-m-d');
 
-        $logo = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
-        $pdf = new \TCPDF();
-        $pdf->SetCreator('MHC Payroll');
-        $pdf->SetAuthor('MHC');
-        $pdf->SetTitle('Worker Slip PDF');
-        $pdf->SetMargins(10, 20, 10);
-        $pdf->AddPage();
-        if (file_exists($logo)) {
-            $pdf->Image($logo, 20, 10, 40, 0, '', '', '', false, 300);
-        }
-        $pdf->SetFont('helvetica', 'B', 16);
-        $pdf->Cell(0, 18, 'Worker Payroll Slip', 0, 1, 'C');
-        $pdf->SetFont('helvetica', '', 12);
-        $pdf->Cell(0, 10, 'Worker: ' . ($data['worker_name'] ?? '---'), 0, 1, 'L');
-        $pdf->Ln(4);
+        // Logo (ruta absoluta de archivo para mPDF)
+        $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
 
+        // ==== HTML (tu versión ajustada para diseño suave) ====
+        // NOTA: mantenemos nombres/estructura de columnas y datos como pediste.
+        $html = '
+<style>
+  body, .container { font-family: DejaVu Sans, Arial, sans-serif; font-size: 11px; color:#333; }
+  .header { border-bottom: 2px solid #006699; padding-bottom: 10px; margin-bottom: 20px; }
+  .header h2 { margin:0; color:#000; font-size: 16px; }
+  .info p { margin:4px 0; font-size:11px; }
+  .info strong { color:#000; }
+  .section-title { font-size: 12px; font-weight: bold; color:#006699; margin: 18px 0 8px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  thead th { background:#f2f2f2; color:#000; font-weight:bold; text-align:center; border:1px solid #bbb; }
+  tbody td, tfoot td { border:1px solid #bbb; }
+  th, td { font-size:10px; padding:8px; }
+  .footer { font-size: 9px; color:#555; text-align:center; margin-top:22px; }
+  .totals td { background: #e6f0fa; font-weight: bold; }
+  .totals td:first-child { text-align:left; }
+  .spacer { height:10px; }
+</style>
 
-        // Hours
-        $pdf->SetFont('helvetica', 'B', 13);
-        $pdf->Cell(0, 10, 'Regular Payments', 0, 1, 'L');
-        $pdf->SetFont('helvetica', '', 11);
-        if (!empty($data['hours'])) {
-            // Encabezados de la tabla
-            $pdf->SetFont('helvetica', 'B', 11);
-            $pdf->Cell(45, 8, 'Patient', 1, 0, 'L');
-            $pdf->Cell(30, 8, 'Role', 1, 0, 'L');
-            $pdf->Cell(25, 8, 'Hours', 1, 0, 'L');
-            $pdf->Cell(30, 8, 'Rate', 1, 0, 'L');
-            //add segment info
-            $pdf->Cell(30, 8, 'Week', 1, 0, 'L');
-            $pdf->Cell(30, 8, 'Total', 1, 1, 'L');
-            $pdf->SetFont('helvetica', '', 11);
-            foreach ($data['hours'] as $h) {
-                // Calcular la altura necesaria para la celda Week (segment)
-                $week_text = ($h->segment_start ?? '') . ' - ' . ($h->segment_end ?? '');
-                $weekHeight = $pdf->getStringHeight(30, $week_text);
-                $rowHeight = max(8, $weekHeight);
-                $pdf->Cell(45, $rowHeight, ($h->patient_name ?? ''), 1, 0, 'L');
-                $pdf->Cell(30, $rowHeight, ($h->role_code ?? ''), 1, 0, 'L');
-                $pdf->Cell(25, $rowHeight, ($h->hours ?? 0), 1, 0, 'L');
-                $pdf->Cell(30, $rowHeight, '$' . number_format($h->used_rate ?? 0, 2), 1, 0, 'L');
-                $pdf->MultiCell(30, $rowHeight, $week_text, 1, 'L', false, 0);
-                $pdf->Cell(30, $rowHeight, '$' . number_format($h->total ?? 0, 2), 1, 1, 'L');
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <table style="border:none;">
+      <tr>
+        <td style="width:70%; border:none;">
+          ' . (file_exists($logo_path) ? '<img src="' . $logo_path . '" width="100" />' : '') . '
+        </td>
+        <td style="width:30%; text-align:right; border:none;">
+          <h2>Worker Payroll Slip</h2>
+          <div style="font-size:10px;">Company: Agency of Mental Health Services</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Worker Info -->
+  <div class="info">
+    <p><strong>Worker:</strong> ' . htmlspecialchars($worker_name) . '</p>
+    <p><strong>Company:</strong> ' . htmlspecialchars($company_name ?: "---") . '</p>
+    <p><strong>Payroll Period:</strong> ' . $start . ' to ' . $end . '</p>
+  </div>
+
+  <!-- Regular Payments -->
+  <div class="section-title">Regular Payments</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Client</th>
+        <th>Role</th>
+        <th>Week</th>
+        <th>Hours</th>
+        <th>Rate</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>';
+
+        // filas Regular Payments (con zebra opcional sin cambiar nombres de campos)
+        if (!empty($hours)) {
+            $i = 0;
+            foreach ($hours as $h) {
+                $i++;
+                $rowBg = ($i % 2 === 0) ? ' style="background:#fbfbfb;"' : '';
+                $html .= '<tr' . $rowBg . '>
+              <td>' . htmlspecialchars($h->patient_name) . '</td>
+              <td>' . htmlspecialchars($h->role_code) . '</td>
+              <td align="center" style="white-space:nowrap;">' . ($h->segment_start ?? '') . ' – ' . ($h->segment_end ?? '') . '</td>
+              <td align="center">' . number_format($h->hours, 2) . '</td>
+              <td align="right">$' . number_format($h->used_rate, 2) . '</td>
+              <td align="right">$' . number_format($h->total, 2) . '</td>
+            </tr>';
             }
         } else {
-            $pdf->Cell(0, 8, 'No hours registered.', 0, 1, 'L');
+            $html .= '<tr><td colspan="6" align="center">No hours registered.</td></tr>';
         }
-        $pdf->Ln(4);
 
-        // Extras
-        if (!empty($data['extras'])) {
-            $pdf->SetFont('helvetica', 'B', 13);
-            $pdf->Cell(0, 10, 'Additional Payments', 0, 1, 'L');
-            $pdf->SetFont('helvetica', 'B', 11);
-            $pdf->Cell(55, 8, 'Label', 1, 0, 'L');
-            $pdf->Cell(35, 8, 'Code', 1, 0, 'L');
-            $pdf->Cell(45, 8, 'To (Worker/Patient)', 1, 0, 'L');
-            $pdf->Cell(20, 8, 'Amount', 1, 0, 'L');
-            $pdf->Cell(40, 8, 'Notes', 1, 1, 'L');
-            $pdf->SetFont('helvetica', '', 11);
-            foreach ($data['extras'] as $e) {
-                // Calcular la altura necesaria para la celda Notes
-                $notes = $e->notes ?? '';
-                $notesHeight = $pdf->getStringHeight(40, $notes);
-                $rowHeight = max(8, $notesHeight);
-                $pdf->Cell(55, $rowHeight, ($e->label ?? ''), 1, 0, 'L');
-                $pdf->Cell(35, $rowHeight, ($e->cpt_code ?? ''), 1, 0, 'L');
+        $html .= '
+    </tbody>
+  </table>';
+        if (!empty($extras)) {
+            $html .= '
+
+  <!-- Additional Payments -->
+  <div class="section-title">Additional Payments</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Label</th>
+        <th>Applies To</th>
+        <th>Amount</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>';
+
+
+            $j = 0;
+            foreach ($extras as $e) {
+                $j++;
+                $rowBg = ($j % 2 === 0) ? ' style="background:#fbfbfb;"' : '';
                 $entity_name = '';
                 if (!empty($e->supervised_worker_name)) {
                     $entity_name = $e->supervised_worker_name;
                 } elseif (!empty($e->patient_name)) {
                     $entity_name = $e->patient_name;
                 }
-                $pdf->Cell(45, $rowHeight, $entity_name, 1, 0, 'L');
-                $pdf->Cell(20, $rowHeight, '$' . number_format($e->amount ?? 0, 2), 1, 0, 'L');
-                $pdf->MultiCell(40, $rowHeight, $notes, 1, 'L', false, 1);
+                $html .= '<tr' . $rowBg . '>
+              <td style="white-space:nowrap;">' . htmlspecialchars($e->label) . ' ' . htmlspecialchars($e->cpt_code) . '</td>
+              <td>' . htmlspecialchars($entity_name) . '</td>
+              <td align="right">$' . number_format($e->amount, 2) . '</td>
+              <td>' . htmlspecialchars($e->notes) . '</td>
+            </tr>';
             }
-            $pdf->Ln(4);
+
+
+            $html .= '
+    </tbody>
+  </table>';
         }
+        $html .= '
 
-        // Totals
-        $pdf->SetFont('helvetica', 'B', 13);
-        $pdf->Cell(0, 10, 'Totals', 0, 1, 'L');
-        $pdf->SetFont('helvetica', '', 11);
-        $totals = $data['totals'] ?? [];
-        $pdf->Cell(40, 8, 'Total Hours: ' . number_format($totals['total_hours'] ?? 0, 2), 0, 0, 'L');
-        $pdf->Cell(50, 8, 'Regular Amount: $' . number_format($totals['hours_amount'] ?? 0, 2), 0, 0, 'L');
-        $pdf->Cell(55, 8, 'Additional Amount: $' . number_format($totals['extras_amount'] ?? 0, 2), 0, 0, 'L');
-        $pdf->Cell(0, 8, 'Grand Total: $' . number_format($totals['grand_total'] ?? 0, 2), 0, 1, 'L');
+  <!-- Totals -->
+  <div class="section-title">Totals</div>
+  <table>
+    <tbody>
+      <tr class="totals">
+        <td>Total Hours</td>
+        <td colspan="4" align="right">' . number_format($data["totals"]["total_hours"], 2) . '</td>
+      </tr>
+      <tr class="totals">
+        <td>Regular Amount</td>
+        <td colspan="4" align="right">$' . number_format($data["totals"]["hours_amount"], 2) . '</td>
+      </tr>
+      <tr class="totals">
+        <td>Additional Amount</td>
+        <td colspan="4" align="right">$' . number_format($data["totals"]["extras_amount"], 2) . '</td>
+      </tr>
+      <tr class="totals">
+        <td>Grand Total</td>
+        <td colspan="4" align="right">$' . number_format($data["totals"]["grand_total"], 2) . '</td>
+      </tr>
+    </tbody>
+  </table>
 
-        // Obtener fechas del payroll y nombre del worker
-        $payroll = isset($data['payroll_id']) ? \Mhc\Inc\Models\Payroll::findById($data['payroll_id']) : null;
-        $start = $payroll->start_date ?? date('Y-m-d');
-        $end = $payroll->end_date ?? date('Y-m-d');
-        $worker_name = $data['worker_name'] ?? 'worker';
-        // Mostrar fechas de payroll en el PDF
-        $pdf->SetFont('helvetica', '', 11);
-        $pdf->Cell(0, 8, 'Payroll Period: ' . $start . ' to ' . $end, 0, 1, 'L');
-        $pdf->Ln(2);
-        // Limpiar el nombre para archivo
+  <!-- Footer -->
+  <div class="footer">
+    Slip generated automatically - Agency of Mental Health Services © ' . date("Y") . '
+  </div>
+</div>';
+
+        // ====== mPDF ======
+        // tempDir: usa una carpeta escribible (ajústala si quieres)
+        $mpdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'margin_left'   => 10,
+            'margin_right'  => 10,
+            'margin_top'    => 20,
+            'margin_bottom' => 15,
+            'tempDir' => WP_CONTENT_DIR . '/uploads/mpdf', // asegúrate que exista y sea escribible
+        ]);
+        $mpdf->SetTitle('Worker Slip PDF');
+        $mpdf->SetAuthor('MHC');
+        $mpdf->SetCreator('MHC Payroll');
+        $mpdf->autoLangToFont = true; // para acentos/ñ
+
+        $mpdf->WriteHTML($html);
+
+        // Guardar en archivo temporal y devolver ruta (igual que antes)
         $worker_name_clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $worker_name);
         $filename = $worker_name_clean . '_' . $start . '-' . $end . '.pdf';
         $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $filename;
-        $pdf->Output($tmp, 'F');
+
+        $mpdf->Output($tmp, Destination::FILE);
         return $tmp;
     }
+
 
     /**
      * Generates the Slim PDF and returns the file path (or saves it as a temporary file).

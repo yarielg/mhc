@@ -53,7 +53,7 @@
               <el-icon><User /></el-icon><span>Workers</span>
             </el-menu-item>
             <el-menu-item index="/patients">
-              <el-icon><UserFilled /></el-icon><span>Patients</span>
+              <el-icon><UserFilled /></el-icon><span>Clients</span>
             </el-menu-item>
 
             <el-sub-menu index="/settings">
@@ -88,7 +88,7 @@
             <el-menu-item index="/payrolls">All Payrolls</el-menu-item>
           </el-sub-menu>
           <el-menu-item index="/workers"><el-icon><User /></el-icon><span>Workers</span></el-menu-item>
-          <el-menu-item index="/patients"><el-icon><UserFilled /></el-icon><span>Patients</span></el-menu-item>
+          <el-menu-item index="/patients"><el-icon><UserFilled /></el-icon><span>Clients</span></el-menu-item>
 
           <el-sub-menu index="/settings">
             <template #title><el-icon><Setting /></el-icon><span>Settings</span></template>

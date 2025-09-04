@@ -25,6 +25,15 @@ By combining a modern Vue frontend with a WordPress backend, the plugin allows s
 - Node.js 18+ and npm 9+
 - Access to `wp-content/plugins/`
 
+### PHP Extensions
+These must be enabled on the server (usually they are by default on most hosting providers):
+
+- `ext-mbstring` – required by mPDF for UTF-8 and multibyte text rendering.  
+- `ext-gd` – required by mPDF for image rendering.
+
+### Additional Notes
+- Ensure a writable temp directory for mPDF. Recommended: wp-content/uploads/mpdf
+
 ## Installation
 
 1. **Clone the repository** into `wp-content/plugins/`:
@@ -59,6 +68,19 @@ By combining a modern Vue frontend with a WordPress backend, the plugin allows s
 6. **Activate the plugin** in WordPress admin under *Plugins → MHC *.
 
 > 💡 In production, use the build command (`npm run build`) instead of `watch`.
+
+## PDF Generation
+
+The plugin uses **mPDF** to generate worker payslips and payroll reports.
+
+Library installed via Composer:
+
+```bash
+composer require mpdf/mpdf:^8.2
+```
+Fonts: mPDF automatically handles UTF-8 and special characters (á, ñ, ü, etc.).
+
+Images: ensure ext-gd is enabled for logos and signatures.
 
 ## Shortcodes
 

@@ -1,13 +1,13 @@
 <template>
   <div class="wp-wrap">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-semibold">Patients</h2>
+      <h2 class="text-xl font-semibold">Client</h2>
     </div>
 
     <div class="mb-20">
       <el-row :gutter="20">
         <el-col :span="20">
-          <el-button type="primary" @click="openCreate">Add Patient</el-button>
+          <el-button type="primary" @click="openCreate">Add Client</el-button>
         </el-col>
         <el-col :span="4">
           <div class="mb-3">
@@ -23,7 +23,7 @@
     </div>
 
     <el-table :data="state.items" v-loading="state.loading" border style="width: 100%" size="small"
-      empty-text="No patients found">
+      empty-text="No clients found">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="first_name" label="First Name" />
       <el-table-column prop="last_name" label="Last Name" />
@@ -46,7 +46,7 @@
         :page-size="state.per_page" :current-page="state.page" @current-change="fetchData" />
     </div>
 
-    <el-dialog :title="state.editing ? 'Edit Patient' : 'Add Patient'" v-model="state.showDialog" width="820px"
+    <el-dialog :title="state.editing ? 'Edit Client' : 'Add Client'" v-model="state.showDialog" width="820px"
       :close-on-click-modal="false">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="130px">
         <el-form-item label="First Name" prop="first_name">
@@ -67,7 +67,7 @@
         <!-- Assignments -->
         <el-divider>Assignments (Worker → Role → Rate)</el-divider>
         <el-alert type="info" show-icon :closable="false" class="mb-3"
-          description="Add one or more worker-role assignments for this patient. Role options are filtered by the selected worker. Rate defaults to the worker's role rate but can be adjusted." />
+          description="Add one or more worker-role assignments for this client. Role options are filtered by the selected worker. Rate defaults to the worker's role rate but can be adjusted." />
         <div class="assignments">
           <el-table :data="form.assignments" border style="width: 100%" size="small" empty-text="No assignments yet">
             <el-table-column label="Worker">
@@ -219,7 +219,7 @@ async function fetchData(page = state.page) {
     state.total = data.data.total
   } catch (e) {
     console.error(e)
-    ElMessage.error(e.message || 'Error loading patients')
+    ElMessage.error(e.message || 'Error loading clients')
   } finally {
     state.loading = false
   }
