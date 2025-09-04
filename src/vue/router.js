@@ -7,6 +7,7 @@ import Roles from './pages/Roles.vue'
 import SpecialRates from './pages/SpecialRates.vue'
 import Payrolls from "./pages/Payrolls.vue";
 import PayrollDetail from "./pages/PayrollDetail.vue";
+import Settings from './pages/Settings.vue'
 
 const routes = [
     { path: '/', component: Dashboard, meta: { title: 'Dashboard' } },
@@ -15,6 +16,7 @@ const routes = [
     { path: '/payrolls', component: Payrolls, meta: { title: 'Payrolls' } },
     { path: '/roles', component: Roles, meta: { title: 'Roles' } },
     { path: '/special-rates', component: SpecialRates, meta: { title: 'Special Rates' } },
+    { path: '/settings', component: Settings, meta: { title: 'Settings' } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
     {
         path: '/payrolls/:id(\\d+)',
