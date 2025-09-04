@@ -564,47 +564,49 @@
 
         <!-- Show patient/client select only if initialassesment or reassesment special rate -->
         <el-form-item
-          v-if="isAssessmentRate"
-          label="Client (required)"
-          required
-        >
-          <el-select
-            v-model="modals.extra.form.patient_id"
-            filterable
-            remote
-            clearable
-            placeholder="Type a name..."
-            :loading="loading.patients"
-            :remote-method="searchPatients"
-            style="width: 100%"
+            v-if="isAssessmentRate"
+            label="Client (required)"
+            required
           >
-            <el-option
-              v-for="opt in patientsOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
-          </el-select>
-        </el-form-item>
+            <el-select
+              v-model="modals.extra.form.patient_id"
+              filterable
+              remote
+              clearable
+              :multiple="!modals.extra.editing"
+              placeholder="Type a name..."
+              :loading="loading.patients"
+              :remote-method="searchPatients"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="opt in patientsOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </el-form-item>
 
         <!-- Show supervised worker select only if supervision special rate -->
         <el-form-item
-          v-if="isSupervisionRate"
-          label="Supervised worker (required)"
-          required
-        >
-          <el-select-v2
-            v-model="modals.extra.form.supervised_worker_id"
-            placeholder="Search supervised worker…"
-            style="width: 100%"
-            filterable
-            remote
-            clearable
-            :remote-method="searchWorkers"
-            :options="workersOptions"
-            :disabled="payroll.status === 'finalized'"
-          />
-        </el-form-item>
+            v-if="isSupervisionRate"
+            label="Supervised worker (required)"
+            required
+          >
+            <el-select-v2
+              v-model="modals.extra.form.supervised_worker_id"
+              placeholder="Search supervised worker…"
+              style="width: 100%"
+              filterable
+              remote
+              clearable
+              :multiple="!modals.extra.editing"
+              :remote-method="searchWorkers"
+              :options="workersOptions"
+              :disabled="payroll.status === 'finalized'"
+            />
+          </el-form-item>
 
         <el-form-item label="Notes">
           <el-input
@@ -1423,12 +1425,12 @@ async function saveExtra() {
     ElMessage.warning("Worker, special rate, and amount are required");
     return;
   }
-  // Required validation for patient or supervised worker on add/edit
-  if (isAssessmentRate.value && !f.patient_id) {
+  // Required validation for patient o supervised worker en add/edit
+  if (isAssessmentRate.value && (!f.patient_id || (Array.isArray(f.patient_id) && f.patient_id.length === 0))) {
     ElMessage.warning("Client is required for this rate");
     return;
   }
-  if (isSupervisionRate.value && !f.supervised_worker_id) {
+  if (isSupervisionRate.value && (!f.supervised_worker_id || (Array.isArray(f.supervised_worker_id) && f.supervised_worker_id.length === 0))) {
     ElMessage.warning("Supervised worker is required for this rate");
     return;
   }
@@ -1437,15 +1439,26 @@ async function saveExtra() {
     if (modals.extra.editing) {
       await ajaxPostForm("mhc_payroll_extras_update", { ...f });
     } else {
-      await ajaxPostForm("mhc_payroll_extras_create", {
-        payroll_id: id,
-        worker_id: f.worker_id,
-        special_rate_id: f.special_rate_id,
-        amount: f.amount,
-        patient_id: f.patient_id || "",
-        supervised_worker_id: f.supervised_worker_id || "",
-        notes: f.notes || "",
-      });
+      // Si es multiselect, guardar uno por uno
+      let patientIds = isAssessmentRate.value && Array.isArray(f.patient_id) ? f.patient_id : [f.patient_id];
+      let supervisedIds = isSupervisionRate.value && Array.isArray(f.supervised_worker_id) ? f.supervised_worker_id : [f.supervised_worker_id];
+      // Si no aplica, usar array con un solo elemento
+      if (!isAssessmentRate.value) patientIds = [null];
+      if (!isSupervisionRate.value) supervisedIds = [null];
+      // Si ambos son multiselect, hacer combinaciones
+      for (const pid of patientIds) {
+        for (const sid of supervisedIds) {
+          await ajaxPostForm("mhc_payroll_extras_create", {
+            payroll_id: id,
+            worker_id: f.worker_id,
+            special_rate_id: f.special_rate_id,
+            amount: f.amount,
+            patient_id: pid || "",
+            supervised_worker_id: sid || "",
+            notes: f.notes || "",
+          });
+        }
+      }
     }
     modals.extra.visible = false;
     await loadExtras();
