@@ -564,49 +564,49 @@
 
         <!-- Show patient/client select only if initialassesment or reassesment special rate -->
         <el-form-item
-            v-if="isAssessmentRate"
-            label="Client (required)"
-            required
+          v-if="isAssessmentRate"
+          label="Client (required)"
+          required
+        >
+          <el-select
+            v-model="modals.extra.form.patient_id"
+            filterable
+            remote
+            clearable
+            :multiple="!modals.extra.editing"
+            placeholder="Type a name..."
+            :loading="loading.patients"
+            :remote-method="searchPatients"
+            style="width: 100%"
           >
-            <el-select
-              v-model="modals.extra.form.patient_id"
-              filterable
-              remote
-              clearable
-              :multiple="!modals.extra.editing"
-              placeholder="Type a name..."
-              :loading="loading.patients"
-              :remote-method="searchPatients"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="opt in patientsOptions"
-                :key="opt.value"
-                :label="opt.label"
-                :value="opt.value"
-              />
-            </el-select>
-          </el-form-item>
+            <el-option
+              v-for="opt in patientsOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+        </el-form-item>
 
         <!-- Show supervised worker select only if supervision special rate -->
         <el-form-item
-            v-if="isSupervisionRate"
-            label="Supervised worker (required)"
-            required
-          >
-            <el-select-v2
-              v-model="modals.extra.form.supervised_worker_id"
-              placeholder="Search supervised worker…"
-              style="width: 100%"
-              filterable
-              remote
-              clearable
-              :multiple="!modals.extra.editing"
-              :remote-method="searchWorkers"
-              :options="workersOptions"
-              :disabled="payroll.status === 'finalized'"
-            />
-          </el-form-item>
+          v-if="isSupervisionRate"
+          label="Supervised worker (required)"
+          required
+        >
+          <el-select-v2
+            v-model="modals.extra.form.supervised_worker_id"
+            placeholder="Search supervised worker…"
+            style="width: 100%"
+            filterable
+            remote
+            clearable
+            :multiple="!modals.extra.editing"
+            :remote-method="searchWorkers"
+            :options="workersOptions"
+            :disabled="payroll.status === 'finalized'"
+          />
+        </el-form-item>
 
         <el-form-item label="Notes">
           <el-input
@@ -648,8 +648,13 @@
           border
           empty-text="No hours"
         >
-          <el-table-column prop="patient_name" label="client" min-width="160" />
+          <el-table-column prop="patient_name" label="Client" min-width="160" />
           <el-table-column prop="role_code" label="Role" width="100" />
+          <el-table-column label="Week" width="160">
+            <template #default="{ row }">
+              {{ formatWeekRange(row.segment_start, row.segment_end) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="hours" label="Hours" width="100" />
           <el-table-column prop="used_rate" label="Rate" width="110">
             <template #default="{ row }">{{ money(row.used_rate) }}</template>
@@ -666,8 +671,20 @@
           border
           empty-text="No extras"
         >
-          <el-table-column prop="code" label="Code" width="100" />
-          <el-table-column prop="label" label="Label" min-width="180" />
+          <el-table-column prop="label" label="Label" min-width="180">
+            <template #default="{ row }">
+              {{ row.label }} / {{ row.cpt_code }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="Applies To"
+            min-width="140"
+            show-overflow-tooltip
+          >
+            <template #default="{ row }">
+              {{ row.patient_name || row.supervised_worker_name || "—" }}
+            </template>
+          </el-table-column>
           <el-table-column prop="amount" label="Amount" width="120">
             <template #default="{ row }">{{ money(row.amount) }}</template>
           </el-table-column>
@@ -964,6 +981,39 @@ function fmtDate(d) {
 function money(n) {
   const v = Number(n || 0);
   return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
+function formatWeekRange(start, end) {
+  if (!start || !end) return "—";
+  // Parse dates as local (YYYY-MM-DD)
+  function parseLocalDate(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const s = parseLocalDate(start);
+  const e = parseLocalDate(end);
+  if (isNaN(s) || isNaN(e)) return `${start} / ${end}`;
+  // Intl month
+  const sm = s.toLocaleString('en-US', { month: 'short' });
+  const em = e.toLocaleString('en-US', { month: 'short' });
+  const sy = s.getFullYear();
+  const ey = e.getFullYear();
+  const sd = s.getDate();
+  const ed = e.getDate();
+  // Si es el mismo día
+  if (s.getTime() === e.getTime()) {
+    return `${sm} ${sd}, ${sy}`;
+  }
+  // Si es el mismo mes y año
+  if (sm === em && sy === ey) {
+    return `${sm} ${sd}–${ed}, ${sy}`;
+  }
+  // Si cambia el mes pero es el mismo año
+  if (sy === ey) {
+    return `${sm} ${sd}–${em} ${ed}, ${sy}`;
+  }
+  // Si cambia el año
+  return `${sm} ${sd}, ${sy}–${em} ${ed}, ${ey}`;
 }
 
 /* ======= Loaders ======= */
@@ -1426,11 +1476,20 @@ async function saveExtra() {
     return;
   }
   // Required validation for patient o supervised worker en add/edit
-  if (isAssessmentRate.value && (!f.patient_id || (Array.isArray(f.patient_id) && f.patient_id.length === 0))) {
+  if (
+    isAssessmentRate.value &&
+    (!f.patient_id ||
+      (Array.isArray(f.patient_id) && f.patient_id.length === 0))
+  ) {
     ElMessage.warning("Client is required for this rate");
     return;
   }
-  if (isSupervisionRate.value && (!f.supervised_worker_id || (Array.isArray(f.supervised_worker_id) && f.supervised_worker_id.length === 0))) {
+  if (
+    isSupervisionRate.value &&
+    (!f.supervised_worker_id ||
+      (Array.isArray(f.supervised_worker_id) &&
+        f.supervised_worker_id.length === 0))
+  ) {
     ElMessage.warning("Supervised worker is required for this rate");
     return;
   }
@@ -1440,8 +1499,14 @@ async function saveExtra() {
       await ajaxPostForm("mhc_payroll_extras_update", { ...f });
     } else {
       // Si es multiselect, guardar uno por uno
-      let patientIds = isAssessmentRate.value && Array.isArray(f.patient_id) ? f.patient_id : [f.patient_id];
-      let supervisedIds = isSupervisionRate.value && Array.isArray(f.supervised_worker_id) ? f.supervised_worker_id : [f.supervised_worker_id];
+      let patientIds =
+        isAssessmentRate.value && Array.isArray(f.patient_id)
+          ? f.patient_id
+          : [f.patient_id];
+      let supervisedIds =
+        isSupervisionRate.value && Array.isArray(f.supervised_worker_id)
+          ? f.supervised_worker_id
+          : [f.supervised_worker_id];
       // Si no aplica, usar array con un solo elemento
       if (!isAssessmentRate.value) patientIds = [null];
       if (!isSupervisionRate.value) supervisedIds = [null];
