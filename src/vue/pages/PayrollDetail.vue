@@ -24,7 +24,7 @@
           </div>
 
           <div class="flex gap-2">
-            <el-button :loading="loading.seed" @click="reseedPatients" :disabled="!id">Re-seed patients</el-button>
+            <el-button :loading="loading.seed" @click="reseedPatients" :disabled="!id">Re-seed clients</el-button>
             <el-button
                 v-if="payroll.status !== 'finalized'"
                 type="success"
@@ -50,7 +50,7 @@
           <el-card shadow="never" class="h-full">
             <template #header>
               <div class="flex items-center justify-between">
-                <div class="font-semibold">Patients</div>
+                <div class="font-semibold">Clients</div>
 
 
                 <el-segmented v-model="patientsFilter" :options="patientFilters" size="small" @change="loadPatients" />
@@ -58,7 +58,7 @@
             </template>
             <el-input
                 v-model="patientSearch"
-                placeholder="Search patient..."
+                placeholder="Search client..."
                 clearable
                 size="small"
                 @input="loadPatients"
@@ -78,7 +78,7 @@
                 @current-change="selectPatient"
             >
               <el-table-column type="index" width="52" label="#" />
-              <el-table-column prop="processed" label="Patient Name" width="260">
+              <el-table-column prop="processed" label="Client Name" width="260">
                 <template #default="{ row }">
                   <p>{{ row.first_name}} {{ row.last_name }}</p>
                 </template>
@@ -104,8 +104,8 @@
         <el-col :xs="24" :md="15">
           <el-card shadow="never">
             <el-tabs v-model="tabs.active" @tab-change="onTab">
-              <el-tab-pane name="process" label="Process patient">
-                <div v-if="!selectedPatient" class="text-gray-600">Select a patient to start processing.</div>
+              <el-tab-pane name="process" label="Process client">
+                <div v-if="!selectedPatient" class="text-gray-600">Select a client to start processing.</div>
                 <template v-else>
                   <div class="flex items-center justify-between mb-2">
                     <div class="font-semibold">
@@ -128,7 +128,7 @@
                       <div class="flex items-center justify-between">
                         <div class="font-semibold">Assigned workers</div>
                         <el-button size="small" @click="modals.addWpr.visible = true" :disabled="payroll.status === 'finalized'">
-                          Add worker to this patient
+                          Add worker to this client
                         </el-button>
                       </div>
                     </template>
@@ -178,7 +178,7 @@
                     </el-table>
 
                     <div class="mt-2 text-sm text-gray-600" v-if="hoursTotals">
-                      Patient totals — Hours: <b>{{ formatHours(hoursTotals.total_hours || 0) }}</b>
+                      Client totals — Hours: <b>{{ formatHours(hoursTotals.total_hours || 0) }}</b>
                       • Amount: <b>{{ money(hoursTotals.total_amount || 0) }}</b>
                     </div>
                   </el-card>
@@ -216,7 +216,7 @@
                   <el-table-column prop="amount" label="Amount" width="120">
                     <template #default="{ row }">{{ money(row.amount) }}</template>
                   </el-table-column>
-                  <el-table-column prop="patient_name" label="Patient" min-width="140" show-overflow-tooltip />
+                  <el-table-column prop="patient_name" label="Client" min-width="140" show-overflow-tooltip />
                   <el-table-column prop="notes" label="Notes" min-width="160" show-overflow-tooltip />
 
                   <el-table-column label="Actions" width="200" fixed="right">
@@ -310,7 +310,7 @@
     </el-card>
 
     <!-- Add WPR (worker → patient) modal -->
-    <el-dialog v-model="modals.addWpr.visible" title="Add worker to this patient (temporary)" width="560px" destroy-on-close>
+    <el-dialog v-model="modals.addWpr.visible" title="Add worker to this client (temporary)" width="560px" destroy-on-close>
       <el-form :model="modals.addWpr.form" label-width="140px">
         <el-form-item label="Worker">
           <el-select-v2
@@ -389,7 +389,7 @@
           <el-input-number v-model="modals.extra.form.amount" :min="0" :step="1" :precision="2" style="width: 100%" :disabled="payroll.status === 'finalized' || amountLocked" />
         </el-form-item>
 
-        <el-form-item label="Patient (optional)">
+        <el-form-item label="Client (optional)">
 
           <el-select
               v-model="modals.extra.form.patient_id"
@@ -445,7 +445,7 @@
 
         <el-divider content-position="left">Hours</el-divider>
         <el-table :data="modals.slip.hours" size="small" border empty-text="No hours">
-          <el-table-column prop="patient_name" label="Patient" min-width="160" />
+          <el-table-column prop="patient_name" label="client" min-width="160" />
           <el-table-column prop="role_code" label="Role" width="100" />
           <el-table-column prop="hours" label="Hours" width="100" />
           <el-table-column prop="used_rate" label="Rate" width="110">
@@ -930,7 +930,7 @@ async function reseedPatients() {
     const res = await ajaxPostForm('mhc_payroll_seed_patients', { payroll_id: id })
     patients.value = res?.patients || []
     counts.value = res?.counts || null
-    ElMessage.success(`Added ${res?.added || 0} new patient(s)`)
+    ElMessage.success(`Added ${res?.added || 0} new client(s)`)
   } catch (e) {
     ElMessage.error(e.message || 'Re-seed failed')
   } finally {
