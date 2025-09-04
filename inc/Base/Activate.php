@@ -45,6 +45,7 @@ class Activate {
             first_name VARCHAR(100) NOT NULL,
             last_name VARCHAR(100) NOT NULL,
             email VARCHAR(190) NOT NULL DEFAULT '',
+            company VARCHAR(100) NOT NULL DEFAULT '',
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             start_date DATE NULL,
             end_date DATE NULL,
@@ -117,10 +118,22 @@ class Activate {
             KEY idx_status (status)
         ) {$charset_collate};";
 
+        // Segments (semanas o fracciones de semana dentro de un payroll)
+        $sql[] = "CREATE TABLE {$pfx}mhc_payroll_segments (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            payroll_id BIGINT UNSIGNED NOT NULL,
+            segment_start DATE NOT NULL,
+            segment_end DATE NOT NULL,
+            notes TEXT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX (payroll_id)
+        ) $charset_collate;";
+
         // 8) HoursEntries
         $sql[] = "CREATE TABLE {$pfx}mhc_hours_entries (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            payroll_id BIGINT UNSIGNED NOT NULL,
+            segment_id BIGINT UNSIGNED NOT NULL,
             worker_patient_role_id BIGINT UNSIGNED NOT NULL,
             hours DECIMAL(7,2) NOT NULL DEFAULT 0.00,
             used_rate DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -128,7 +141,7 @@ class Activate {
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
-            KEY idx_payroll (payroll_id),
+            KEY idx_segment (segment_id),
             KEY idx_wpr (worker_patient_role_id)
         ) {$charset_collate};";
 

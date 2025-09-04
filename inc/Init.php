@@ -9,6 +9,7 @@ final class Init{
         return [
             Base\Enqueue::class,
             Base\Settings::class,
+            Base\Ajax::class,
             Base\Shortcodes::class,
             Controllers\PatientsController::class,
             Controllers\WorkersController::class,
@@ -16,6 +17,7 @@ final class Init{
             Controllers\SpecialRatesController::class,
             Controllers\DashboardController::class,
             Controllers\PayrollController::class,
+            Controllers\PayrollSegmentController::class,
             Controllers\PdfController::class,
             Controllers\SeedController::class,
 

@@ -27,12 +27,13 @@
     <el-table :data="state.items" v-loading="state.loading" border style="width:100%" size="small"
       empty-text="No workers found">
       <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="first_name" label="First Name" width="200" show-overflow-tooltip />
-      <el-table-column prop="last_name" label="Last Name" width="200" show-overflow-tooltip />
-      <el-table-column prop="email" label="Email" width="240" show-overflow-tooltip />
+      <el-table-column prop="first_name" label="First Name" width="150" show-overflow-tooltip />
+      <el-table-column prop="last_name" label="Last Name" width="150" show-overflow-tooltip />
+      <el-table-column prop="email" label="Email" width="210" show-overflow-tooltip />
+      <el-table-column prop="company" label="Company" width="200" show-overflow-tooltip />
 
       <!-- New: Supervisor -->
-      <el-table-column label="Supervisor" min-width="220" show-overflow-tooltip>
+      <el-table-column label="Supervisor" min-width="210" show-overflow-tooltip>
         <template #default="{ row }">
           <span v-if="row.supervisor_id">
             {{ row.supervisor_full_name || (row.supervisor_first_name + ' ' + row.supervisor_last_name).trim() }}
@@ -42,7 +43,7 @@
       </el-table-column>
 
       <!-- Roles with labels + rates -->
-      <el-table-column label="Roles" min-width="280">
+      <el-table-column label="Roles" min-width="100">
         <template #default="{ row }">
           <div class="flex flex-wrap gap-1">
             <el-tag v-for="rr in (row.worker_roles || [])" :key="(rr.id ?? rr.role_id) + '-' + (rr.general_rate ?? '')"
@@ -53,7 +54,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="Active" width="110">
+      <el-table-column label="Active" width="80">
         <template #default="{ row }">
           <el-tag :type="String(row.is_active) === '1' ? 'success' : 'info'">
             {{ String(row.is_active) === '1' ? 'Active' : 'Inactive' }}
@@ -61,15 +62,9 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="Actions" width="180" fixed="right">
+      <el-table-column label="Actions" width="80" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="openEdit(row)">Edit</el-button>
-          <el-popconfirm title="Delete this worker?" confirm-button-text="Yes" cancel-button-text="No"
-            @confirm="remove(row)">
-            <template #reference>
-              <el-button size="small" type="danger">Delete</el-button>
-            </template>
-          </el-popconfirm>
+          <el-button size="small" @click="openEdit(row)">Edit</el-button>          
         </template>
       </el-table-column>
     </el-table>
@@ -93,6 +88,10 @@
 
         <el-form-item label="Email" prop="email">
           <el-input v-model="form.email" type="email" />
+        </el-form-item>
+
+        <el-form-item label="Company" prop="company">
+          <el-input v-model="form.company" />
         </el-form-item>
 
         <!-- New: Supervisor (remote autocomplete) -->
@@ -197,6 +196,7 @@ const form = reactive({
   first_name: '',
   last_name: '',
   email: '',
+  company: '',               // NEW
   is_active: '1',
   supervisor_id: null,        // NEW
   worker_roles: []            // [{ uid, role_id:Number, general_rate:Number }]
@@ -207,6 +207,7 @@ const rules = {
   first_name: [{ required: true, message: 'First name is required', trigger: 'blur' }],
   last_name: [{ required: true, message: 'Last name is required', trigger: 'blur' }],
   email: [{ required: true, type: 'email', message: 'Valid email is required', trigger: 'blur' }],
+  company: [{ required: true, message: 'Company is required', trigger: 'blur' }],
 }
 
 /** HELPERS (roles table) */
@@ -272,6 +273,7 @@ async function searchSupervisors(query) {
       label: w.full_name || `${w.first_name || ''} ${w.last_name || ''}`.trim()
     }))
     fd.append('email', form.email)
+    fd.append('company', form.company)
   } catch (e) {
     console.error(e)
     ElMessage.error(e.message || 'Error searching supervisors')
@@ -285,6 +287,7 @@ function mapRowToForm(row) {
   form.first_name = row.first_name || ''
   form.last_name = row.last_name || ''
   form.email = row.email || ''
+  form.company = row.company || ''
   form.is_active = String(row.is_active ?? '1')
   form.supervisor_id = row.supervisor_id != null ? Number(row.supervisor_id) : null
 
@@ -316,6 +319,7 @@ function resetForm() {
   form.first_name = ''
   form.last_name = ''
   form.email = ''
+  form.company = ''
   form.is_active = '1'
   form.supervisor_id = null
   form.worker_roles = []
@@ -389,6 +393,8 @@ async function submit() {
     fd.append('last_name', form.last_name)
     fd.append('is_active', form.is_active)
     fd.append('email', form.email)
+    fd.append('company', form.company)
+
 
     if (form.supervisor_id != null && form.supervisor_id !== '') {
       fd.append('supervisor_id', String(form.supervisor_id))
