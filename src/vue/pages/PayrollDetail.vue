@@ -602,7 +602,7 @@
             remote
             clearable
             :multiple="!modals.extra.editing"
-            :remote-method="searchWorkers"
+            :remote-method="(q) => searchWorkers(q, 1)"
             :options="workersOptions"
             :disabled="payroll.status === 'finalized'"
           />
@@ -1557,14 +1557,16 @@ async function searchRates(q) {
   } catch (_) {}
 }
 // Adjust this action name to your existing worker search endpoint.
-async function searchWorkers(q) {
+async function searchWorkers(q, roleId = null) {
   loading.workers = true;
   try {
-    // Example expected response shape: { items: [{ id, name }] }
-    const res = await ajaxPostForm("mhc_workers_list", {
+    // Example expected response shape: { items: [{ id, name }] } 
+    const params = {
       search: q,
       limit: 20,
-    }); // <-- change if needed
+    };
+    if (roleId) params.role_id = roleId;
+    const res = await ajaxPostForm("mhc_workers_list", params);
     workersOptions.value = (res?.items || []).map((w) => ({
       value: w.id,
       label: w.first_name + " " + w.last_name,

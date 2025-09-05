@@ -88,7 +88,7 @@ class Worker {
         return $row;
     }
 
-    public static function findAll($search = '', $page = 1, $per_page = 10) {
+    public static function findAll($search = '', $page = 1, $per_page = 10, $role_id = null) {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $table = "{$pfx}mhc_workers";
@@ -103,14 +103,21 @@ class Worker {
             $like = '%' . $wpdb->esc_like($search) . '%';
             array_push($params, $like, $like, $like);
         }
+        // Filtro por rol si viene
+        $join_roles = '';
+        if (!empty($role_id)) {
+            $join_roles = " INNER JOIN $wr AS wrf ON wrf.worker_id = w.id AND wrf.role_id = %d ";
+            $params[] = (int)$role_id;
+        }
 
-        $total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table AS w $where", $params));
+        $total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT w.id) FROM $table AS w $join_roles $where", $params));
 
         // Include supervisor name columns
         $rows = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT w.*, s.first_name AS supervisor_first_name, s.last_name AS supervisor_last_name
                  FROM $table AS w
+                 $join_roles
                  LEFT JOIN $table AS s ON s.id = w.supervisor_id
                  $where
                  ORDER BY w.id DESC
