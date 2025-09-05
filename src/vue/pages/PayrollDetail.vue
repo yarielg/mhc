@@ -358,6 +358,14 @@
                       <el-icon><Search /></el-icon>
                     </template>
                   </el-input>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    style="float: right; margin-right: 8px;"
+                    @click="downloadSummaryPdf"
+                  >
+                    <el-icon><Download /></el-icon>                    
+                  </el-button>
                 </div>
 
                 <el-table
@@ -723,6 +731,21 @@ import {
 } from "@element-plus/icons-vue";
 
 const sendingSlip = reactive({});
+
+function downloadSummaryPdf() {
+  const payrollId = typeof id !== "undefined" ? id : props?.id || null;
+  if (!payrollId) return;
+  const ajaxUrl = typeof parameters !== "undefined" && parameters?.ajax_url
+    ? parameters.ajax_url
+    : window.ajaxurl || "/wp-admin/admin-ajax.php";
+  const url = new URL(ajaxUrl, window.location.origin);
+  url.searchParams.set("action", "mhc_payroll_summary_pdf");
+  url.searchParams.set("payroll_id", payrollId);
+  if (typeof parameters !== "undefined" && parameters?.nonce) {
+    url.searchParams.set("nonce", parameters.nonce);
+  }
+  window.open(url.toString(), "_blank");
+}
 
 /* ======= WP ajax setup ======= */
 const props = defineProps({ id: { type: Number, required: true } });

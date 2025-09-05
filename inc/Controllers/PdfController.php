@@ -17,6 +17,18 @@ use Mpdf\Output\Destination;
 class PdfController
 {
   /**
+   * Registers the AJAX endpoints in WordPress for the PDFs.
+   * Only logged-in users can access.
+   *
+   * @return void
+   */
+  public static function register()
+  {
+    add_action('wp_ajax_mhc_show_slim_pdf', [__CLASS__, 'ajax_show_slim_pdf']);
+    add_action('wp_ajax_mhc_payroll_summary_pdf', [__CLASS__, 'ajax_payroll_summary_pdf']);
+    add_action('wp_ajax_mhc_worker_slip_pdf', [__CLASS__, 'ajax_worker_slip_pdf']);
+  }
+  /**
    * Checks AJAX access for logged-in users only.
    * Calls mhc_check_ajax_access() defined in util/helpers.php.
    *
@@ -393,16 +405,155 @@ class PdfController
   }
 
   /**
-   * Registers the AJAX endpoints in WordPress for the PDFs.
-   * Only logged-in users can access.
-   *
-   * @return void
+   * AJAX endpoint to display the payroll summary PDF for all workers.
+   * Requires GET parameter: payroll_id
+   * Generates and outputs the PDF in the browser.
    */
-  public static function register()
+  public static function ajax_payroll_summary_pdf()
   {
-    add_action('wp_ajax_mhc_show_slim_pdf', [__CLASS__, 'ajax_show_slim_pdf']);
-    //add_action('wp_ajax_nopriv_mhc_show_slim_pdf', [__CLASS__, 'ajax_show_slim_pdf']);
-    add_action('wp_ajax_mhc_worker_slip_pdf', [__CLASS__, 'ajax_worker_slip_pdf']);
-    //add_action('wp_ajax_nopriv_mhc_worker_slip_pdf', [__CLASS__, 'ajax_worker_slip_pdf']);
+    self::check();
+    $payroll_id = (int)($_GET['payroll_id'] ?? 0);
+    if ($payroll_id <= 0) {
+      status_header(400);
+      echo 'Missing payroll_id';
+      exit;
+    }
+    $pdfPath = self::generatePayrollSummaryPdf($payroll_id);
+    if (!file_exists($pdfPath)) {
+      status_header(500);
+      echo 'Error generating PDF';
+      exit;
+    }
+    $download_name = 'payroll_summary_' . $payroll_id . '.pdf';
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . $download_name . '"');
+    readfile($pdfPath);
+    unlink($pdfPath);
+    exit;
+  }
+
+  /**
+   * Generates the payroll summary PDF for all workers in a payroll.
+   * @param int $payroll_id
+   * @return string Path to the generated PDF file
+   */
+  public static function generatePayrollSummaryPdf($payroll_id)
+  {
+    global $wpdb;
+    // Get payroll info
+    $payroll = \Mhc\Inc\Models\Payroll::findById($payroll_id);
+    $start = $payroll->start_date ?? date('Y-m-d');
+    $end   = $payroll->end_date   ?? date('Y-m-d');
+    $status = $payroll->status ?? '';
+    // Get summary data (like ajax_workers)
+    $hours = \Mhc\Inc\Models\HoursEntry::totalsByWorkerForPayroll($payroll_id);
+    $extras = \Mhc\Inc\Models\ExtraPayment::totalsByWorkerForPayroll($payroll_id);
+    $map = [];
+    foreach ($hours as $h) {
+      $wid = (int)$h['worker_id'];
+      $map[$wid] = [
+        'worker_id'     => $wid,
+        'worker_name'   => $h['worker_name'] ?? '',
+        'company'       => $h['worker_company'] ?? '',
+        'hours_hours'   => (float)$h['total_hours'],
+        'hours_amount'  => (float)$h['total_amount'],
+        'extras_amount' => 0.0,
+      ];
+    }
+    foreach ($extras as $e) {
+      $wid = (int)$e['worker_id'];
+      if (!isset($map[$wid])) {
+        $map[$wid] = [
+          'worker_id'     => $wid,
+          'worker_name'   => '',
+          'company'       => '',
+          'hours_hours'   => 0.0,
+          'hours_amount'  => 0.0,
+          'extras_amount' => 0.0,
+        ];
+      }
+      $map[$wid]['extras_amount'] = (float)$e['total_amount'];
+    }
+    $items = array_values(array_map(function ($r) {
+      $r['grand_total'] = round((float)$r['hours_amount'] + (float)$r['extras_amount'], 2);
+      return $r;
+    }, $map));
+    // Totals
+    $sum_hours_amount  = array_sum(array_column($items, 'hours_amount'));
+    $sum_extras_amount = array_sum(array_column($items, 'extras_amount'));
+    $sum_grand_total   = $sum_hours_amount + $sum_extras_amount;
+    // PDF HTML
+    $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
+    $html = '<style>
+      body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 11px; color:#333; }
+      .header { border-bottom: 2px solid #006699; padding-bottom: 10px; margin-bottom: 20px; }
+      .header h2 { margin:0; color:#000; font-size: 16px; }
+      .section-title { font-size: 13px; font-weight: bold; color:#006699; margin: 18px 0 8px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+      thead th { background:#f2f2f2; color:#000; font-weight:bold; text-align:center; border:1px solid #bbb; }
+      tbody td, tfoot td { border:1px solid #bbb; }
+      th, td { font-size:10px; padding:8px; }
+      .totals td { background: #e6f0fa; font-weight: bold; }
+      .totals td:first-child { text-align:left; }
+      .footer { font-size: 9px; color:#555; text-align:center; margin-top:22px; }
+    </style>';
+    $html .= '<div class="header">
+      <table style="border:none; width:100%"><tr>
+        <td style="width:70%; border:none;">' . (file_exists($logo_path) ? '<img src="' . $logo_path . '" width="100" />' : '') . '</td>
+        <td style="width:30%; text-align:right; border:none;">
+          <h2>Payroll Workers Summary</h2>
+          <div style="font-size:10px; margin-top: 1rem;">Agency of Mental Health Services</div>
+        </td>
+      </tr></table>
+      <div style="margin-top:8px; font-size:12px;">Period: <b>' . htmlspecialchars($start) . '</b> to <b>' . htmlspecialchars($end) . '</b> &nbsp;|&nbsp; Status: <b>' . htmlspecialchars($status) . '</b></div>
+    </div>';
+    $html .= '<div class="section-title">Workers Summary</div>';
+    $html .= '<table><thead><tr>
+      <th>Worker</th>
+      <th>Company</th>
+      <th>Hours</th>
+      <th>Hours $</th>
+      <th>Additionals $</th>
+      <th>Total $</th>
+    </tr></thead><tbody>';
+    if (!empty($items)) {
+      foreach ($items as $i) {
+        $html .= '<tr>
+          <td>' . htmlspecialchars($i['worker_name']) . '</td>
+          <td>' . htmlspecialchars($i['company']) . '</td>
+          <td align="center">' . number_format($i['hours_hours'], 2) . '</td>
+          <td align="right">$' . number_format($i['hours_amount'], 2) . '</td>
+          <td align="right">$' . number_format($i['extras_amount'], 2) . '</td>
+          <td align="right"><b>$' . number_format($i['grand_total'], 2) . '</b></td>
+        </tr>';
+      }
+    } else {
+      $html .= '<tr><td colspan="6" align="center">No data</td></tr>';
+    }
+    $html .= '</tbody></table>';
+    $html .= '<div class="section-title">Payroll Totals</div>';
+    $html .= '<table><tbody>';
+    $html .= '<tr class="totals"><td>Regular</td><td colspan="5" align="right">$' . number_format($sum_hours_amount, 2) . '</td></tr>';
+    $html .= '<tr class="totals"><td>Additionals</td><td colspan="5" align="right">$' . number_format($sum_extras_amount, 2) . '</td></tr>';
+    $html .= '<tr class="totals"><td>Grand Total</td><td colspan="5" align="right"><b>$' . number_format($sum_grand_total, 2) . '</b></td></tr>';
+    $html .= '</tbody></table>';
+    $html .= '<div class="footer">Summary generated automatically - Agency of Mental Health Services © ' . date('Y') . '</div>';
+    // mPDF
+    $mpdf = new Mpdf([
+      'mode' => 'utf-8',
+      'format' => 'A4',
+      'margin_left'   => 10,
+      'margin_right'  => 10,
+      'margin_top'    => 20,
+      'margin_bottom' => 15,
+      'tempDir' => WP_CONTENT_DIR . '/uploads/mpdf',
+    ]);
+    $mpdf->SetTitle('Payroll Workers Summary PDF');
+    $mpdf->SetAuthor('MHC');
+    $mpdf->SetCreator('MHC Payroll');
+    $mpdf->WriteHTML($html);
+    $tmp = tempnam(sys_get_temp_dir(), 'payrollsummary_') . '.pdf';
+    $mpdf->Output($tmp, Destination::FILE);
+    return $tmp;
   }
 }
