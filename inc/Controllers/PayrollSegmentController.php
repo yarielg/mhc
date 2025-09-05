@@ -35,7 +35,7 @@ class PayrollSegmentController
      */
     public static function ajax_list() {
         self::check();
-        $payrollId = isset($_POST['payroll_id']) ? absint($_POST['payroll_id']) : 0;
+        $payrollId = isset($_GET['payroll_id']) ? absint($_GET['payroll_id']) : 0;        
         $result = \Mhc\Inc\Models\PayrollSegment::findAll(['payroll_id' => $payrollId]);
         wp_send_json_success($result);
     }

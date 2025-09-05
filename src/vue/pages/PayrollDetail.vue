@@ -1054,7 +1054,7 @@ async function loadSegments() {
 
   loading.segments = true;
   try {
-    const data = await ajaxGet("mhc_segment_list", { id: id });    
+    const data = await ajaxGet("mhc_segment_list", { payroll_id: id });
     segments.value = data;
   } catch (e) {
     ElMessage.error(e.message || "Failed to load segments");
