@@ -469,6 +469,7 @@ class PayrollController
             $map[$wid] = [
                 'worker_id'     => $wid,
                 'worker_name'   => $h['worker_name'] ?? '',
+                'company'       => $h['worker_company'] ?? '',
                 'hours_hours'   => (float)$h['total_hours'],
                 'hours_amount'  => (float)$h['total_amount'],
                 'extras_amount' => 0.0,
@@ -491,18 +492,21 @@ class PayrollController
             $map[$wid]['extras_items']  = (int)$e['items'];
         }
 
-        // Rellenar nombres faltantes (trabajadores que solo tienen extras)
+        // Rellenar nombres faltantes y company (trabajadores que solo tienen extras)
         $missing = array_map('intval', array_keys(array_filter($map, fn($r) => $r['worker_name'] === '')));
         if (!empty($missing)) {
             global $wpdb;
             $t = $wpdb->prefix . 'mhc_workers';
             // ✅ fix: remove stray AND in WHERE
             $ids = implode(',', array_map('intval', $missing));
-            $rows = $wpdb->get_results("SELECT id, CONCAT(first_name,' ',last_name) AS name FROM {$t} WHERE id IN ($ids)", ARRAY_A);
+            $rows = $wpdb->get_results("SELECT id, CONCAT(first_name,' ',last_name) AS name, company FROM {$t} WHERE id IN ($ids)", ARRAY_A);
             $names = [];
             foreach ($rows ?: [] as $r) $names[(int)$r['id']] = (string)$r['name'];
             foreach ($missing as $wid) {
-                if (isset($names[$wid])) $map[$wid]['worker_name'] = $names[$wid];
+                if (isset($names[$wid])) {
+                    $map[$wid]['worker_name'] = $names[$wid];
+                    $map[$wid]['company'] = $r['company'] ?? '';
+                }
             }
         }
 
@@ -562,19 +566,25 @@ class PayrollController
             $te += (float)$e->amount;
         }
 
-        // nombre del worker
+        // nombre del worker and company
         $worker_name = '';
-        if (!empty($hours)) $worker_name = $hours[0]->worker_name ?? '';
+        $company = '';
+        if (!empty($hours)){
+            $worker_name = $hours[0]->worker_name ?? '';
+            $company = $hours[0]->worker_company ?? '';
+        }
         if ($worker_name === '') {
             global $wpdb;
             $t = $wpdb->prefix . 'mhc_workers';
             $worker_name = (string)$wpdb->get_var($wpdb->prepare("SELECT CONCAT(first_name,' ',last_name) FROM {$t} WHERE id=%d", $worker_id));
+            $company = (string)$wpdb->get_var($wpdb->prepare("SELECT company FROM {$t} WHERE id=%d", $worker_id));
         }
 
         wp_send_json_success([
             'worker' => [
                 'worker_id'   => $worker_id,
                 'worker_name' => $worker_name,
+                'company'     => $company,
             ],
             'hours'  => $hours,   // cada item: patient_name, role_code, hours, used_rate, total...
             'extras' => $extras,  // cada item: code, label, unit_rate, amount, notes...

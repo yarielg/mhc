@@ -374,6 +374,12 @@
                     show-overflow-tooltip
                   />
                   <el-table-column
+                    prop="company"
+                    label="Company"
+                    min-width="120"
+                    show-overflow-tooltip
+                  />
+                  <el-table-column
                     prop="hours_hours"
                     label="Hours"
                     width="90"
@@ -636,7 +642,7 @@
     <!-- Worker slip modal -->
     <el-dialog
       v-model="modals.slip.visible"
-      :title="`Worker slip — ${modals.slip.header.worker_name || ''}`"
+      :title="`Worker slip — ${modals.slip.header.worker_name || ''} (${modals.slip.header.company || '-'})`"
       width="780px"
       destroy-on-close
     >
