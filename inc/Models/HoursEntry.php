@@ -381,21 +381,21 @@ class HoursEntry
         if (!empty($filters['role_id'])) { $where[] = "wpr.role_id=%d"; $params[] = absint($filters['role_id']); }
 
         $sql = "
-            SELECT he.*,
-                   wpr.worker_id, wpr.patient_id, wpr.role_id,
-                   CONCAT(w.first_name,' ',w.last_name) AS worker_name, w.company AS worker_company,
-                   CONCAT(p.first_name,' ',p.last_name) AS patient_name,
-                   r.code AS role_code, r.name AS role_name,
-                   seg.id AS segment_id, seg.segment_start AS segment_start, seg.segment_end AS segment_end
-            FROM {$t} he
-            JOIN {$wpr} wpr ON wpr.id = he.worker_patient_role_id
-            JOIN {$wk} w ON w.id = wpr.worker_id
-            JOIN {$pt} p ON p.id = wpr.patient_id
-            JOIN {$rl} r ON r.id = wpr.role_id
-            JOIN {$seg} seg ON seg.id = he.segment_id
-            WHERE " . implode(' AND ', $where) . "
-            ORDER BY he.id DESC
-        ";
+         SELECT he.*,
+             wpr.worker_id, wpr.patient_id, wpr.role_id,
+             CONCAT(w.first_name,' ',w.last_name) AS worker_name, w.company AS worker_company,
+             CONCAT(p.first_name,' ',p.last_name) AS patient_name,
+             r.code AS role_code, r.name AS role_name,
+             seg.id AS segment_id, seg.segment_start AS segment_start, seg.segment_end AS segment_end
+         FROM {$t} he
+         JOIN {$wpr} wpr ON wpr.id = he.worker_patient_role_id
+         JOIN {$wk} w ON w.id = wpr.worker_id
+         JOIN {$pt} p ON p.id = wpr.patient_id
+         JOIN {$rl} r ON r.id = wpr.role_id
+         JOIN {$seg} seg ON seg.id = he.segment_id
+         WHERE " . implode(' AND ', $where) . "
+         ORDER BY seg.segment_start ASC, seg.segment_end ASC, he.id DESC
+     ";
         $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params));
         return array_map([__CLASS__, 'normalizeRow'], $rows ?: []);
     }
