@@ -944,13 +944,11 @@ const amountLocked = computed(() => {
   return !!(r && Number(r.unit_rate || 0) !== 0);
 });
 const isAssessmentRate = computed(() => {
-  const r = selectedRate.value;
-  console.log("isAssessmentRate", r);
+  const r = selectedRate.value;  
   return r && (r.code === "initial_assessment" || r.code === "reassessment");
 });
 const isSupervisionRate = computed(() => {
-  const r = selectedRate.value;
-  console.log("isSupervisionRate", r);
+  const r = selectedRate.value;  
   return r && r.code === "supervision";
 });
 watch(
@@ -1056,8 +1054,7 @@ async function loadSegments() {
 
   loading.segments = true;
   try {
-    const data = await ajaxGet("mhc_segment_list", { id: id });
-    console.log(data);
+    const data = await ajaxGet("mhc_segment_list", { id: id });    
     segments.value = data;
   } catch (e) {
     ElMessage.error(e.message || "Failed to load segments");
