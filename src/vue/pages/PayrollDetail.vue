@@ -245,7 +245,7 @@
                 </template>
               </el-tab-pane>
 
-              <el-tab-pane name="extras" label="Extras">
+              <el-tab-pane name="extras" label="Additional Payments">
                 <div class="mb-20 flex gap-2">
                   <!-- Worker filter (optional) -->
                   <el-select-v2
@@ -264,7 +264,7 @@
                     type="primary"
                     plain
                     :disabled="payroll.status === 'finalized'"
-                    >Add extra</el-button
+                    >Add additional payment</el-button
                   >
                 </div>
 
@@ -273,7 +273,7 @@
                   size="small"
                   border
                   v-loading="loading.extras"
-                  empty-text="No extras"
+                  empty-text="No additional payments"
                 >
                   <el-table-column
                     prop="worker_name"
@@ -321,7 +321,7 @@
                         <el-icon><Edit /></el-icon>
                       </el-button>
                       <el-popconfirm
-                        title="Delete this extra?"
+                        title="Delete this additional payment?"
                         confirm-button-text="Delete"
                         cancel-button-text="Cancel"
                         confirm-button-type="danger"
@@ -344,7 +344,7 @@
 
               <el-tab-pane name="summary" label="Workers summary">
                 <div class="mb-2 text-sm text-gray-600">
-                  Totals per worker (hours + extras).
+                  Totals per worker (regular + additionals).
 
                   <el-input
                     v-model="workerSearch"
@@ -389,7 +389,7 @@
                   </el-table-column>
                   <el-table-column
                     prop="extras_amount"
-                    label="Extras $"
+                    label="Additionals $"
                     width="120"
                   >
                     <template #default="{ row }">{{
@@ -437,9 +437,9 @@
 
                 <div class="mt-2 text-sm">
                   <b>Payroll totals:</b>
-                  Hours $ {{ money(summary.totals?.hours_amount || 0) }} •
-                  Extras $ {{ money(summary.totals?.extras_amount || 0) }} •
-                  Grand $ <b>{{ money(summary.totals?.grand_total || 0) }}</b>
+                  Regular {{ money(summary.totals?.hours_amount || 0) }} •
+                  Addtionals {{ money(summary.totals?.extras_amount || 0) }} •
+                  Grand <b>{{ money(summary.totals?.grand_total || 0) }}</b>
                 </div>
               </el-tab-pane>
             </el-tabs>
@@ -513,7 +513,7 @@
     <!-- Add/Edit Extra modal -->
     <el-dialog
       v-model="modals.extra.visible"
-      :title="modals.extra.editing ? 'Edit extra' : 'Add extra'"
+      :title="modals.extra.editing ? 'Edit additional payment' : 'Add additional payment'"
       width="620px"
       destroy-on-close
     >
@@ -641,7 +641,7 @@
       destroy-on-close
     >
       <div v-loading="loading.slip">
-        <el-divider content-position="left">Hours</el-divider>
+        <el-divider content-position="left">Regular Payments</el-divider>
         <el-table
           :data="modals.slip.hours"
           size="small"
@@ -664,12 +664,12 @@
           </el-table-column>
         </el-table>
 
-        <el-divider content-position="left" class="mt-3">Extras</el-divider>
+        <el-divider content-position="left" class="mt-3">Additional Payments</el-divider>
         <el-table
           :data="modals.slip.extras"
           size="small"
           border
-          empty-text="No extras"
+          empty-text="No Additional Payments"
         >
           <el-table-column prop="label" label="Label" min-width="180">
             <template #default="{ row }">
@@ -1392,7 +1392,7 @@ async function loadExtras() {
     });
     extras.value = res?.items || [];
   } catch (e) {
-    ElMessage.error(e.message || "Failed to load extras");
+    ElMessage.error(e.message || "Failed to load additional payments");
   } finally {
     loading.extras = false;
   }
@@ -1628,7 +1628,7 @@ async function finalizePayroll() {
   loading.finalize = true;
   try {
     await ElMessageBox.confirm(
-      "Finalize this payroll? After finalizing you cannot edit hours/extras.",
+      "Finalize this payroll? After finalizing you cannot edit Regular/Additional Payments.",
       "Finalize",
       { type: "warning" }
     );
