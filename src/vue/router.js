@@ -8,6 +8,8 @@ import SpecialRates from './pages/SpecialRates.vue'
 import Payrolls from "./pages/Payrolls.vue";
 import PayrollDetail from "./pages/PayrollDetail.vue";
 import Settings from './pages/Settings.vue'
+import Reports from './pages/Reports.vue'
+import ReportByDate from './pages/ReportByDate.vue'
 
 const routes = [
     { path: '/', component: Dashboard, meta: { title: 'Dashboard' } },
@@ -17,6 +19,8 @@ const routes = [
     { path: '/roles', component: Roles, meta: { title: 'Roles' } },
     { path: '/special-rates', component: SpecialRates, meta: { title: 'Special Rates' } },
     { path: '/settings', component: Settings, meta: { title: 'Settings' } },
+    { path: '/reports', component: Reports, meta: { title: 'Reports' } },
+    { path: '/reports/all', component: ReportByDate, meta: { title: 'Report By Date' } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
     {
         path: '/payrolls/:id(\\d+)',

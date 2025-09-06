@@ -78,7 +78,9 @@ class Settings{
                 'workers',
                 'patients',
                 'payrolls',
-                '/payrolls/new'
+                '/payrolls/new',
+                'reports',
+                'reports/all',
             ];
 
             // If the requested path matches a Vue route, load your plugin's root page
