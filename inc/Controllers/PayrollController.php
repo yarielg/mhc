@@ -7,7 +7,7 @@ use Mhc\Inc\Models\PatientPayroll;
 use Mhc\Inc\Models\HoursEntry;
 use Mhc\Inc\Models\WorkerPatientRole;
 use Mhc\Inc\Models\ExtraPayment;
-
+use WP_Error;
 
 if (!defined('ABSPATH')) exit;
 
@@ -134,11 +134,59 @@ class PayrollController
             wp_send_json_error(['message' => 'El rango de fechas se solapa con otro payroll'], 409);
         }
 
+        // === VALIDACIÓN DE DÍA DE INICIO DE SEMANA ===
+        $week_start = get_option('mhc_week_start_day', 'monday');
+        $week_days = ['sunday'=>0,'monday'=>1,'tuesday'=>2,'wednesday'=>3,'thursday'=>4,'friday'=>5,'saturday'=>6];
+        $week_start_num = isset($week_days[$week_start]) ? $week_days[$week_start] : 1;
+
+        $start_date = $payload['start_date'];
+        $end_date = $payload['end_date'];
+        $start_ts = strtotime($start_date);
+        $end_ts = strtotime($end_date);
+        if ($start_ts === false || $end_ts === false) {
+            wp_send_json_error(['message' => 'Invalid start or end date'], 400);
+        }
+        // Validate start_date matches week start
+        if ((int)date('w', $start_ts) !== $week_start_num) {
+            $day_name = ucfirst($week_start);
+            wp_send_json_error(['message' => "Payroll start_date must be a $day_name"], 400);
+        }
+
         $id = Payroll::create($payload);
         if ($id instanceof \WP_Error) {
             wp_send_json_error(['message' => $id->get_error_message()], 400);
         }
         if (!$id) wp_send_json_error(['message' => 'No se pudo crear el payroll'], 500);
+
+        // Generate segments
+        $segments = [];
+        $cur_start = $start_ts;
+        $seg_num = 1;
+        while ($cur_start <= $end_ts) {
+            // Find segment end (next week start - 1 day, or end_date)
+            $cur_end = strtotime('+6 days', $cur_start);
+            // If segment crosses month, split at month end
+            $month_end = strtotime(date('Y-m-t', $cur_start));
+            if ($month_end < $cur_end && $month_end < $end_ts) {
+                $cur_end = $month_end;
+            } else if ($cur_end > $end_ts) {
+                $cur_end = $end_ts;
+            }
+            $seg_start_str = date('Y-m-d', $cur_start);
+            $seg_end_str = date('Y-m-d', $cur_end);
+            $note = "Week $seg_num: $seg_start_str to $seg_end_str";
+            if ($cur_end == $month_end) {
+                $note .= " (End of month)";
+            }
+            $segments[] = [
+                'segment_start' => $seg_start_str,
+                'segment_end' => $seg_end_str,
+                'notes' => $note
+            ];
+            $cur_start = strtotime('+1 day', $cur_end);
+            $seg_num++;
+        }
+        \Mhc\Inc\Models\PayrollSegment::bulkCreate((int)$id, $segments);
 
         // SEED aquí (tal como pediste)
         $seeded = PatientPayroll::seedForPayroll((int)$id);
@@ -421,6 +469,7 @@ class PayrollController
             $map[$wid] = [
                 'worker_id'     => $wid,
                 'worker_name'   => $h['worker_name'] ?? '',
+                'company'       => $h['worker_company'] ?? '',
                 'hours_hours'   => (float)$h['total_hours'],
                 'hours_amount'  => (float)$h['total_amount'],
                 'extras_amount' => 0.0,
@@ -443,18 +492,21 @@ class PayrollController
             $map[$wid]['extras_items']  = (int)$e['items'];
         }
 
-        // Rellenar nombres faltantes (trabajadores que solo tienen extras)
+        // Rellenar nombres faltantes y company (trabajadores que solo tienen extras)
         $missing = array_map('intval', array_keys(array_filter($map, fn($r) => $r['worker_name'] === '')));
         if (!empty($missing)) {
             global $wpdb;
             $t = $wpdb->prefix . 'mhc_workers';
             // ✅ fix: remove stray AND in WHERE
             $ids = implode(',', array_map('intval', $missing));
-            $rows = $wpdb->get_results("SELECT id, CONCAT(first_name,' ',last_name) AS name FROM {$t} WHERE id IN ($ids)", ARRAY_A);
+            $rows = $wpdb->get_results("SELECT id, CONCAT(first_name,' ',last_name) AS name, company FROM {$t} WHERE id IN ($ids)", ARRAY_A);
             $names = [];
             foreach ($rows ?: [] as $r) $names[(int)$r['id']] = (string)$r['name'];
             foreach ($missing as $wid) {
-                if (isset($names[$wid])) $map[$wid]['worker_name'] = $names[$wid];
+                if (isset($names[$wid])) {
+                    $map[$wid]['worker_name'] = $names[$wid];
+                    $map[$wid]['company'] = $r['company'] ?? '';
+                }
             }
         }
 
@@ -514,19 +566,25 @@ class PayrollController
             $te += (float)$e->amount;
         }
 
-        // nombre del worker
+        // nombre del worker and company
         $worker_name = '';
-        if (!empty($hours)) $worker_name = $hours[0]->worker_name ?? '';
+        $company = '';
+        if (!empty($hours)){
+            $worker_name = $hours[0]->worker_name ?? '';
+            $company = $hours[0]->worker_company ?? '';
+        }
         if ($worker_name === '') {
             global $wpdb;
             $t = $wpdb->prefix . 'mhc_workers';
             $worker_name = (string)$wpdb->get_var($wpdb->prepare("SELECT CONCAT(first_name,' ',last_name) FROM {$t} WHERE id=%d", $worker_id));
+            $company = (string)$wpdb->get_var($wpdb->prepare("SELECT company FROM {$t} WHERE id=%d", $worker_id));
         }
 
         wp_send_json_success([
             'worker' => [
                 'worker_id'   => $worker_id,
                 'worker_name' => $worker_name,
+                'company'     => $company,
             ],
             'hours'  => $hours,   // cada item: patient_name, role_code, hours, used_rate, total...
             'extras' => $extras,  // cada item: code, label, unit_rate, amount, notes...

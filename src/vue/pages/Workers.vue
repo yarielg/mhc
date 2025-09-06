@@ -206,8 +206,7 @@ const form = reactive({
 const rules = {
   first_name: [{ required: true, message: 'First name is required', trigger: 'blur' }],
   last_name: [{ required: true, message: 'Last name is required', trigger: 'blur' }],
-  email: [{ required: true, type: 'email', message: 'Valid email is required', trigger: 'blur' }],
-  company: [{ required: true, message: 'Company is required', trigger: 'blur' }],
+  email: [{ required: true, type: 'email', message: 'Valid email is required', trigger: 'blur' }],  
 }
 
 /** HELPERS (roles table) */

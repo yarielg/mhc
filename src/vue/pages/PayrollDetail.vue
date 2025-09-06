@@ -204,7 +204,7 @@
                       <el-table-column
                         v-for="seg in segments"
                         :key="'segcol-' + seg.id"
-                        :label="seg.segment_start + ' to ' + seg.segment_end"
+                        :label="formatWeekRange(seg.segment_start, seg.segment_end)"
                         width="180"
                       >
                         <template #default="{ row }">
@@ -245,7 +245,7 @@
                 </template>
               </el-tab-pane>
 
-              <el-tab-pane name="extras" label="Extras">
+              <el-tab-pane name="extras" label="Additional Payments">
                 <div class="mb-20 flex gap-2">
                   <!-- Worker filter (optional) -->
                   <el-select-v2
@@ -264,7 +264,7 @@
                     type="primary"
                     plain
                     :disabled="payroll.status === 'finalized'"
-                    >Add extra</el-button
+                    >Add additional payment</el-button
                   >
                 </div>
 
@@ -273,7 +273,7 @@
                   size="small"
                   border
                   v-loading="loading.extras"
-                  empty-text="No extras"
+                  empty-text="No additional payments"
                 >
                   <el-table-column
                     prop="worker_name"
@@ -321,7 +321,7 @@
                         <el-icon><Edit /></el-icon>
                       </el-button>
                       <el-popconfirm
-                        title="Delete this extra?"
+                        title="Delete this additional payment?"
                         confirm-button-text="Delete"
                         cancel-button-text="Cancel"
                         confirm-button-type="danger"
@@ -344,7 +344,7 @@
 
               <el-tab-pane name="summary" label="Workers summary">
                 <div class="mb-2 text-sm text-gray-600">
-                  Totals per worker (hours + extras).
+                  Totals per worker (regular + additionals).
 
                   <el-input
                     v-model="workerSearch"
@@ -358,6 +358,14 @@
                       <el-icon><Search /></el-icon>
                     </template>
                   </el-input>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    style="float: right; margin-right: 8px;"
+                    @click="downloadSummaryPdf"
+                  >
+                    <el-icon><Download /></el-icon>                    
+                  </el-button>
                 </div>
 
                 <el-table
@@ -371,6 +379,12 @@
                     prop="worker_name"
                     label="Worker"
                     min-width="180"
+                    show-overflow-tooltip
+                  />
+                  <el-table-column
+                    prop="company"
+                    label="Company"
+                    min-width="120"
                     show-overflow-tooltip
                   />
                   <el-table-column
@@ -389,7 +403,7 @@
                   </el-table-column>
                   <el-table-column
                     prop="extras_amount"
-                    label="Extras $"
+                    label="Additionals $"
                     width="120"
                   >
                     <template #default="{ row }">{{
@@ -437,9 +451,9 @@
 
                 <div class="mt-2 text-sm">
                   <b>Payroll totals:</b>
-                  Hours $ {{ money(summary.totals?.hours_amount || 0) }} •
-                  Extras $ {{ money(summary.totals?.extras_amount || 0) }} •
-                  Grand $ <b>{{ money(summary.totals?.grand_total || 0) }}</b>
+                  Regular {{ money(summary.totals?.hours_amount || 0) }} •
+                  Addtionals {{ money(summary.totals?.extras_amount || 0) }} •
+                  Grand <b>{{ money(summary.totals?.grand_total || 0) }}</b>
                 </div>
               </el-tab-pane>
             </el-tabs>
@@ -513,7 +527,7 @@
     <!-- Add/Edit Extra modal -->
     <el-dialog
       v-model="modals.extra.visible"
-      :title="modals.extra.editing ? 'Edit extra' : 'Add extra'"
+      :title="modals.extra.editing ? 'Edit additional payment' : 'Add additional payment'"
       width="620px"
       destroy-on-close
     >
@@ -564,49 +578,49 @@
 
         <!-- Show patient/client select only if initialassesment or reassesment special rate -->
         <el-form-item
-            v-if="isAssessmentRate"
-            label="Client (required)"
-            required
+          v-if="isAssessmentRate"
+          label="Client (required)"
+          required
+        >
+          <el-select
+            v-model="modals.extra.form.patient_id"
+            filterable
+            remote
+            clearable
+            :multiple="!modals.extra.editing"
+            placeholder="Type a name..."
+            :loading="loading.patients"
+            :remote-method="searchPatients"
+            style="width: 100%"
           >
-            <el-select
-              v-model="modals.extra.form.patient_id"
-              filterable
-              remote
-              clearable
-              :multiple="!modals.extra.editing"
-              placeholder="Type a name..."
-              :loading="loading.patients"
-              :remote-method="searchPatients"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="opt in patientsOptions"
-                :key="opt.value"
-                :label="opt.label"
-                :value="opt.value"
-              />
-            </el-select>
-          </el-form-item>
+            <el-option
+              v-for="opt in patientsOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+        </el-form-item>
 
         <!-- Show supervised worker select only if supervision special rate -->
         <el-form-item
-            v-if="isSupervisionRate"
-            label="Supervised worker (required)"
-            required
-          >
-            <el-select-v2
-              v-model="modals.extra.form.supervised_worker_id"
-              placeholder="Search supervised worker…"
-              style="width: 100%"
-              filterable
-              remote
-              clearable
-              :multiple="!modals.extra.editing"
-              :remote-method="searchWorkers"
-              :options="workersOptions"
-              :disabled="payroll.status === 'finalized'"
-            />
-          </el-form-item>
+          v-if="isSupervisionRate"
+          label="Supervised worker (required)"
+          required
+        >
+          <el-select-v2
+            v-model="modals.extra.form.supervised_worker_id"
+            placeholder="Search supervised worker…"
+            style="width: 100%"
+            filterable
+            remote
+            clearable
+            :multiple="!modals.extra.editing"
+            :remote-method="(q) => searchWorkers(q, 1)"
+            :options="workersOptions"
+            :disabled="payroll.status === 'finalized'"
+          />
+        </el-form-item>
 
         <el-form-item label="Notes">
           <el-input
@@ -636,20 +650,25 @@
     <!-- Worker slip modal -->
     <el-dialog
       v-model="modals.slip.visible"
-      :title="`Worker slip — ${modals.slip.header.worker_name || ''}`"
+      :title="`Worker slip — ${modals.slip.header.worker_name || ''} (${modals.slip.header.company || '-'})`"
       width="780px"
       destroy-on-close
     >
       <div v-loading="loading.slip">
-        <el-divider content-position="left">Hours</el-divider>
+        <el-divider content-position="left">Regular Payments</el-divider>
         <el-table
           :data="modals.slip.hours"
           size="small"
           border
           empty-text="No hours"
         >
-          <el-table-column prop="patient_name" label="client" min-width="160" />
+          <el-table-column prop="patient_name" label="Client" min-width="160" />
           <el-table-column prop="role_code" label="Role" width="100" />
+          <el-table-column label="Week" width="160">
+            <template #default="{ row }">
+              {{ formatWeekRange(row.segment_start, row.segment_end) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="hours" label="Hours" width="100" />
           <el-table-column prop="used_rate" label="Rate" width="110">
             <template #default="{ row }">{{ money(row.used_rate) }}</template>
@@ -659,15 +678,27 @@
           </el-table-column>
         </el-table>
 
-        <el-divider content-position="left" class="mt-3">Extras</el-divider>
+        <el-divider content-position="left" class="mt-3">Additional Payments</el-divider>
         <el-table
           :data="modals.slip.extras"
           size="small"
           border
-          empty-text="No extras"
+          empty-text="No Additional Payments"
         >
-          <el-table-column prop="code" label="Code" width="100" />
-          <el-table-column prop="label" label="Label" min-width="180" />
+          <el-table-column prop="label" label="Label" min-width="180">
+            <template #default="{ row }">
+              {{ row.label }} / {{ row.cpt_code }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="Applies To"
+            min-width="140"
+            show-overflow-tooltip
+          >
+            <template #default="{ row }">
+              {{ row.patient_name || row.supervised_worker_name || "—" }}
+            </template>
+          </el-table-column>
           <el-table-column prop="amount" label="Amount" width="120">
             <template #default="{ row }">{{ money(row.amount) }}</template>
           </el-table-column>
@@ -700,6 +731,21 @@ import {
 } from "@element-plus/icons-vue";
 
 const sendingSlip = reactive({});
+
+function downloadSummaryPdf() {
+  const payrollId = typeof id !== "undefined" ? id : props?.id || null;
+  if (!payrollId) return;
+  const ajaxUrl = typeof parameters !== "undefined" && parameters?.ajax_url
+    ? parameters.ajax_url
+    : window.ajaxurl || "/wp-admin/admin-ajax.php";
+  const url = new URL(ajaxUrl, window.location.origin);
+  url.searchParams.set("action", "mhc_payroll_summary_pdf");
+  url.searchParams.set("payroll_id", payrollId);
+  if (typeof parameters !== "undefined" && parameters?.nonce) {
+    url.searchParams.set("nonce", parameters.nonce);
+  }
+  window.open(url.toString(), "_blank");
+}
 
 /* ======= WP ajax setup ======= */
 const props = defineProps({ id: { type: Number, required: true } });
@@ -927,13 +973,11 @@ const amountLocked = computed(() => {
   return !!(r && Number(r.unit_rate || 0) !== 0);
 });
 const isAssessmentRate = computed(() => {
-  const r = selectedRate.value;
-  console.log("isAssessmentRate", r);
+  const r = selectedRate.value;  
   return r && (r.code === "initial_assessment" || r.code === "reassessment");
 });
 const isSupervisionRate = computed(() => {
-  const r = selectedRate.value;
-  console.log("isSupervisionRate", r);
+  const r = selectedRate.value;  
   return r && r.code === "supervision";
 });
 watch(
@@ -964,6 +1008,39 @@ function fmtDate(d) {
 function money(n) {
   const v = Number(n || 0);
   return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
+function formatWeekRange(start, end) {
+  if (!start || !end) return "—";
+  // Parse dates as local (YYYY-MM-DD)
+  function parseLocalDate(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const s = parseLocalDate(start);
+  const e = parseLocalDate(end);
+  if (isNaN(s) || isNaN(e)) return `${start} / ${end}`;
+  // Intl month
+  const sm = s.toLocaleString('en-US', { month: 'short' });
+  const em = e.toLocaleString('en-US', { month: 'short' });
+  const sy = s.getFullYear();
+  const ey = e.getFullYear();
+  const sd = s.getDate();
+  const ed = e.getDate();
+  // Si es el mismo día
+  if (s.getTime() === e.getTime()) {
+    return `${sm} ${sd}, ${sy}`;
+  }
+  // Si es el mismo mes y año
+  if (sm === em && sy === ey) {
+    return `${sm} ${sd}–${ed}, ${sy}`;
+  }
+  // Si cambia el mes pero es el mismo año
+  if (sy === ey) {
+    return `${sm} ${sd}–${em} ${ed}, ${sy}`;
+  }
+  // Si cambia el año
+  return `${sm} ${sd}, ${sy}–${em} ${ed}, ${ey}`;
 }
 
 /* ======= Loaders ======= */
@@ -1006,8 +1083,7 @@ async function loadSegments() {
 
   loading.segments = true;
   try {
-    const data = await ajaxGet("mhc_segment_list", { id: id });
-    console.log(data);
+    const data = await ajaxGet("mhc_segment_list", { payroll_id: id });
     segments.value = data;
   } catch (e) {
     ElMessage.error(e.message || "Failed to load segments");
@@ -1345,7 +1421,7 @@ async function loadExtras() {
     });
     extras.value = res?.items || [];
   } catch (e) {
-    ElMessage.error(e.message || "Failed to load extras");
+    ElMessage.error(e.message || "Failed to load additional payments");
   } finally {
     loading.extras = false;
   }
@@ -1426,11 +1502,20 @@ async function saveExtra() {
     return;
   }
   // Required validation for patient o supervised worker en add/edit
-  if (isAssessmentRate.value && (!f.patient_id || (Array.isArray(f.patient_id) && f.patient_id.length === 0))) {
+  if (
+    isAssessmentRate.value &&
+    (!f.patient_id ||
+      (Array.isArray(f.patient_id) && f.patient_id.length === 0))
+  ) {
     ElMessage.warning("Client is required for this rate");
     return;
   }
-  if (isSupervisionRate.value && (!f.supervised_worker_id || (Array.isArray(f.supervised_worker_id) && f.supervised_worker_id.length === 0))) {
+  if (
+    isSupervisionRate.value &&
+    (!f.supervised_worker_id ||
+      (Array.isArray(f.supervised_worker_id) &&
+        f.supervised_worker_id.length === 0))
+  ) {
     ElMessage.warning("Supervised worker is required for this rate");
     return;
   }
@@ -1440,8 +1525,14 @@ async function saveExtra() {
       await ajaxPostForm("mhc_payroll_extras_update", { ...f });
     } else {
       // Si es multiselect, guardar uno por uno
-      let patientIds = isAssessmentRate.value && Array.isArray(f.patient_id) ? f.patient_id : [f.patient_id];
-      let supervisedIds = isSupervisionRate.value && Array.isArray(f.supervised_worker_id) ? f.supervised_worker_id : [f.supervised_worker_id];
+      let patientIds =
+        isAssessmentRate.value && Array.isArray(f.patient_id)
+          ? f.patient_id
+          : [f.patient_id];
+      let supervisedIds =
+        isSupervisionRate.value && Array.isArray(f.supervised_worker_id)
+          ? f.supervised_worker_id
+          : [f.supervised_worker_id];
       // Si no aplica, usar array con un solo elemento
       if (!isAssessmentRate.value) patientIds = [null];
       if (!isSupervisionRate.value) supervisedIds = [null];
@@ -1492,14 +1583,16 @@ async function searchRates(q) {
   } catch (_) {}
 }
 // Adjust this action name to your existing worker search endpoint.
-async function searchWorkers(q) {
+async function searchWorkers(q, roleId = null) {
   loading.workers = true;
   try {
-    // Example expected response shape: { items: [{ id, name }] }
-    const res = await ajaxPostForm("mhc_workers_list", {
+    // Example expected response shape: { items: [{ id, name }] } 
+    const params = {
       search: q,
       limit: 20,
-    }); // <-- change if needed
+    };
+    if (roleId) params.role_id = roleId;
+    const res = await ajaxPostForm("mhc_workers_list", params);
     workersOptions.value = (res?.items || []).map((w) => ({
       value: w.id,
       label: w.first_name + " " + w.last_name,
@@ -1564,7 +1657,7 @@ async function finalizePayroll() {
   loading.finalize = true;
   try {
     await ElMessageBox.confirm(
-      "Finalize this payroll? After finalizing you cannot edit hours/extras.",
+      "Finalize this payroll? After finalizing you cannot edit Regular/Additional Payments.",
       "Finalize",
       { type: "warning" }
     );
