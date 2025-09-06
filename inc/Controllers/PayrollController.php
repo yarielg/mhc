@@ -136,7 +136,7 @@ class PayrollController
 
         // === VALIDACIÓN DE DÍA DE INICIO DE SEMANA ===
         $week_start = get_option('mhc_week_start_day', 'monday');
-        $week_days = ['sunday'=>0,'monday'=>1,'tuesday'=>2,'wednesday'=>3,'thursday'=>4,'friday'=>5,'saturday'=>6];
+        $week_days = ['sunday' => 0, 'monday' => 1, 'tuesday' => 2, 'wednesday' => 3, 'thursday' => 4, 'friday' => 5, 'saturday' => 6];
         $week_start_num = isset($week_days[$week_start]) ? $week_days[$week_start] : 1;
 
         $start_date = $payload['start_date'];
@@ -158,33 +158,53 @@ class PayrollController
         }
         if (!$id) wp_send_json_error(['message' => 'No se pudo crear el payroll'], 500);
 
-        // Generate segments
+        // === GENERACIÓN DE SEGMENTOS ===
         $segments = [];
         $cur_start = $start_ts;
         $seg_num = 1;
+
         while ($cur_start <= $end_ts) {
-            // Find segment end (next week start - 1 day, or end_date)
+            // Calcular el fin de la semana (cur_start + 6 días)
             $cur_end = strtotime('+6 days', $cur_start);
-            // If segment crosses month, split at month end
-            $month_end = strtotime(date('Y-m-t', $cur_start));
-            if ($month_end < $cur_end && $month_end < $end_ts) {
-                $cur_end = $month_end;
-            } else if ($cur_end > $end_ts) {
+            if ($cur_end > $end_ts) {
                 $cur_end = $end_ts;
             }
-            $seg_start_str = date('Y-m-d', $cur_start);
-            $seg_end_str = date('Y-m-d', $cur_end);
-            $note = "Week $seg_num: $seg_start_str to $seg_end_str";
-            if ($cur_end == $month_end) {
-                $note .= " (End of month)";
+
+            // Último día del mes en curso
+            $month_end = strtotime(date('Y-m-t', $cur_start));
+
+            // Caso: la semana cruza el fin de mes
+            if ($month_end >= $cur_start && $month_end < $cur_end) {
+                // Segmento 1: desde inicio hasta fin de mes
+                $segments[] = [
+                    'segment_start' => date('Y-m-d', $cur_start),
+                    'segment_end'   => date('Y-m-d', $month_end),
+                    'notes'         => "Week $seg_num: " . date('Y-m-d', $cur_start) . " to " . date('Y-m-d', $month_end) . " (End of month)"
+                ];
+                $seg_num++;
+
+                // Segmento 2: desde el inicio del mes siguiente hasta el fin de semana
+                $next_start = strtotime('+1 day', $month_end);
+                $segments[] = [
+                    'segment_start' => date('Y-m-d', $next_start),
+                    'segment_end'   => date('Y-m-d', $cur_end),
+                    'notes'         => "Week $seg_num: " . date('Y-m-d', $next_start) . " to " . date('Y-m-d', $cur_end)
+                ];
+                $seg_num++;
+
+                $cur_start = strtotime('+1 day', $cur_end);
+                continue;
             }
+
+            // Caso normal: semana completa
             $segments[] = [
-                'segment_start' => $seg_start_str,
-                'segment_end' => $seg_end_str,
-                'notes' => $note
+                'segment_start' => date('Y-m-d', $cur_start),
+                'segment_end'   => date('Y-m-d', $cur_end),
+                'notes'         => "Week $seg_num: " . date('Y-m-d', $cur_start) . " to " . date('Y-m-d', $cur_end)
             ];
-            $cur_start = strtotime('+1 day', $cur_end);
+
             $seg_num++;
+            $cur_start = strtotime('+1 day', $cur_end);
         }
         \Mhc\Inc\Models\PayrollSegment::bulkCreate((int)$id, $segments);
 
@@ -569,7 +589,7 @@ class PayrollController
         // nombre del worker and company
         $worker_name = '';
         $company = '';
-        if (!empty($hours)){
+        if (!empty($hours)) {
             $worker_name = $hours[0]->worker_name ?? '';
             $company = $hours[0]->worker_company ?? '';
         }
@@ -750,7 +770,7 @@ class PayrollController
                 'worker_name' => $name
             ]);
             if (!file_exists($pdfPath)) continue;
-            
+
             $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
             $result = mhc_send_email(
                 $email,
@@ -790,7 +810,7 @@ class PayrollController
             'worker_name' => $name
         ]);
         if (!file_exists($pdfPath)) wp_send_json_error(['message' => 'PDF generation failed'], 500);
-        
+
         $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
         $result = mhc_send_email(
             $email,
