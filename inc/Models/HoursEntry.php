@@ -385,6 +385,7 @@ class HoursEntry
              wpr.worker_id, wpr.patient_id, wpr.role_id,
              CONCAT(w.first_name,' ',w.last_name) AS worker_name, w.company AS worker_company,
              CONCAT(p.first_name,' ',p.last_name) AS patient_name,
+             p.record_number AS patient_record_number,
              r.code AS role_code, r.name AS role_name,
              seg.id AS segment_id, seg.segment_start AS segment_start, seg.segment_end AS segment_end
          FROM {$t} he

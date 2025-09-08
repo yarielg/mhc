@@ -61,6 +61,7 @@ class Activate {
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,            
             first_name VARCHAR(100) NOT NULL,
             last_name VARCHAR(100) NOT NULL,
+            record_number VARCHAR(80) NOT NULL DEFAULT '',
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             start_date DATE NULL,
             end_date DATE NULL,

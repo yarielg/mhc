@@ -345,6 +345,7 @@ class ExtraPayment
                    sr.code, sr.label, sr.unit_rate, sr.cpt_code,
                    CONCAT_WS(' ',w.first_name, w.last_name) as worker_name,
                    IFNULL(CONCAT_WS(' ',p.first_name, p.last_name), '') as patient_name,
+                    IFNULL(p.record_number, '') as patient_record_number,
                    IFNULL(CONCAT_WS(' ',sw.first_name, sw.last_name), '') as supervised_worker_name
             FROM {$t} ep
             JOIN {$sr} sr ON sr.id = ep.special_rate_id

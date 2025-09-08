@@ -50,10 +50,15 @@ class PatientsController{
         $data = [
             'first_name' => sanitize_text_field(wp_unslash($_POST['first_name'] ?? '')),
             'last_name'  => sanitize_text_field(wp_unslash($_POST['last_name'] ?? '')),
+            'record_number' => sanitize_text_field(wp_unslash($_POST['record_number'] ?? '')),
             'is_active'  => intval($_POST['is_active'] ?? 1),
         ];
         if ($data['first_name'] === '' || $data['last_name'] === '') {
             wp_send_json_error(['message' => 'First and last name are required'], 400);
+        }
+        //validate record_number
+        if ($data['record_number'] === '') {
+            wp_send_json_error(['message' => 'Record number is required'], 400);
         }
 
         $assignments = [];
@@ -86,6 +91,7 @@ class PatientsController{
         $data = [];
         if (isset($_POST['first_name'])) $data['first_name'] = sanitize_text_field(wp_unslash($_POST['first_name']));
         if (isset($_POST['last_name']))  $data['last_name']  = sanitize_text_field(wp_unslash($_POST['last_name']));
+        if (isset($_POST['record_number']))  $data['record_number']  = sanitize_text_field(wp_unslash($_POST['record_number']));
         if (isset($_POST['is_active'])) {
             $st = intval($_POST['is_active']);
             if (!in_array($st, [1,0], true)) $st = 1;

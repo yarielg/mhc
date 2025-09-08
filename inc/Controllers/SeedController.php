@@ -62,9 +62,13 @@ class SeedController {
         for ($i = 0; $i < 10; $i++) {
             $first = $faker->firstName;
             $last = $faker->lastName;
+            //create faker record_number this number is the first letter of first name + first letter of last name + - + random 4 digits
+            //ej: John Doe -> jd-1234
+            $record_number = $first[0] . $last[0] . '-' . rand(1000, 9999);
             $wpdb->insert("{$pfx}mhc_patients", [
                 'first_name' => $first,
                 'last_name' => $last,
+                'record_number' => $record_number,
                 'is_active' => 1,
                 'start_date' => date('Y-m-d', strtotime('-1 year')),
             ]);

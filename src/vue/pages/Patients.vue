@@ -27,6 +27,7 @@
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="first_name" label="First Name" />
       <el-table-column prop="last_name" label="Last Name" />
+      <el-table-column prop="record_number" label="Record Number" />
       <el-table-column prop="is_active" label="Is Active?" width="110">
         <template #default="{ row }">
           <el-tag :type="row.is_active == 1 ? 'success' : 'info'">
@@ -55,6 +56,10 @@
 
         <el-form-item label="Last Name" prop="last_name">
           <el-input v-model="form.last_name" />
+        </el-form-item>
+
+        <el-form-item label="Record Number" prop="record_number">
+          <el-input v-model="form.record_number" />
         </el-form-item>
 
         <el-form-item label="Is Active?">
@@ -144,6 +149,7 @@ const formRef = ref(null)
 const form = reactive({
   first_name: '',
   last_name: '',
+  record_number: '',
   is_active: '1',
   // NEW
   assignments: [], // [{ worker_id, role_id, rate, _workerOptions, _rolesForWorker, _lastRoleDefault }]
@@ -152,11 +158,13 @@ const form = reactive({
 const rules = {
   first_name: [{ required: true, message: 'First name is required', trigger: 'blur' }],
   last_name: [{ required: true, message: 'Last name is required', trigger: 'blur' }],
+  record_number: [{ required: true, message: 'Record number is required', trigger: 'blur' }],
 }
 
 function resetForm() {
   form.first_name = ''
   form.last_name = ''
+  form.record_number = ''
   form.is_active = '1'
   form.assignments = []
   state.currentId = null
@@ -173,6 +181,7 @@ async function openEdit(row) {
   state.currentId = row.id
   form.first_name = row.first_name
   form.last_name = row.last_name
+  form.record_number = row.record_number || ''
   form.is_active = String(row.is_active ?? '1')
   form.assignments = (row.assignments || []).map(a => ({
     worker_id: a.worker_id,
@@ -350,6 +359,7 @@ async function submit() {
 
     fd.append('first_name', form.first_name)
     fd.append('last_name', form.last_name)
+    fd.append('record_number', form.record_number)
     fd.append('is_active', form.is_active)
 
     // Prepare assignments payload (new patients only for now)

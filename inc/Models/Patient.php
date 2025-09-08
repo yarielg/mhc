@@ -30,7 +30,7 @@ class Patient {
         $where = "WHERE 1=1";
         $params = [];
         if ($search !== '') {
-            $where .= " AND (first_name LIKE %s OR last_name LIKE %s OR CONCAT(first_name,' ',last_name) LIKE %s)";
+            $where .= " AND (first_name LIKE %s OR last_name LIKE %s OR CONCAT(first_name,' ',last_name) LIKE %s OR record_number LIKE %s)";
             $like = '%' . $wpdb->esc_like($search) . '%';
             $params[] = $like; $params[] = $like; $params[] = $like;
         }
@@ -59,7 +59,7 @@ class Patient {
         $table = "{$pfx}mhc_patients";
         $fields = [];
         $fmts = [];
-        foreach (["first_name","last_name","is_active","start_date","end_date"] as $field) {
+        foreach (["first_name","last_name","record_number","is_active","start_date","end_date"] as $field) {
             if (isset($data[$field])) {
                 $fields[$field] = $data[$field];
                 $fmts[] = $field === "is_active" ? '%d' : '%s';
@@ -84,7 +84,7 @@ class Patient {
         $wpr = "{$pfx}mhc_worker_patient_roles";
         $fields = [];
         $fmts = [];
-        foreach (["first_name","last_name","is_active","start_date","end_date"] as $field) {
+        foreach (["first_name","last_name","record_number","is_active","start_date","end_date"] as $field) {
             if (isset($data[$field])) {
                 $fields[$field] = $data[$field];
                 $fmts[] = $field === "is_active" ? '%d' : '%s';

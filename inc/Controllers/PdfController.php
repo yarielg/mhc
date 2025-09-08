@@ -211,7 +211,7 @@ class PdfController
         $i++;
         $rowBg = ($i % 2 === 0) ? ' style="background:#fbfbfb;"' : '';
         $html .= '<tr' . $rowBg . '>
-              <td>' . htmlspecialchars($h->patient_name) . '</td>
+              <td>' . htmlspecialchars($h->patient_record_number) . '</td>
               <td>' . htmlspecialchars($h->role_code) . '</td>
               <td align="center" style="white-space:nowrap;">' . self::format_week_range($h->segment_start ?? '', $h->segment_end ?? '') . '</td>
               <td align="center">' . number_format($h->hours, 2) . '</td>
@@ -251,7 +251,7 @@ class PdfController
         if (!empty($e->supervised_worker_name)) {
           $entity_name = $e->supervised_worker_name;
         } elseif (!empty($e->patient_name)) {
-          $entity_name = $e->patient_name;
+          $entity_name = $e->patient_record_number;
         }
         $html .= '<tr' . $rowBg . '>
               <td style="white-space:nowrap;">' . htmlspecialchars($e->label) . ' ' . htmlspecialchars($e->cpt_code) . '</td>
