@@ -393,7 +393,7 @@
                   />
                   <el-table-column
                     prop="hours_amount"
-                    label="Hours $"
+                    label="Regular $"
                     width="120"
                   >
                     <template #default="{ row }">{{
@@ -1202,9 +1202,11 @@ function hydrateFromHoursResponse(res) {
 
   // rebuild maps
   const seen = new Set();
+  //set put wprHours[wprId] = 0 for all seen
+  Object.keys(wprHours).forEach((k) => (wprHours[k] = 0));
   for (const r of list) {
     const wprId = Number(r.worker_patient_role_id);
-    wprHours[wprId] = Number(r.hours || 0);
+    wprHours[wprId] += Number(r.hours || 0);
     hoursEntryId[wprId] = Number(r.id || 0) || undefined;
     seen.add(wprId);
   }
@@ -1235,9 +1237,9 @@ async function loadHours() {
     // map by WPR
     (res?.items || []).forEach((r) => {
       const wprId = Number(r.worker_patient_role_id);
-      wprHours[wprId] = Number(r.hours || 0);
+      wprHours[wprId] = (Number(wprHours[wprId]) || 0) + (Number(r.hours) || 0);
       hoursEntryId[wprId] = Number(r.id || 0) || undefined;
-    });
+    });    
   } catch (e) {
     ElMessage.error(e.message || "Failed to load hours");
   } finally {
