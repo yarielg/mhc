@@ -46,9 +46,9 @@
           <template #default="{ row }">
             <div class="flex flex-col">
               <span class="font-medium">
-                {{ fmtDate(row.start_date) }} → {{ fmtDate(row.end_date) }}
+                {{ formatWeekRange(row.start_date, row.end_date) }}
               </span>
-              <small class="text-gray-500">Created: {{ fmtDateTime(row.created_at) }}</small>
+              <small class="text-gray-500 ml-1">Created: {{ fmtDateTime(row.created_at) }}</small>
             </div>
           </template>
         </el-table-column>
@@ -174,6 +174,7 @@
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatWeekRange } from '../util/dateUtils'
 
 import { useRouter } from 'vue-router' // ✅ import
 
@@ -417,6 +418,7 @@ onMounted(fetchList)
 .justify-between { justify-content: space-between; }
 .mb-4 { margin-bottom: 1rem; }
 .mt-3 { margin-top: .75rem; }
+.ml-1 { margin-left: .25rem; }
 .gap-2 { gap: .5rem; }
 .text-gray-500 { color: #6b7280; }
 .text-xs { font-size: 12px; }

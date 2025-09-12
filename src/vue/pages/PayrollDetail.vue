@@ -24,8 +24,7 @@
               </el-tag>
             </h3>
             <div class="text-gray-600">
-              Period: <b>{{ fmtDate(payroll.start_date) }}</b> →
-              <b>{{ fmtDate(payroll.end_date) }}</b>
+              Period: <b>{{ formatWeekRange(payroll.start_date, payroll.end_date) }}</b>
               <span v-if="payroll.notes"> • {{ payroll.notes }}</span>
             </div>
           </div>
@@ -719,6 +718,7 @@
 
 <script setup>
 import { onMounted, reactive, ref, computed, watch, nextTick } from "vue";
+import { formatWeekRange } from '../util/dateUtils'
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   User,
@@ -1010,38 +1010,7 @@ function money(n) {
   return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
 }
 
-function formatWeekRange(start, end) {
-  if (!start || !end) return "—";
-  // Parse dates as local (YYYY-MM-DD)
-  function parseLocalDate(str) {
-    const [y, m, d] = str.split('-').map(Number);
-    return new Date(y, m - 1, d);
-  }
-  const s = parseLocalDate(start);
-  const e = parseLocalDate(end);
-  if (isNaN(s) || isNaN(e)) return `${start} / ${end}`;
-  // Intl month
-  const sm = s.toLocaleString('en-US', { month: 'short' });
-  const em = e.toLocaleString('en-US', { month: 'short' });
-  const sy = s.getFullYear();
-  const ey = e.getFullYear();
-  const sd = s.getDate();
-  const ed = e.getDate();
-  // Si es el mismo día
-  if (s.getTime() === e.getTime()) {
-    return `${sm} ${sd}, ${sy}`;
-  }
-  // Si es el mismo mes y año
-  if (sm === em && sy === ey) {
-    return `${sm} ${sd}–${ed}, ${sy}`;
-  }
-  // Si cambia el mes pero es el mismo año
-  if (sy === ey) {
-    return `${sm} ${sd}–${em} ${ed}, ${sy}`;
-  }
-  // Si cambia el año
-  return `${sm} ${sd}, ${sy}–${em} ${ed}, ${ey}`;
-}
+// ...existing code...
 
 /* ======= Loaders ======= */
 async function loadHeader() {

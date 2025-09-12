@@ -10,7 +10,7 @@
           <el-icon class="mr-2"><User /></el-icon>Workers
         </el-button>
         <el-button size="small" @click="$router.push('/patients')">
-          <el-icon class="mr-2"><UserFilled /></el-icon>Patients
+          <el-icon class="mr-2"><UserFilled /></el-icon>Clients
         </el-button>
         <el-button type="primary" size="small" @click="$router.push('/payrolls')">
           <el-icon class="mr-2"><Wallet /></el-icon>Payrolls
@@ -41,7 +41,7 @@
             <el-icon><UserFilled /></el-icon>
           </div>
           <div class="stat-body">
-            <div class="stat-label">Active Patients</div>
+            <div class="stat-label">Active Clients</div>
             <div class="stat-value">
               <el-skeleton v-if="loading" :rows="1" animated />
               <template v-else>{{ stats?.patients?.active ?? 0 }}</template>
@@ -126,7 +126,7 @@
             <el-table-column label="ID" prop="id" width="80" />
             <el-table-column label="Period" min-width="160">
               <template #default="{ row }">
-                {{ row.start_date }} → {{ row.end_date }}
+                {{ formatWeekRange(row.start_date, row.end_date) }}
               </template>
             </el-table-column>
             <el-table-column label="Status" width="120">
@@ -177,6 +177,7 @@
 
 <script setup>
 import { ref, computed, onMounted,onBeforeUnmount } from 'vue'
+import { formatWeekRange } from '../util/dateUtils'
 import { ElMessage } from 'element-plus'
 import {
   UserFilled, User, Calendar, Plus, Search, Money, Warning, BellFilled,
@@ -241,6 +242,8 @@ async function loadEchartsIfNeeded() {
   echarts = window.echarts
 }
 
+// ...existing code...
+
 // === ADD: fetch metrics from WP AJAX (does not touch your existing APIs) ===
 async function fetchDashboardCharts() {
   chartsLoading.value = true
@@ -271,7 +274,7 @@ function renderDashboardCharts() {
 
   // 1) Last 10 payroll totals
   const last10 = [...(chartsData.value.payroll_totals || [])].reverse()
-  const lbl = last10.map(r => `#${r.id}\n${r.start_date} → ${r.end_date}`)
+  const lbl = last10.map(r => `#${r.id}\n${formatWeekRange(r.start_date, r.end_date)}`)
   const totals = last10.map(r => Number(r.hours_total||0) + Number(r.extras_total||0))
   mountChart(elLast10.value, {
     tooltip: { trigger: 'axis', valueFormatter: v => fmtMoney(v) },
