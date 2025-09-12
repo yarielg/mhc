@@ -17,7 +17,7 @@ class Patient {
             $wpdb->prepare("SELECT worker_id, role_id, rate FROM $wpr WHERE patient_id=%d", $id),
             ARRAY_A
         );
-        error_log(print_r($row, true));
+        //error_log(print_r($row, true));
         return $row;
     }
 
@@ -46,7 +46,7 @@ class Patient {
             );
         }
         unset($row);
-        error_log(print_r($rows, true));
+        //error_log(print_r($rows, true));
         return [
             'items' => $rows,
             'total' => $total,

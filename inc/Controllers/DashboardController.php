@@ -1,24 +1,28 @@
 <?php
+
 namespace Mhc\Inc\Controllers;
 
-class DashboardController {
+class DashboardController
+{
 
     /** Register AJAX routes */
-    public function register() {
+    public function register()
+    {
         add_action('wp_ajax_mhc_dashboard_get',   [$this, 'get']);
 
 
         // === ADD inside register() ===
         add_action('wp_ajax_mhc_dashboard_metrics', [__CLASS__, 'ajax_dashboard_metrics']);
-// If you need the charts for non-admin logged-in users, optionally expose nopriv:
+        // If you need the charts for non-admin logged-in users, optionally expose nopriv:
         add_action('wp_ajax_nopriv_mhc_dashboard_metrics', [__CLASS__, 'ajax_dashboard_metrics']);
 
-// Localize a nonce for the admin script that runs Dashboard.vue
+        // Localize a nonce for the admin script that runs Dashboard.vue
         add_action('admin_enqueue_scripts', [__CLASS__, 'localize_dashboard_nonce']);
     }
 
     /** Core handler: aggregated dashboard payload */
-    public function get() {
+    public function get()
+    {
         self::check();
 
         $payload = [
@@ -32,7 +36,8 @@ class DashboardController {
     }
 
     /** Security */
-    protected static function check() {
+    protected static function check()
+    {
         if (!function_exists('mhc_check_ajax_access')) {
             require_once dirname(__DIR__, 2) . '/util/helpers.php';
         }
@@ -40,14 +45,16 @@ class DashboardController {
     }
 
     /** Helpers */
-    protected function tableExists($table) {
+    protected function tableExists($table)
+    {
         global $wpdb;
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table));
         return $exists === $table;
     }
 
-    protected function getColumns($table) {
+    protected function getColumns($table)
+    {
         global $wpdb;
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $rows = $wpdb->get_results("SHOW COLUMNS FROM {$table}", ARRAY_A) ?: [];
@@ -55,8 +62,10 @@ class DashboardController {
     }
 
     /** Stats for cards (totals + 60d window) */
-    protected function stats() {
-        global $wpdb; $pfx = $wpdb->prefix;
+    protected function stats()
+    {
+        global $wpdb;
+        $pfx = $wpdb->prefix;
 
         $tables = [
             'roles'        => "{$pfx}mhc_roles",
@@ -64,6 +73,7 @@ class DashboardController {
             'patients'     => "{$pfx}mhc_patients",
             'assignments'  => "{$pfx}mhc_patient_workers",
             'payrolls'     => "{$pfx}mhc_payrolls",
+            'segments'     => "{$pfx}mhc_payroll_segments",
             'hours'        => "{$pfx}mhc_hours_entries",
             'extras'       => "{$pfx}mhc_extra_payments",
         ];
@@ -73,19 +83,22 @@ class DashboardController {
             'workers'      => ['total' => 0, 'active' => 0],
             'patients'     => ['total' => 0, 'active' => 0],
             'assignments'  => 0,
-            'payrolls_60d' => ['count' => 0, 'total_paid' => 0.0], // total_paid = hours.total + extras.amount (>=0 and <0)
+            'payrolls_60d' => ['count' => 0, 'total_paid' => 0.0],
         ];
 
+        // Roles
         if ($this->tableExists($tables['roles'])) {
             $out['roles']['total']  = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$tables['roles']}");
             $out['roles']['active'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$tables['roles']} WHERE is_active=1");
         }
 
+        // Workers
         if ($this->tableExists($tables['workers'])) {
             $out['workers']['total']  = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$tables['workers']}");
             $out['workers']['active'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$tables['workers']} WHERE is_active=1");
         }
 
+        // Patients
         if ($this->tableExists($tables['patients'])) {
             $out['patients']['total']  = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$tables['patients']}");
             $hasActive = $wpdb->get_row("SHOW COLUMNS FROM {$tables['patients']} LIKE 'is_active'");
@@ -94,43 +107,39 @@ class DashboardController {
             }
         }
 
+        // Assignments
         if ($this->tableExists($tables['assignments'])) {
             $out['assignments'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$tables['assignments']}");
         }
 
-        // Payroll count in last 60d
+        // Payroll últimos 60 días
         if ($this->tableExists($tables['payrolls'])) {
             $out['payrolls_60d']['count'] = (int) $wpdb->get_var("
-                SELECT COUNT(*) FROM {$tables['payrolls']}
-                WHERE start_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
-            ");
-        }
+            SELECT COUNT(*) 
+            FROM {$tables['payrolls']}
+            WHERE start_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
+        ");
 
-        // Total paid in last 60d: SUM(hours.total) + SUM(extras.amount) for payrolls started in last 60d
-        if ($this->tableExists($tables['payrolls'])) {
-            $payrollIdsSql = "
-                SELECT id FROM {$tables['payrolls']}
-                WHERE start_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
-            ";
-
+            // Totales de horas + extras en esos payrolls
             $sumHours = 0.0;
-            if ($this->tableExists($tables['hours'])) {
-                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            if ($this->tableExists($tables['hours']) && $this->tableExists($tables['segments'])) {
                 $sumHours = (float) $wpdb->get_var("
-                    SELECT COALESCE(SUM(h.total),0)
-                    FROM {$tables['hours']} h
-                    INNER JOIN ({$payrollIdsSql}) p ON p.id = h.payroll_id
-                ");
+                SELECT COALESCE(SUM(h.total),0)
+                FROM {$tables['hours']} h
+                JOIN {$tables['segments']} s ON s.id = h.segment_id
+                JOIN {$tables['payrolls']} p ON p.id = s.payroll_id
+                WHERE p.start_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
+            ");
             }
 
             $sumExtras = 0.0;
             if ($this->tableExists($tables['extras'])) {
-                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                 $sumExtras = (float) $wpdb->get_var("
-                    SELECT COALESCE(SUM(e.amount),0)
-                    FROM {$tables['extras']} e
-                    INNER JOIN ({$payrollIdsSql}) p ON p.id = e.payroll_id
-                ");
+                SELECT COALESCE(SUM(e.amount),0)
+                FROM {$tables['extras']} e
+                JOIN {$tables['payrolls']} p ON p.id = e.payroll_id
+                WHERE p.start_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
+            ");
             }
 
             $out['payrolls_60d']['total_paid'] = $sumHours + $sumExtras;
@@ -141,9 +150,12 @@ class DashboardController {
 
 
 
+
     /** Quick metrics (cards) */
-    protected function quick() {
-        global $wpdb; $pfx = $wpdb->prefix;
+    protected function quick()
+    {
+        global $wpdb;
+        $pfx = $wpdb->prefix;
 
         $payrolls = "{$pfx}mhc_payrolls";
         $hours    = "{$pfx}mhc_hours_entries";
@@ -187,10 +199,13 @@ class DashboardController {
     }
 
     /** Recent payrolls list (latest 5 with counts/totals) */
-    protected function recent() {
-        global $wpdb; $pfx = $wpdb->prefix;
+    protected function recent()
+    {
+        global $wpdb;
+        $pfx = $wpdb->prefix;
 
         $payrolls = "{$pfx}mhc_payrolls";
+        $segments = "{$pfx}mhc_payroll_segments";
         $hours    = "{$pfx}mhc_hours_entries";
         $extras   = "{$pfx}mhc_extra_payments";
         $out      = ['payrolls' => []];
@@ -198,17 +213,16 @@ class DashboardController {
         if (!$this->tableExists($payrolls)) return $out;
 
         // Get last 5 payrolls
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $rows = $wpdb->get_results("
-            SELECT id, start_date, end_date, status
-            FROM {$payrolls}
-            ORDER BY start_date DESC
-            LIMIT 5
-        ", ARRAY_A) ?: [];
+        SELECT id, start_date, end_date, status
+        FROM {$payrolls}
+        ORDER BY start_date DESC
+        LIMIT 5
+    ", ARRAY_A) ?: [];
 
         if (!$rows) return $out;
 
-        $haveHours  = $this->tableExists($hours);
+        $haveHours  = $this->tableExists($hours) && $this->tableExists($segments);
         $haveExtras = $this->tableExists($extras);
 
         foreach ($rows as $r) {
@@ -222,28 +236,35 @@ class DashboardController {
                 'total'      => 0.0,
             ];
 
-            $cnt = 0; $sum = 0.0;
+            $cnt = 0;
+            $sum = 0.0;
 
             if ($haveHours) {
-                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-                $cnt += (int) $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$hours} WHERE payroll_id = %d", $pid
-                ));
-                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-                $sum += (float) $wpdb->get_var($wpdb->prepare(
-                    "SELECT COALESCE(SUM(total),0) FROM {$hours} WHERE payroll_id = %d", $pid
-                ));
+                // Conteo de horas por payroll vía segments
+                $cnt += (int) $wpdb->get_var($wpdb->prepare("
+                SELECT COUNT(*)
+                FROM {$hours} h
+                JOIN {$segments} s ON s.id = h.segment_id
+                WHERE s.payroll_id = %d
+            ", $pid));
+
+                // Suma de horas por payroll vía segments
+                $sum += (float) $wpdb->get_var($wpdb->prepare("
+                SELECT COALESCE(SUM(h.total),0)
+                FROM {$hours} h
+                JOIN {$segments} s ON s.id = h.segment_id
+                WHERE s.payroll_id = %d
+            ", $pid));
             }
 
             if ($haveExtras) {
-                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-                $cnt += (int) $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$extras} WHERE payroll_id = %d", $pid
-                ));
-                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-                $sum += (float) $wpdb->get_var($wpdb->prepare(
-                    "SELECT COALESCE(SUM(amount),0) FROM {$extras} WHERE payroll_id = %d", $pid
-                ));
+                $cnt += (int) $wpdb->get_var($wpdb->prepare("
+                SELECT COUNT(*) FROM {$extras} WHERE payroll_id = %d
+            ", $pid));
+
+                $sum += (float) $wpdb->get_var($wpdb->prepare("
+                SELECT COALESCE(SUM(amount),0) FROM {$extras} WHERE payroll_id = %d
+            ", $pid));
             }
 
             $payload['items'] = $cnt;
@@ -255,14 +276,16 @@ class DashboardController {
         return $out;
     }
 
-    public static function localize_dashboard_nonce(): void {
+
+    public static function localize_dashboard_nonce(): void
+    {
         $handle = 'mhc-admin'; // change if your admin app uses a different script handle
         if (wp_script_is($handle, 'enqueued') || wp_script_is($handle, 'registered')) {
             wp_localize_script($handle, 'MHC_AJAX_NONCE', wp_create_nonce(self::NONCE_ACTION));
         } else {
             // Fallback: make it available anyway
             $nonce = wp_create_nonce(self::NONCE_ACTION);
-            wp_add_inline_script('jquery-core', 'window.MHC_AJAX_NONCE = "'.$nonce.'";', 'before');
+            wp_add_inline_script('jquery-core', 'window.MHC_AJAX_NONCE = "' . $nonce . '";', 'before');
         }
     }
 
@@ -277,6 +300,7 @@ class DashboardController {
         $pfx = $wpdb->prefix;
 
         $t_payrolls       = $pfx . 'mhc_payrolls';
+        $t_segments       = $pfx . 'mhc_payroll_segments';
         $t_hours_entries  = $pfx . 'mhc_hours_entries';
         $t_extra_payments = $pfx . 'mhc_extra_payments';
         $t_wpr            = $pfx . 'mhc_worker_patient_roles';
@@ -288,9 +312,12 @@ class DashboardController {
         $sql_payroll_totals = "
         SELECT p.id, p.start_date, p.end_date,
                COALESCE(SUM(he.total), 0) AS hours_total,
-               COALESCE((SELECT SUM(ep.amount) FROM {$t_extra_payments} ep WHERE ep.payroll_id = p.id), 0) AS extras_total
+               COALESCE((SELECT SUM(ep.amount) 
+                         FROM {$t_extra_payments} ep 
+                         WHERE ep.payroll_id = p.id), 0) AS extras_total
         FROM {$t_payrolls} p
-        LEFT JOIN {$t_hours_entries} he ON he.payroll_id = p.id
+        LEFT JOIN {$t_segments} s ON s.payroll_id = p.id
+        LEFT JOIN {$t_hours_entries} he ON he.segment_id = s.id
         GROUP BY p.id, p.start_date, p.end_date
         ORDER BY p.id DESC
         LIMIT 10
@@ -299,12 +326,14 @@ class DashboardController {
 
         // 2) Stacked totals by role for those payrolls
         $sql_role_totals = "
-        SELECT he.payroll_id, r.code AS role_code, COALESCE(SUM(he.total), 0) AS role_total
+        SELECT p.id AS payroll_id, r.code AS role_code, COALESCE(SUM(he.total), 0) AS role_total
         FROM {$t_hours_entries} he
+        JOIN {$t_segments} s ON s.id = he.segment_id
+        JOIN {$t_payrolls} p ON p.id = s.payroll_id
         JOIN {$t_wpr} wpr ON wpr.id = he.worker_patient_role_id
         JOIN {$t_roles} r ON r.id = wpr.role_id
-        WHERE he.payroll_id IN (SELECT id FROM {$t_payrolls} ORDER BY id DESC LIMIT 10)
-        GROUP BY he.payroll_id, r.code
+        JOIN (SELECT id FROM {$t_payrolls} ORDER BY id DESC LIMIT 10) last_p ON last_p.id = p.id
+        GROUP BY p.id, r.code
     ";
         $rows_role_totals = $wpdb->get_results($sql_role_totals, ARRAY_A) ?: [];
 
@@ -317,9 +346,11 @@ class DashboardController {
                    CONCAT(w.first_name, ' ', w.last_name) AS worker_name,
                    COALESCE(SUM(he.hours), 0) AS hours
             FROM {$t_hours_entries} he
+            JOIN {$t_segments} s ON s.id = he.segment_id
+            JOIN {$t_payrolls} p ON p.id = s.payroll_id
             JOIN {$t_wpr} wpr ON wpr.id = he.worker_patient_role_id
             JOIN {$t_workers} w ON w.id = wpr.worker_id
-            WHERE he.payroll_id = %d
+            WHERE p.id = %d
             GROUP BY w.id, w.first_name, w.last_name
             ORDER BY hours DESC
             LIMIT 5
@@ -340,7 +371,7 @@ class DashboardController {
     ";
         $rows_pending = $wpdb->get_results($sql_pending, ARRAY_A) ?: [];
 
-        // Optional: assessments (adjust codes if you use different ones)
+        // 5) Assessments (initial/reassessment) for last 10 payrolls
         $rows_assess = [];
         $exists_sr = $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = %s",
@@ -351,8 +382,8 @@ class DashboardController {
             SELECT ep.payroll_id, sr.code AS rate_code, COUNT(*) AS cnt, COALESCE(SUM(ep.amount), 0) AS total
             FROM {$t_extra_payments} ep
             JOIN {$t_special_rates} sr ON sr.id = ep.special_rate_id
+            JOIN (SELECT id FROM {$t_payrolls} ORDER BY id DESC LIMIT 10) last_p ON last_p.id = ep.payroll_id
             WHERE sr.code IN ('initial_assessment','reassessment')
-              AND ep.payroll_id IN (SELECT id FROM {$t_payrolls} ORDER BY id DESC LIMIT 10)
             GROUP BY ep.payroll_id, sr.code
         ";
             $rows_assess = $wpdb->get_results($sql_assess, ARRAY_A) ?: [];
@@ -367,7 +398,6 @@ class DashboardController {
             'latest_payroll_id' => $latest_payroll_id,
         ]);
     }
-
     // Nonce action for dashboard AJAX
     public const NONCE_ACTION = 'mhc_dashboard_ajax';
 }
