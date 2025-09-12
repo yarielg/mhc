@@ -168,7 +168,7 @@ onMounted(() => {
 // Apply whenever user toggles
 watch(dark, (v) => applyTheme(v))
 
-const userName = 'Admin'
+const userName = (window as any).parameters?.user_name || 'Admin'
 
 const toggleAside = () => {
   if (window.matchMedia('(max-width: 1024px)').matches) {

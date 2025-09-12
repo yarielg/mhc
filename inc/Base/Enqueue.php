@@ -42,6 +42,7 @@ class Enqueue{
             'plugin_path' => MHC_PLUGIN_URL,
             'img_url' => MHC_PLUGIN_URL . 'assets/img/',
             'nonce'   => wp_create_nonce('mhc_ajax'),
+            'user_name' => wp_get_current_user()->display_name,
         ]);
 
         wp_enqueue_style( 'main_css', MHC_PLUGIN_URL . '/assets/dist/app.css'  );
