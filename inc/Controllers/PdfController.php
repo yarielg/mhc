@@ -186,7 +186,7 @@ class PdfController
   <div class="info">
     <p><strong>Worker:</strong> ' . htmlspecialchars($worker_name) . '</p>
     <p><strong>Company:</strong> ' . htmlspecialchars($company_name ?: "---") . '</p>
-    <p><strong>Payroll Period:</strong> ' . $start . ' to ' . $end . '</p>
+    <p><strong>Payroll Period:</strong> ' . self::format_week_range($start, $end) . '</p>
   </div>
 
   <!-- Regular Payments -->
@@ -505,7 +505,7 @@ class PdfController
           <div style="font-size:10px; margin-top: 1rem;">Agency of Mental Health Services</div>
         </td>
       </tr></table>
-      <div style="margin-top:8px; font-size:12px;">Period: <b>' . htmlspecialchars($start) . '</b> to <b>' . htmlspecialchars($end) . '</b> &nbsp;|&nbsp; Status: <b>' . htmlspecialchars($status) . '</b></div>
+      <div style="margin-top:8px; font-size:12px;">Period: <b>' . self::format_week_range($start, $end) . '</b> &nbsp;|&nbsp; Status: <b>' . htmlspecialchars($status) . '</b></div>
     </div>';
     $html .= '<div class="section-title">Workers Summary</div>';
     $html .= '<table><thead><tr>
