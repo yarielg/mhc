@@ -2,9 +2,7 @@
   <div class="wp-wrap">
     <!-- Breadcrumb -->
     <el-breadcrumb separator="›" class="mb-3">
-      <el-breadcrumb-item @click="$router.push('/payrolls')" class="cursor"
-        >Payrolls</el-breadcrumb-item
-      >
+      <el-breadcrumb-item @click="$router.push('/payrolls')" class="cursor">Payrolls</el-breadcrumb-item>
       <el-breadcrumb-item>#{{ id }}</el-breadcrumb-item>
     </el-breadcrumb>
 
@@ -15,11 +13,7 @@
           <div>
             <h3 class="text-lg font-semibold">
               Payroll #{{ id }}
-              <el-tag
-                :type="payroll.status === 'finalized' ? 'success' : 'info'"
-                effect="light"
-                class="ml-2"
-              >
+              <el-tag :type="payroll.status === 'finalized' ? 'success' : 'info'" effect="light" class="ml-2">
                 {{ payroll.status || "—" }}
               </el-tag>
             </h3>
@@ -30,28 +24,10 @@
           </div>
 
           <div class="flex gap-2">
-            <el-button
-              :loading="loading.seed"
-              @click="reseedPatients"
-              :disabled="!id"
-              >Re-seed clients</el-button
-            >
-            <el-button
-              v-if="payroll.status !== 'finalized'"
-              type="success"
-              plain
-              :loading="loading.finalize"
-              @click="finalizePayroll"
-              >Finalize</el-button
-            >
-            <el-button
-              v-else
-              type="warning"
-              plain
-              :loading="loading.reopen"
-              @click="reopenPayroll"
-              >Reopen</el-button
-            >
+            <el-button :loading="loading.seed" @click="reseedPatients" :disabled="!id">Re-seed clients</el-button>
+            <el-button v-if="payroll.status !== 'finalized'" type="success" plain :loading="loading.finalize"
+              @click="finalizePayroll">Finalize</el-button>
+            <el-button v-else type="warning" plain :loading="loading.reopen" @click="reopenPayroll">Reopen</el-button>
           </div>
         </div>
       </template>
@@ -59,74 +35,53 @@
       <!-- Content layout -->
       <el-row :gutter="16">
         <!-- Left: Patients -->
-        <el-col :xs="24" :md="9">
+        <el-col :xs="24" :md="8">
           <el-card shadow="never" class="h-full">
             <template #header>
               <div class="flex items-center justify-between">
                 <div class="font-semibold">Clients</div>
 
-                <el-segmented
-                  v-model="patientsFilter"
-                  :options="patientFilters"
-                  size="small"
-                  @change="loadPatients"
-                />
+                <el-segmented v-model="patientsFilter" :options="patientFilters" size="small" @change="loadPatients" />
               </div>
             </template>
-            <el-input
-              v-model="patientSearch"
-              placeholder="Search client..."
-              clearable
-              size="small"
-              @input="loadPatients"
-              style="width: 200px"
-            >
+            <el-input v-model="patientSearch" placeholder="Search client..." clearable size="small"
+              @input="loadPatients" style="width: 200px">
               <template #prefix>
-                <el-icon><Search /></el-icon>
+                <el-icon>
+                  <Search />
+                </el-icon>
               </template>
             </el-input>
-            <el-table
-              :data="patients"
-              size="small"
-              border
-              highlight-current-row
-              height="440"
-              v-loading="loading.patients"
-              @current-change="selectPatient"
-            >
-              <el-table-column type="index" width="52" label="#" />
-              <el-table-column prop="processed" label="Client Name" width="260">
-                <template #default="{ row }">
-                  <p>{{ row.first_name }} {{ row.last_name }}</p>
-                </template>
-              </el-table-column>
-              <el-table-column prop="processed" label="Processed" width="110">
-                <template #default="{ row }">
-                  <el-tag
-                    :type="is_processed(row.is_processed) ? 'success' : 'info'"
-                  >
-                    {{ is_processed(row.is_processed) ? "Yes" : "No" }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-            </el-table>
-
+            <div class="mt-2">
+              <el-table :data="patients" size="small" border highlight-current-row height="440"
+                v-loading="loading.patients" @current-change="selectPatient">
+                <el-table-column type="index" width="52" label="#" />
+                <el-table-column prop="processed" label="Client Name" width="260">
+                  <template #default="{ row }">
+                    <p>{{ row.first_name }} {{ row.last_name }}</p>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="processed" label="Processed" width="110">
+                  <template #default="{ row }">
+                    <el-tag :type="is_processed(row.is_processed) ? 'success' : 'info'">
+                      {{ is_processed(row.is_processed) ? "Yes" : "No" }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
             <div class="mt-2 text-xs text-gray-600">
-              <span v-if="counts"
-                >Total: {{ counts.total ?? patients.length }}</span
-              >
+              <span v-if="counts">Total: {{ counts.total ?? patients.length }}</span>
               <span v-if="counts && counts.pending !== undefined">
-                • Pending: {{ counts.pending }}</span
-              >
+                • Pending: {{ counts.pending }}</span>
               <span v-if="counts && counts.processed !== undefined">
-                • Processed: {{ counts.processed }}</span
-              >
+                • Processed: {{ counts.processed }}</span>
             </div>
           </el-card>
         </el-col>
 
         <!-- Right: Patient processing + Extras + Summary tabs -->
-        <el-col :xs="24" :md="15">
+        <el-col :xs="24" :md="16">
           <el-card shadow="never">
             <el-tabs v-model="tabs.active" @tab-change="onTab">
               <el-tab-pane name="process" label="Process client">
@@ -137,14 +92,10 @@
                   <div class="flex items-center justify-between mb-2">
                     <div class="font-semibold">
                       {{ selectedPatient.patient_name }}
-                      <el-tag
-                        class="ml-2"
-                        :type="
-                          is_processed(selectedPatient.is_processed)
-                            ? 'success'
-                            : 'info'
-                        "
-                      >
+                      <el-tag class="ml-2" :type="is_processed(selectedPatient.is_processed)
+                        ? 'success'
+                        : 'info'
+                        ">
                         {{
                           is_processed(selectedPatient.is_processed)
                             ? "Processed"
@@ -152,12 +103,8 @@
                         }}
                       </el-tag>
                     </div>
-                    <el-switch
-                      :model-value="is_processed(selectedPatient.is_processed)"
-                      active-text="Processed"
-                      inactive-text="Pending"
-                      @change="toggleProcessed"
-                    />
+                    <el-switch :model-value="is_processed(selectedPatient.is_processed)" active-text="Processed"
+                      inactive-text="Pending" @change="toggleProcessed" />
                   </div>
 
                   <!-- Assigned workers for this patient in this payroll -->
@@ -165,34 +112,17 @@
                     <template #header>
                       <div class="flex items-center justify-between">
                         <div class="font-semibold">Assigned workers</div>
-                        <el-button
-                          size="small"
-                          @click="modals.addWpr.visible = true"
-                          :disabled="payroll.status === 'finalized'"
-                        >
+                        <el-button size="small" @click="modals.addWpr.visible = true"
+                          :disabled="payroll.status === 'finalized'">
                           Add worker to this client
                         </el-button>
                       </div>
                     </template>
 
-                    <el-table
-                      :data="patientWorkers"
-                      size="small"
-                      border
-                      v-loading="loading.patientWorkers"
-                      empty-text="No workers assigned yet"
-                    >
-                      <el-table-column
-                        prop="worker_name"
-                        label="Worker"
-                        min-width="120"
-                        show-overflow-tooltip
-                      />
-                      <el-table-column
-                        prop="role_code"
-                        label="Role"
-                        width="120"
-                      />
+                    <el-table :data="patientWorkers" size="small" border v-loading="loading.patientWorkers"
+                      empty-text="No workers assigned yet">
+                      <el-table-column prop="worker_name" label="Worker" min-width="120" show-overflow-tooltip />
+                      <el-table-column prop="role_code" label="Role" width="120" />
                       <el-table-column label="Rate" width="110">
                         <template #default="{ row }">
                           {{ money(row.effective_rate) }}
@@ -200,25 +130,13 @@
                       </el-table-column>
 
                       <!-- NEW: inline hours entry -->
-                      <el-table-column
-                        v-for="seg in segments"
-                        :key="'segcol-' + seg.id"
-                        :label="formatWeekRange(seg.segment_start, seg.segment_end)"
-                        width="180"
-                      >
+                      <el-table-column v-for="seg in segments" :key="'segcol-' + seg.id"
+                        :label="formatWeekRange(seg.segment_start, seg.segment_end)" width="180">
                         <template #default="{ row }">
-                          <el-input-number
-                            :model-value="segVal(row, seg)"
-                            @update:model-value="
-                              (val) => setSegVal(row, seg, val)
-                            "
-                            @change="(val) => onSegHoursChange(row, seg, val)"
-                            :min="0"
-                            :step="0.25"
-                            :precision="2"
-                            size="small"
-                            :disabled="payroll.status === 'finalized'"
-                          />
+                          <el-input-number :model-value="segVal(row, seg)" @update:model-value="
+                            (val) => setSegVal(row, seg, val)
+                          " @change="(val) => onSegHoursChange(row, seg, val)" :min="0" :step="0.25" :precision="2"
+                            size="small" :disabled="payroll.status === 'finalized'" />
                         </template>
                       </el-table-column>
 
@@ -228,7 +146,7 @@
                           {{
                             money(
                               Number(wprHours[getWprId(row)] || 0) *
-                                Number(row.effective_rate || 0)
+                              Number(row.effective_rate || 0)
                             )
                           }}
                         </template>
@@ -247,93 +165,46 @@
               <el-tab-pane name="extras" label="Additional Payments">
                 <div class="mb-20 flex gap-2">
                   <!-- Worker filter (optional) -->
-                  <el-select-v2
-                    v-model="extrasFilter.worker"
-                    placeholder="Filter by worker (optional)"
-                    style="width: 320px"
-                    filterable
-                    remote
-                    :remote-method="searchWorkers"
-                    :options="workersOptions"
-                    clearable
-                    @change="loadExtras"
-                  />
-                  <el-button
-                    @click="openAddExtra"
-                    type="primary"
-                    plain
-                    :disabled="payroll.status === 'finalized'"
-                    >Add additional payment</el-button
-                  >
+                  <el-select-v2 v-model="extrasFilter.worker" placeholder="Filter by worker (optional)"
+                    style="width: 320px" filterable remote :remote-method="searchWorkers" :options="workersOptions"
+                    clearable @change="loadExtras" />
+                  <el-button @click="openAddExtra" type="primary" plain :disabled="payroll.status === 'finalized'">Add
+                    additional
+                    payment</el-button>
                 </div>
 
-                <el-table
-                  :data="extras"
-                  size="small"
-                  border
-                  v-loading="loading.extras"
-                  empty-text="No additional payments"
-                >
-                  <el-table-column
-                    prop="worker_name"
-                    label="Worker"
-                    min-width="160"
-                    show-overflow-tooltip
-                  />
-                  <el-table-column
-                    prop="label"
-                    label="Rate"
-                    min-width="160"
-                    show-overflow-tooltip
-                  />
+                <el-table :data="extras" size="small" border v-loading="loading.extras"
+                  empty-text="No additional payments">
+                  <el-table-column prop="worker_name" label="Worker" min-width="160" show-overflow-tooltip />
+                  <el-table-column prop="label" label="Rate" min-width="160" show-overflow-tooltip />
                   <el-table-column prop="amount" label="Amount" width="120">
                     <template #default="{ row }">{{
                       money(row.amount)
                     }}</template>
                   </el-table-column>
-                  <el-table-column
-                    label="Applies To"
-                    min-width="140"
-                    show-overflow-tooltip
-                  >
+                  <el-table-column label="Applies To" min-width="140" show-overflow-tooltip>
                     <template #default="{ row }">
                       {{
                         row.patient_name || row.supervised_worker_name || "—"
                       }}
                     </template>
                   </el-table-column>
-                  <el-table-column
-                    prop="notes"
-                    label="Notes"
-                    min-width="160"
-                    show-overflow-tooltip
-                  />
+                  <el-table-column prop="notes" label="Notes" min-width="160" show-overflow-tooltip />
 
                   <el-table-column label="Actions" width="200" fixed="right">
                     <template #default="{ row }">
-                      <el-button
-                        size="small"
-                        plain
-                        :disabled="payroll.status === 'finalized'"
-                        @click="editExtra(row)"
-                      >
-                        <el-icon><Edit /></el-icon>
+                      <el-button size="small" plain :disabled="payroll.status === 'finalized'" @click="editExtra(row)">
+                        <el-icon>
+                          <Edit />
+                        </el-icon>
                       </el-button>
-                      <el-popconfirm
-                        title="Delete this additional payment?"
-                        confirm-button-text="Delete"
-                        cancel-button-text="Cancel"
-                        confirm-button-type="danger"
-                        @confirm="deleteExtra(row)"
-                      >
+                      <el-popconfirm title="Delete this additional payment?" confirm-button-text="Delete"
+                        cancel-button-text="Cancel" confirm-button-type="danger" @confirm="deleteExtra(row)">
                         <template #reference>
-                          <el-button
-                            size="small"
-                            type="danger"
-                            plain
-                            :disabled="payroll.status === 'finalized'"
-                            ><el-icon><Delete /></el-icon
-                          ></el-button>
+                          <el-button size="small" type="danger" plain
+                            :disabled="payroll.status === 'finalized'"><el-icon>
+                              <Delete />
+                            </el-icon></el-button>
                         </template>
                       </el-popconfirm>
                     </template>
@@ -345,103 +216,60 @@
                 <div class="mb-2 text-sm text-gray-600">
                   Totals per worker (regular + additionals).
 
-                  <el-input
-                    v-model="workerSearch"
-                    placeholder="Search worker..."
-                    clearable
-                    size="small"
-                    @input="loadSummary"
-                    style="width: 200px; float: right"
-                  >
+                  <el-input v-model="workerSearch" placeholder="Search worker..." clearable size="small"
+                    @input="loadSummary" style="width: 200px; float: right">
                     <template #prefix>
-                      <el-icon><Search /></el-icon>
+                      <el-icon>
+                        <Search />
+                      </el-icon>
                     </template>
                   </el-input>
-                  <el-button
-                    size="small"
-                    type="primary"
-                    style="float: right; margin-right: 8px;"
-                    @click="downloadSummaryPdf"
-                  >
-                    <el-icon><Download /></el-icon>                    
+                  <el-button size="small" type="primary" style="float: right; margin-right: 8px;"
+                    @click="downloadSummaryPdf">
+                    <el-icon>
+                      <Download />
+                    </el-icon>
                   </el-button>
                 </div>
 
-                <el-table
-                  :data="summary.items"
-                  size="small"
-                  border
-                  v-loading="loading.summary"
-                  empty-text="No data"
-                >
-                  <el-table-column
-                    prop="worker_name"
-                    label="Worker"
-                    min-width="180"
-                    show-overflow-tooltip
-                  />
-                  <el-table-column
-                    prop="company"
-                    label="Company"
-                    min-width="120"
-                    show-overflow-tooltip
-                  />
-                  <el-table-column
-                    prop="hours_hours"
-                    label="Hours"
-                    width="90"
-                  />
-                  <el-table-column
-                    prop="hours_amount"
-                    label="Regular $"
-                    width="120"
-                  >
+                <el-table :data="summary.items" size="small" border v-loading="loading.summary" empty-text="No data">
+                  <el-table-column prop="worker_name" label="Worker" min-width="180" show-overflow-tooltip />
+                  <el-table-column prop="company" label="Company" min-width="120" show-overflow-tooltip />
+                  <el-table-column prop="hours_hours" label="Hours" width="90" />
+                  <el-table-column prop="hours_amount" label="Regular $" width="120">
                     <template #default="{ row }">{{
                       money(row.hours_amount)
                     }}</template>
                   </el-table-column>
-                  <el-table-column
-                    prop="extras_amount"
-                    label="Additionals $"
-                    width="120"
-                  >
+                  <el-table-column prop="extras_amount" label="Additionals $" width="120">
                     <template #default="{ row }">{{
                       money(row.extras_amount)
                     }}</template>
                   </el-table-column>
-                  <el-table-column
-                    prop="grand_total"
-                    label="Total $"
-                    width="130"
-                  >
-                    <template #default="{ row }"
-                      ><b>{{ money(row.grand_total) }}</b></template
-                    >
+                  <el-table-column prop="grand_total" label="Total $" width="130">
+                    <template #default="{ row }"><b>{{ money(row.grand_total) }}</b></template>
                   </el-table-column>
                   <el-table-column label="Slip" width="150" fixed="right">
                     <template #default="{ row }">
-                      <div
-                        style="
+                      <div style="
                           display: flex;
                           flex-direction: row;
                           align-items: center;
-                        "
-                      >
+                        ">
                         <el-button size="small" @click="openWorkerSlip(row)">
-                          <el-icon><View /></el-icon>
+                          <el-icon>
+                            <View />
+                          </el-icon>
                         </el-button>
-                        <el-button
-                          size="small"
-                          :loading="sendingSlip[row.worker_id]"
-                          @click.stop="sendWorkerSlip(row)"
-                        >
-                          <el-icon class=""><Message /></el-icon>
+                        <el-button size="small" :loading="sendingSlip[row.worker_id]" @click.stop="sendWorkerSlip(row)">
+                          <el-icon class="">
+                            <Message />
+                          </el-icon>
                         </el-button>
-                        <el-button
-                          size="small"
-                          @click.stop="downloadWorkerSlip(row)"
-                        >
-                          <el-icon class=""><Download /></el-icon>
+                        <el-button size="small" @click.stop="downloadWorkerSlip(row)">
+                          <el-icon class="">
+                            <Download />
+                          </el-icon>
                         </el-button>
                       </div>
                     </template>
@@ -462,53 +290,25 @@
     </el-card>
 
     <!-- Add WPR (worker → patient) modal -->
-    <el-dialog
-      v-model="modals.addWpr.visible"
-      title="Add worker to this client (temporary)"
-      width="560px"
-      destroy-on-close
-    >
+    <el-dialog v-model="modals.addWpr.visible" title="Add worker to this client (temporary)" width="560px"
+      destroy-on-close>
       <el-form :model="modals.addWpr.form" label-width="140px">
         <el-form-item label="Worker">
-          <el-select-v2
-            v-model="modals.addWpr.form.worker_id"
-            placeholder="Search worker…"
-            style="width: 100%"
-            filterable
-            remote
-            :remote-method="searchWorkers"
-            :options="workersOptions"
-          />
+          <el-select-v2 v-model="modals.addWpr.form.worker_id" placeholder="Search worker…" style="width: 100%"
+            filterable remote :remote-method="searchWorkers" :options="workersOptions" />
         </el-form-item>
         <el-form-item label="Role">
-          <el-select
-            v-model="modals.addWpr.form.role_id"
-            placeholder="Select role…"
-            filterable
-            style="width: 100%"
-            :loading="loading.roles"
-            @visible-change="
+          <el-select v-model="modals.addWpr.form.role_id" placeholder="Select role…" filterable style="width: 100%"
+            :loading="loading.roles" @visible-change="
               (v) => {
                 if (v) loadRoles();
               }
-            "
-          >
-            <el-option
-              v-for="r in roles"
-              :key="r.id"
-              :label="`${r.code} — ${r.name}`"
-              :value="r.id"
-            />
+            ">
+            <el-option v-for="r in roles" :key="r.id" :label="`${r.code} — ${r.name}`" :value="r.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="Override rate (optional)">
-          <el-input-number
-            v-model="modals.addWpr.form.rate"
-            :min="0"
-            :step="1"
-            :precision="2"
-            style="width: 100%"
-          />
+          <el-input-number v-model="modals.addWpr.form.rate" :min="0" :step="1" :precision="2" style="width: 100%" />
         </el-form-item>
         <div class="text-xs text-gray-600">
           This assignment only lives in this payroll. (We set the temp end date
@@ -517,150 +317,72 @@
       </el-form>
       <template #footer>
         <el-button @click="modals.addWpr.visible = false">Cancel</el-button>
-        <el-button type="primary" :loading="loading.addWpr" @click="createWpr"
-          >Add</el-button
-        >
+        <el-button type="primary" :loading="loading.addWpr" @click="createWpr">Add</el-button>
       </template>
     </el-dialog>
 
     <!-- Add/Edit Extra modal -->
-    <el-dialog
-      v-model="modals.extra.visible"
-      :title="modals.extra.editing ? 'Edit additional payment' : 'Add additional payment'"
-      width="620px"
-      destroy-on-close
-    >
+    <el-dialog v-model="modals.extra.visible"
+      :title="modals.extra.editing ? 'Edit additional payment' : 'Add additional payment'" width="620px"
+      destroy-on-close>
       <el-form :model="modals.extra.form" label-width="160px">
         <el-form-item label="Worker">
-          <el-select
-            v-model="modals.extra.form.worker_id"
-            filterable
-            remote
-            clearable
-            placeholder="Type a name..."
-            :loading="loading.workers"
-            :remote-method="searchWorkers"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="opt in workersOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
+          <el-select v-model="modals.extra.form.worker_id" filterable remote clearable placeholder="Type a name..."
+            :loading="loading.workers" :remote-method="searchWorkers" style="width: 100%">
+            <el-option v-for="opt in workersOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>
 
         <el-form-item label="Special rate">
-          <el-select-v2
-            v-model="modals.extra.form.special_rate_id"
-            placeholder="Search special rates…"
-            style="width: 100%"
-            filterable
-            remote
-            :remote-method="searchRates"
-            :options="ratesOptions"
-            :disabled="payroll.status === 'finalized'"
-          />
+          <el-select-v2 v-model="modals.extra.form.special_rate_id" placeholder="Search special rates…"
+            style="width: 100%" filterable remote :remote-method="searchRates" :options="ratesOptions"
+            :disabled="payroll.status === 'finalized'" />
         </el-form-item>
 
         <el-form-item label="Amount">
-          <el-input-number
-            v-model="modals.extra.form.amount"
-            :min="0"
-            :step="1"
-            :precision="2"
-            style="width: 100%"
-            :disabled="payroll.status === 'finalized' || amountLocked"
-          />
+          <el-input-number v-model="modals.extra.form.amount" :min="0" :step="1" :precision="2" style="width: 100%"
+            :disabled="payroll.status === 'finalized' || amountLocked" />
         </el-form-item>
 
         <!-- Show patient/client select only if initialassesment or reassesment special rate -->
-        <el-form-item
-          v-if="isAssessmentRate"
-          label="Client (required)"
-          required
-        >
-          <el-select
-            v-model="modals.extra.form.patient_id"
-            filterable
-            remote
-            clearable
-            :multiple="!modals.extra.editing"
-            placeholder="Type a name..."
-            :loading="loading.patients"
-            :remote-method="searchPatients"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="opt in patientsOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
+        <el-form-item v-if="isAssessmentRate" label="Client (required)" required>
+          <el-select v-model="modals.extra.form.patient_id" filterable remote clearable
+            :multiple="!modals.extra.editing" placeholder="Type a name..." :loading="loading.patients"
+            :remote-method="searchPatients" style="width: 100%">
+            <el-option v-for="opt in patientsOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>
 
         <!-- Show supervised worker select only if supervision special rate -->
-        <el-form-item
-          v-if="isSupervisionRate"
-          label="Supervised worker (required)"
-          required
-        >
-          <el-select-v2
-            v-model="modals.extra.form.supervised_worker_id"
-            placeholder="Search supervised worker…"
-            style="width: 100%"
-            filterable
-            remote
-            clearable
-            :multiple="!modals.extra.editing"
-            :remote-method="(q) => searchWorkers(q, 1)"
-            :options="workersOptions"
-            :disabled="payroll.status === 'finalized'"
-          />
+        <el-form-item v-if="isSupervisionRate" label="Supervised worker (required)" required>
+          <el-select-v2 v-model="modals.extra.form.supervised_worker_id" placeholder="Search supervised worker…"
+            style="width: 100%" filterable remote clearable :multiple="!modals.extra.editing"
+            :remote-method="(q) => searchWorkers(q, 1)" :options="workersOptions"
+            :disabled="payroll.status === 'finalized'" />
         </el-form-item>
 
         <el-form-item label="Notes">
-          <el-input
-            v-model="modals.extra.form.notes"
-            type="textarea"
-            :rows="2"
-            maxlength="255"
-            show-word-limit
-            :disabled="payroll.status === 'finalized'"
-          />
+          <el-input v-model="modals.extra.form.notes" type="textarea" :rows="2" maxlength="255" show-word-limit
+            :disabled="payroll.status === 'finalized'" />
         </el-form-item>
       </el-form>
 
       <template #footer>
         <el-button @click="modals.extra.visible = false">Cancel</el-button>
-        <el-button
-          type="primary"
-          :loading="loading.saveExtra"
-          @click="saveExtra"
-          :disabled="payroll.status === 'finalized'"
-        >
+        <el-button type="primary" :loading="loading.saveExtra" @click="saveExtra"
+          :disabled="payroll.status === 'finalized'">
           {{ modals.extra.editing ? "Update" : "Create" }}
         </el-button>
       </template>
     </el-dialog>
 
     <!-- Worker slip modal -->
-    <el-dialog
-      v-model="modals.slip.visible"
+    <el-dialog v-model="modals.slip.visible"
       :title="`Worker slip — ${modals.slip.header.worker_name || ''} (${modals.slip.header.company || '-'})`"
-      width="780px"
-      destroy-on-close
-    >
+      width="780px" destroy-on-close>
       <div v-loading="loading.slip">
         <el-divider content-position="left">Regular Payments</el-divider>
-        <el-table
-          :data="modals.slip.hours"
-          size="small"
-          border
-          empty-text="No hours"
-        >
+        <el-table :data="modals.slip.hours" size="small" border empty-text="No hours">
           <el-table-column prop="patient_name" label="Client" min-width="160" />
           <el-table-column prop="role_code" label="Role" width="100" />
           <el-table-column label="Week" width="160">
@@ -678,22 +400,13 @@
         </el-table>
 
         <el-divider content-position="left" class="mt-3">Additional Payments</el-divider>
-        <el-table
-          :data="modals.slip.extras"
-          size="small"
-          border
-          empty-text="No Additional Payments"
-        >
+        <el-table :data="modals.slip.extras" size="small" border empty-text="No Additional Payments">
           <el-table-column prop="label" label="Label" min-width="180">
             <template #default="{ row }">
               {{ row.label }} / {{ row.cpt_code }}
             </template>
           </el-table-column>
-          <el-table-column
-            label="Applies To"
-            min-width="140"
-            show-overflow-tooltip
-          >
+          <el-table-column label="Applies To" min-width="140" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.patient_name || row.supervised_worker_name || "—" }}
             </template>
@@ -701,13 +414,15 @@
           <el-table-column prop="amount" label="Amount" width="120">
             <template #default="{ row }">{{ money(row.amount) }}</template>
           </el-table-column>
-          <el-table-column
-            prop="notes"
-            label="Notes"
-            min-width="180"
-            show-overflow-tooltip
-          />
+          <el-table-column prop="notes" label="Notes" min-width="180" show-overflow-tooltip />
         </el-table>
+      </div>
+      <div class="mt-2 text-sm" v-if="modals.slip.totals">
+        <b>Totals:</b>
+        Hours: <b>{{ formatHours(modals.slip.totals.total_hours) }}</b> •
+        Regular: <b>{{ money(modals.slip.totals.hours_amount) }}</b> •
+        Additionals: <b>{{ money(modals.slip.totals.extras_amount) }}</b> •
+        Grand Total: <b>{{ money(modals.slip.totals.grand_total) }}</b>
       </div>
       <template #footer>
         <el-button @click="modals.slip.visible = false">Close</el-button>
@@ -973,11 +688,11 @@ const amountLocked = computed(() => {
   return !!(r && Number(r.unit_rate || 0) !== 0);
 });
 const isAssessmentRate = computed(() => {
-  const r = selectedRate.value;  
+  const r = selectedRate.value;
   return r && (r.code === "initial_assessment" || r.code === "reassessment");
 });
 const isSupervisionRate = computed(() => {
-  const r = selectedRate.value;  
+  const r = selectedRate.value;
   return r && r.code === "supervision";
 });
 watch(
@@ -1239,7 +954,7 @@ async function loadHours() {
       const wprId = Number(r.worker_patient_role_id);
       wprHours[wprId] = (Number(wprHours[wprId]) || 0) + (Number(r.hours) || 0);
       hoursEntryId[wprId] = Number(r.id || 0) || undefined;
-    });    
+    });
   } catch (e) {
     ElMessage.error(e.message || "Failed to load hours");
   } finally {
@@ -1551,7 +1266,7 @@ async function searchRates(q) {
       unit_rate: Number(Math.abs(i.unit_rate) || 0),
       code: i.code || null,
     }));
-  } catch (_) {}
+  } catch (_) { }
 }
 // Adjust this action name to your existing worker search endpoint.
 async function searchWorkers(q, roleId = null) {
@@ -1568,7 +1283,7 @@ async function searchWorkers(q, roleId = null) {
       value: w.id,
       label: w.first_name + " " + w.last_name,
     }));
-  } catch (_) {}
+  } catch (_) { }
   loading.workers = false;
 }
 
@@ -1584,7 +1299,7 @@ async function searchPatients(q) {
       value: p.id,
       label: p.first_name + " " + p.last_name,
     }));
-  } catch (_) {}
+  } catch (_) { }
   loading.patients = false;
 }
 
@@ -1732,42 +1447,55 @@ function downloadWorkerSlip(row) {
 .wp-wrap {
   padding: 12px;
 }
+
 .mb-3 {
   margin-bottom: 0.75rem;
 }
+
 .mt-2 {
   margin-top: 0.5rem;
 }
+
 .flex {
   display: flex;
 }
+
 .items-center {
   align-items: center;
 }
+
 .justify-between {
   justify-content: space-between;
 }
+
 .text-lg {
   font-size: 1.125rem;
 }
+
 .font-semibold {
   font-weight: 600;
 }
+
 .text-gray-600 {
   color: #6b7280;
 }
+
 .text-gray-700 {
   color: #374151;
 }
+
 .cursor {
   cursor: pointer;
 }
+
 .gap-2 {
   gap: 0.5rem;
 }
+
 .h-full {
   height: 100%;
 }
+
 .ml-2 {
   margin-left: 0.5rem;
 }
