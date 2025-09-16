@@ -91,7 +91,8 @@
                 <template v-else>
                   <div class="flex items-center justify-between mb-2">
                     <div class="font-semibold">
-                      {{ selectedPatient.patient_name }}
+                      {{ selectedPatient.patient_name
+                        || (selectedPatient.first_name + ' ' + selectedPatient.last_name) }}
                       <el-tag class="ml-2" :type="is_processed(selectedPatient.is_processed)
                         ? 'success'
                         : 'info'
