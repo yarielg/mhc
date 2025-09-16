@@ -164,7 +164,7 @@ class PayrollController
         if ($id instanceof \WP_Error) {
             wp_send_json_error(['message' => $id->get_error_message()], 400);
         }
-        if (!$id) wp_send_json_error(['message' => 'No se pudo crear el payroll'], 500);
+        if (!$id) wp_send_json_error(['message' => 'Could not create payroll'], 500);
 
         // === GENERACIÓN DE SEGMENTOS ===
         $segments = [];
@@ -343,11 +343,11 @@ class PayrollController
         $is_processed = isset($_POST['is_processed']) ? (int)$_POST['is_processed'] : 0;
 
         if ($payroll_id <= 0 || $patient_id <= 0) {
-            wp_send_json_error(['message' => 'payroll_id y patient_id son requeridos'], 400);
+            wp_send_json_error(['message' => 'payroll_id and patient_id are required'], 400);
         }
 
         $ok = PatientPayroll::setProcessed($payroll_id, $patient_id, $is_processed);
-        if (!$ok) wp_send_json_error(['message' => 'No se pudo actualizar is_processed'], 500);
+        if (!$ok) wp_send_json_error(['message' => 'Could not update is_processed'], 500);
 
         // respuesta útil para refrescar UI
         $counts = PatientPayroll::countsByStatus($payroll_id);
@@ -363,7 +363,7 @@ class PayrollController
         self::check();
         $payroll_id = (int)($_REQUEST['payroll_id'] ?? 0);
         $patient_id = (int)($_REQUEST['patient_id'] ?? 0);
-        if ($payroll_id <= 0 || $patient_id <= 0) wp_send_json_error(['message' => 'payroll_id y patient_id requeridos'], 400);
+        if ($payroll_id <= 0 || $patient_id <= 0) wp_send_json_error(['message' => 'payroll_id and patient_id are required'], 400);
 
         $items = WorkerPatientRole::listForPatientInPayroll($patient_id, $payroll_id);
         wp_send_json_success(['items' => $items]);
@@ -381,7 +381,7 @@ class PayrollController
         $rate       = isset($data['rate']) ? (float)$data['rate'] : null;
 
         if ($payroll_id <= 0 || $patient_id <= 0 || $worker_id <= 0 || $role_id <= 0)
-            wp_send_json_error(['message' => 'Campos requeridos: payroll_id, patient_id, worker_id, role_id'], 400);
+            wp_send_json_error(['message' => 'Required Fields: payroll_id, patient_id, worker_id, role_id'], 400);
 
         $id = WorkerPatientRole::createTemporaryForPayroll($worker_id, $patient_id, $role_id, $payroll_id, $rate);
         if ($id instanceof \WP_Error) wp_send_json_error(['message' => $id->get_error_message()], 400);
@@ -399,7 +399,7 @@ class PayrollController
         self::check();
         $payroll_id = (int)($_REQUEST['payroll_id'] ?? 0);
         $patient_id = (int)($_REQUEST['patient_id'] ?? 0);
-        if ($payroll_id <= 0 || $patient_id <= 0) wp_send_json_error(['message' => 'payroll_id y patient_id requeridos'], 400);
+        if ($payroll_id <= 0 || $patient_id <= 0) wp_send_json_error(['message' => 'payroll_id and patient_id are required'], 400);
 
         $rows = HoursEntry::listDetailedForPayroll($payroll_id, ['patient_id' => $patient_id]);
         // Totales por paciente (para header de la tarjeta)
@@ -419,14 +419,14 @@ class PayrollController
         $wpr_id     = (int)($data['worker_patient_role_id'] ?? 0);
         $hours      = isset($data['hours']) ? (float)$data['hours'] : 0.0;
         $used_rate  = isset($data['used_rate']) ? (float)$data['used_rate'] : null;
-        if ($payroll_id <= 0 || $wpr_id <= 0) wp_send_json_error(['message' => 'payroll_id y worker_patient_role_id requeridos'], 400);
+        if ($payroll_id <= 0 || $wpr_id <= 0) wp_send_json_error(['message' => 'payroll_id and worker_patient_role_id are required'], 400);
 
         // Resolve used_rate si no viene
         if ($used_rate === null) {
             $wpr = WorkerPatientRole::findById($wpr_id);
-            if (!$wpr) wp_send_json_error(['message' => 'Asignación (WPR) no encontrada'], 404);
+            if (!$wpr) wp_send_json_error(['message' => 'Asignación (WPR) not found'], 404);
             $payroll = Payroll::findById($payroll_id);
-            if (!$payroll) wp_send_json_error(['message' => 'Payroll no encontrado'], 404);
+            if (!$payroll) wp_send_json_error(['message' => 'Payroll not found'], 404);
             $used_rate = WorkerPatientRole::resolveEffectiveRate($wpr, (array)$payroll);
         }
 
@@ -456,11 +456,11 @@ class PayrollController
         if ($id <= 0) wp_send_json_error(['message' => 'Missing id'], 400);
 
         $row = HoursEntry::findById($id);
-        if (!$row) wp_send_json_error(['message' => 'No encontrado'], 404);
+        if (!$row) wp_send_json_error(['message' => 'Not found'], 404);
         $wprInfo = HoursEntry::getWprInfo((int)$row->worker_patient_role_id);
 
         $ok = HoursEntry::delete($id);
-        if ($ok instanceof \WP_Error || !$ok) wp_send_json_error(['message' => 'No se pudo eliminar'], 500);
+        if ($ok instanceof \WP_Error || !$ok) wp_send_json_error(['message' => 'Could not delete'], 500);
 
         // Responder con lista y totales del paciente
         $rows = HoursEntry::listDetailedForPayroll((int)$row->payroll_id, ['patient_id' => $wprInfo['patient_id']]);
@@ -480,7 +480,7 @@ class PayrollController
         self::check();
         $payroll_id = (int)($_POST['payroll_id'] ?? 0);
         $search     = sanitize_text_field($_POST['search'] ?? ''); // ✅ capture correctly
-        if ($payroll_id <= 0) wp_send_json_error(['message' => 'payroll_id requerido'], 400);
+        if ($payroll_id <= 0) wp_send_json_error(['message' => 'payroll_id required'], 400);
 
         // Totales por trabajador (horas)
         $hours = HoursEntry::totalsByWorkerForPayroll($payroll_id);
@@ -575,7 +575,7 @@ class PayrollController
         self::check();
         $payroll_id = (int)($_POST['payroll_id'] ?? 0);
         $worker_id  = (int)($_POST['worker_id'] ?? 0);
-        if ($payroll_id <= 0 || $worker_id <= 0) wp_send_json_error(['message' => 'payroll_id y worker_id requeridos'], 400);
+        if ($payroll_id <= 0 || $worker_id <= 0) wp_send_json_error(['message' => 'payroll_id and worker_id are required'], 400);
 
         // Horas detalladas de ese worker en el payroll (por paciente/rol)
         $hours = HoursEntry::listDetailedForPayroll($payroll_id, ['worker_id' => $worker_id]);
@@ -654,7 +654,7 @@ class PayrollController
         self::check();
         $payroll_id = (int)($_POST['payroll_id'] ?? 0);
         $worker_id  = (int)($_POST['worker_id'] ?? 0); // opcional: si no llega, lista todos
-        if ($payroll_id <= 0) wp_send_json_error(['message' => 'payroll_id requerido'], 400);
+        if ($payroll_id <= 0) wp_send_json_error(['message' => 'payroll_id required'], 400);
 
         $filters = ['payroll_id' => $payroll_id];
         if ($worker_id > 0) $filters['worker_id'] = $worker_id;
@@ -676,7 +676,7 @@ class PayrollController
         $notes       = isset($_POST['notes']) ? sanitize_text_field(wp_unslash($_POST['notes'])) : '';
 
         if ($payroll_id <= 0 || $worker_id <= 0 || $rate_id <= 0 || $amount === null)
-            wp_send_json_error(['message' => 'payroll_id, worker_id, special_rate_id y amount son requeridos'], 400);
+            wp_send_json_error(['message' => 'payroll_id, worker_id, special_rate_id y amount are required'], 400);
 
         // Obtener el código del special rate
         $special_rate = \Mhc\Inc\Models\SpecialRate::findById($rate_id);
@@ -704,7 +704,7 @@ class PayrollController
     {
         self::check();
         $id          = (int)($_POST['id'] ?? 0);
-        if ($id <= 0) wp_send_json_error(['message' => 'id requerido'], 400);
+        if ($id <= 0) wp_send_json_error(['message' => 'id required'], 400);
 
 
         $upd = [];
@@ -728,10 +728,10 @@ class PayrollController
             $upd['amount'] = -1 * $upd['amount'];
         }
 
-        if (empty($upd)) wp_send_json_error(['message' => 'Nada para actualizar'], 400);
+        if (empty($upd)) wp_send_json_error(['message' => 'Nothing to update'], 400);
 
         $ok = ExtraPayment::update($id, $upd);
-        if ($ok instanceof \WP_Error || !$ok) wp_send_json_error(['message' => 'No se pudo actualizar'], 500);
+        if ($ok instanceof \WP_Error || !$ok) wp_send_json_error(['message' => 'Could not update'], 500);
 
         // devolver el registro actualizado
         global $wpdb;
@@ -747,7 +747,7 @@ class PayrollController
         if ($id <= 0) wp_send_json_error(['message' => 'id requerido'], 400);
 
         $ok = ExtraPayment::delete($id);
-        if ($ok instanceof \WP_Error || !$ok) wp_send_json_error(['message' => 'No se pudo eliminar'], 500);
+        if ($ok instanceof \WP_Error || !$ok) wp_send_json_error(['message' => 'Could not delete'], 500);
         wp_send_json_success(['deleted' => (int)$id]);
     }
 
