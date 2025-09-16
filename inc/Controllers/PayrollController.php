@@ -19,6 +19,7 @@ class PayrollController
         // Payroll CRUD básico
         add_action('wp_ajax_mhc_payroll_list',        [__CLASS__, 'ajax_list']);
         add_action('wp_ajax_mhc_payroll_get',         [__CLASS__, 'ajax_get']);
+        add_action('wp_ajax_mhc_payroll_check_overlap', [__CLASS__, 'ajax_check_overlap']); //Overlap check --- IGNORE ---
         add_action('wp_ajax_mhc_payroll_create',      [__CLASS__, 'ajax_create']);
         add_action('wp_ajax_mhc_payroll_update',      [__CLASS__, 'ajax_update']);
         add_action('wp_ajax_mhc_payroll_delete',      [__CLASS__, 'ajax_delete']);
@@ -111,6 +112,27 @@ class PayrollController
         $row = Payroll::findById($id);
         if (!$row) wp_send_json_error(['message' => 'Not found'], 404);
         wp_send_json_success($row);
+    }
+
+    // POST: start_date, end_date
+    //Overlap check --- IGNORE ---
+    public static function ajax_check_overlap()
+    {
+        self::check();
+        $data = self::json_input();
+
+        $start_date = isset($data['start_date']) ? self::sanitize_date($data['start_date']) : '';
+        $end_date   = isset($data['end_date'])   ? self::sanitize_date($data['end_date'])   : '';
+        if (!$start_date || !$end_date) {
+            wp_send_json_error(['message' => 'start_date and end_date required'], 400);
+        }
+
+        if (method_exists(Payroll::class, 'hasOverlap')) {
+            $overlap = Payroll::hasOverlap($start_date, $end_date);
+            wp_send_json_success(['overlap' => $overlap]);
+        } else {
+            wp_send_json_error(['message' => 'Overlap check not implemented'], 501);
+        }
     }
 
     // POST: start_date, end_date, (status, notes)

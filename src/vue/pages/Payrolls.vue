@@ -299,15 +299,41 @@ async function submitNew() {
   }
   loading.create = true
   try {
-    // Backend defaults status to 'draft' if not provided
     const payload = {
       start_date: modals.new.form.start_date,
       end_date: modals.new.form.end_date,
       notes: modals.new.form.notes?.trim() || '',
     }
+    // Overlap check before creating
+    let overlap = false
+    try {
+      const overlapRes = await ajaxPost('mhc_payroll_check_overlap', {
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+      })
+      overlap = overlapRes.overlap
+    } catch (e) {
+      // If endpoint fails, ignore and continue
+      overlap = false
+    }
+    if (overlap) {
+      try {
+        await ElMessageBox.confirm(
+          'Warning: The selected period overlaps with an existing payroll. Do you want to continue and create this payroll?',
+          'Overlap Warning',
+          {
+            confirmButtonText: 'Accept',
+            cancelButtonText: 'Cancel',
+            type: 'warning',
+          }
+        )
+      } catch (e) {
+        // User cancelled
+        loading.create = false
+        return
+      }
+    }
     const data = await ajaxPost('mhc_payroll_create', payload)
-
-    // Option A: optimistic insert with what we know; we have id from backend
     const now = new Date()
     const createdRow = {
       id: data.id,
@@ -320,7 +346,6 @@ async function submitNew() {
     }
     items.value.unshift(createdRow)
     total.value += 1
-
     modals.new.visible = false
     ElMessage.success(`Payroll #${data.id} created`)
   } catch (e) {
