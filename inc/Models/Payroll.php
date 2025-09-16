@@ -293,4 +293,19 @@ class Payroll
         $count = (int)$wpdb->get_var($wpdb->prepare($sql, ...$params));
         return $count > 0;
     }
+
+    /**
+     * Verifica si ya existe un payroll con las mismas fechas de inicio y fin.
+     * Útil para evitar duplicados exactos.
+     */
+    public static function existsWithDates(string $start, string $end): bool {
+        global $wpdb;
+        $t = self::table();
+
+        $sql = "SELECT COUNT(*) FROM {$t} WHERE start_date = %s AND end_date = %s";
+        $params = [$start, $end];
+
+        $count = (int)$wpdb->get_var($wpdb->prepare($sql, ...$params));
+        return $count > 0;
+    }
 }

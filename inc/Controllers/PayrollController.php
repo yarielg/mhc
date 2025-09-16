@@ -130,10 +130,15 @@ class PayrollController
             wp_send_json_error(['message' => 'start_date and end_date required'], 400);
         }
         
-        // (Opcional) Evitar solape de periodos
+        // (Opcional) avoid overlap if you have that method
        /*  if (method_exists(Payroll::class, 'hasOverlap') && Payroll::hasOverlap($payload['start_date'], $payload['end_date'])) {
             wp_send_json_error(['message' => 'El rango de fechas se solapa con otro payroll'], 409);
         } */
+
+        //Avoid duplicates start_date and end_date
+        if (Payroll::existsWithDates($payload['start_date'], $payload['end_date'])) {
+            wp_send_json_error(['message' => 'A payroll with the same start_date and end_date already exists'], 409);
+        }
 
         // === VALIDACIÓN DE DÍA DE INICIO DE SEMANA ===
         $week_start = get_option('mhc_week_start_day', 'monday');
