@@ -127,12 +127,13 @@ class PayrollController
             'notes'      => isset($data['notes'])  ? sanitize_text_field($data['notes'])  : '',
         ];
         if (!$payload['start_date'] || !$payload['end_date']) {
-            wp_send_json_error(['message' => 'start_date y end_date son requeridos'], 400);
+            wp_send_json_error(['message' => 'start_date and end_date required'], 400);
         }
+        
         // (Opcional) Evitar solape de periodos
-        if (method_exists(Payroll::class, 'hasOverlap') && Payroll::hasOverlap($payload['start_date'], $payload['end_date'])) {
+       /*  if (method_exists(Payroll::class, 'hasOverlap') && Payroll::hasOverlap($payload['start_date'], $payload['end_date'])) {
             wp_send_json_error(['message' => 'El rango de fechas se solapa con otro payroll'], 409);
-        }
+        } */
 
         // === VALIDACIÓN DE DÍA DE INICIO DE SEMANA ===
         $week_start = get_option('mhc_week_start_day', 'monday');
@@ -151,6 +152,13 @@ class PayrollController
             $day_name = ucfirst($week_start);
             wp_send_json_error(['message' => "Payroll start_date must be a $day_name"], 400);
         }
+
+        // Validate start_date and end_date are week muiltiples (i.e., 7, 14, 21, 28 days apart)
+        $diff_days = ($end_ts - $start_ts) / 86400 + 1; // inclusive
+        if ($diff_days <= 0 || $diff_days % 7 !== 0) {
+            wp_send_json_error(['message' => 'Payroll period must be in full week increments (7, 14, 21, 28 days)'], 400);
+        }
+        // === FIN VALIDACIÓN DÍA INICIO SEMANA ===
 
         $id = Payroll::create($payload);
         if ($id instanceof \WP_Error) {
