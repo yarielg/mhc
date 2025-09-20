@@ -6,10 +6,10 @@
 
     <div class="mb-20">
       <el-row :gutter="20">
-        <el-col :span="20">
+        <el-col :span="8">
           <el-button type="primary" @click="openCreate">Add Client</el-button>
         </el-col>
-        <el-col :span="4">
+        <el-col :span="8">
           <div class="mb-3">
             <el-input v-model="state.search" placeholder="Search by name..." clearable @clear="fetchData(1)"
               @keyup.enter.native="fetchData(1)">
@@ -17,7 +17,13 @@
                 <el-button @click="fetchData(1)">Search</el-button>
               </template>
             </el-input>
+
           </div>
+
+        </el-col>
+        <el-col :span="8">
+          <el-select-v2 v-model="filters.worker_id" placeholder="Search worker…"  clearable
+                        @change="onWorkerChangeX" @clear="onWorkerClearX" filterable remote :remote-method="searchWorkers" :options="workersOptions" style="width: 100%" />
         </el-col>
       </el-row>
     </div>
@@ -145,6 +151,16 @@ const state = reactive({
   currentId: null,
 })
 
+const workersOptions = ref([]); // [{value:id, label:name}]
+
+const loading = reactive({
+  workers: false,
+});
+
+const NONCE = parameters.nonce || ""; // your controller uses NONCE_ACTION 'mhc_ajax'
+const AJAX_URL = parameters.ajax_url || "/wp-admin/admin-ajax.php";
+
+
 const formRef = ref(null)
 const form = reactive({
   first_name: '',
@@ -155,11 +171,28 @@ const form = reactive({
   assignments: [], // [{ worker_id, role_id, rate, _workerOptions, _rolesForWorker, _lastRoleDefault }]
 })
 
+const filters = reactive({
+  // keep your existing filters (e.g., search text)...
+  worker_id: null, // <— NEW
+});
+
 const rules = {
   first_name: [{ required: true, message: 'First name is required', trigger: 'blur' }],
   last_name: [{ required: true, message: 'Last name is required', trigger: 'blur' }],
   record_number: [{ required: true, message: 'Record number is required', trigger: 'blur' }],
 }
+
+const onWorkerChangeX = () => {
+  // If your table pulls from server, just trigger your existing loader
+  fetchData(1);
+};
+
+
+
+const onWorkerClearX= () => {
+  filters.worker_id = null;
+  fetchData(1);
+};
 
 function resetForm() {
   form.first_name = ''
@@ -211,6 +244,42 @@ async function openEdit(row) {
   state.showDialog = true
 }
 
+async function ajaxPostForm(action, body = {}) {
+  const url = new URL(AJAX_URL, window.location.origin);
+  url.searchParams.set("action", action);
+  if (NONCE) url.searchParams.set("nonce", NONCE);
+  const form = new FormData();
+  Object.entries(body).forEach(
+      ([k, v]) => v !== undefined && form.append(k, v)
+  );
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    body: form,
+    credentials: "same-origin",
+  });
+  const json = await res.json();
+  if (!json?.success) throw new Error(json?.data?.message || "Request failed");
+  return json.data;
+}
+
+async function searchWorkers(q, roleId = null) {
+  loading.workers = true;
+  try {
+    // Example expected response shape: { items: [{ id, name }] }
+    const params = {
+      search: q,
+      limit: 20,
+    };
+    if (roleId) params.role_id = roleId;
+    const res = await ajaxPostForm("mhc_workers_list", params);
+    workersOptions.value = (res?.items || []).map((w) => ({
+      value: w.id,
+      label: w.first_name + " " + w.last_name,
+    }));
+  } catch (_) { }
+  loading.workers = false;
+}
+
 async function fetchData(page = state.page) {
   try {
     state.loading = true
@@ -220,6 +289,7 @@ async function fetchData(page = state.page) {
     fd.append('nonce', parameters.nonce)
     fd.append('page', state.page)
     fd.append('per_page', state.per_page)
+    fd.append('worker_id', filters.worker_id)
     if (state.search) fd.append('search', state.search)
 
     const { data } = await axios.post(parameters.ajax_url, fd)

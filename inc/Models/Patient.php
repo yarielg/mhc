@@ -21,37 +21,72 @@ class Patient {
         return $row;
     }
 
-    public static function findAll($search = '', $page = 1, $per_page = 10) {
+    public static function findAll($search = '', $page = 1, $per_page = 10, $worker_id = 0) {
         global $wpdb;
-        $pfx = $wpdb->prefix;
+        $pfx   = $wpdb->prefix;
         $table = "{$pfx}mhc_patients";
-        $wpr = "{$pfx}mhc_worker_patient_roles";
-        $offset = ($page - 1) * $per_page;
-        $where = "WHERE 1=1";
+        $wpr   = "{$pfx}mhc_worker_patient_roles";
+
+        $offset = max(0, ($page - 1) * $per_page);
+
+        $where  = [];
         $params = [];
+
+        // Search (first/last/full name, record number)
         if ($search !== '') {
-            $where .= " AND (first_name LIKE %s OR last_name LIKE %s OR CONCAT(first_name,' ',last_name) LIKE %s OR record_number LIKE %s)";
             $like = '%' . $wpdb->esc_like($search) . '%';
-            $params[] = $like; $params[] = $like; $params[] = $like;
+            $where[] = "(p.first_name LIKE %s OR p.last_name LIKE %s OR CONCAT(p.first_name,' ',p.last_name) LIKE %s OR p.record_number LIKE %s)";
+            $params[] = $like; // first_name
+            $params[] = $like; // last_name
+            $params[] = $like; // full name
+            $params[] = $like; // record_number
         }
-        $total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table $where", $params));
+
+        // Filter: only patients with an active relationship to this worker
+        if ((int)$worker_id > 0) {
+            $where[] = "EXISTS (
+            SELECT 1
+            FROM {$wpr} w
+            WHERE w.patient_id = p.id
+              AND w.worker_id = %d
+              AND w.end_date IS NULL
+        )";
+            $params[] = (int)$worker_id;
+        }
+
+        $where_sql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+        // Total count
+        $total_sql = "SELECT COUNT(*) FROM {$table} p {$where_sql}";
+        $total = (int) $wpdb->get_var($wpdb->prepare($total_sql, $params));
+
+        // Rows (page)
+        $rows_sql = "SELECT p.* FROM {$table} p {$where_sql} ORDER BY p.id DESC LIMIT %d OFFSET %d";
         $rows = $wpdb->get_results(
-            $wpdb->prepare("SELECT * FROM $table $where ORDER BY id DESC LIMIT %d OFFSET %d", array_merge($params, [$per_page, $offset])),
+            $wpdb->prepare($rows_sql, array_merge($params, [(int)$per_page, (int)$offset])),
             ARRAY_A
         );
+
+        // Attach current assignments (optional; keeps your original behavior)
         foreach ($rows as &$row) {
             $row['assignments'] = $wpdb->get_results(
-                $wpdb->prepare("SELECT worker_id, role_id, rate FROM $wpr WHERE patient_id=%d AND end_date IS NULL", $row['id']),
+                $wpdb->prepare(
+                    "SELECT worker_id, role_id, rate
+                 FROM {$wpr}
+                 WHERE patient_id = %d AND end_date IS NULL",
+                    $row['id']
+                ),
                 ARRAY_A
             );
         }
         unset($row);
-        //error_log(print_r($rows, true));
+
         return [
             'items' => $rows,
             'total' => $total,
         ];
     }
+
 
     public static function create($data) {
         global $wpdb;

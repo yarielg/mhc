@@ -52,6 +52,8 @@
                 </el-icon>
               </template>
             </el-input>
+            <el-select-v2 v-model="filters.worker_id" placeholder="Search worker…"  clearable size="small"
+                          @change="onWorkerChange" @clear="onWorkerClear" filterable remote :remote-method="searchWorkers" :options="workersOptions" style="width: 200px" />
             <div class="mt-2">
               <el-table :data="patients" size="small" border highlight-current-row height="440"
                 v-loading="loading.patients" @current-change="selectPatient">
@@ -593,6 +595,7 @@ const loading = reactive({
   finalize: false,
   reopen: false,
   seed: false,
+  workers: false,
 
   patients: false,
   patientWorkers: false,
@@ -619,6 +622,12 @@ const patientFilters = computed(() => [
   { label: `Pending${badge(counts.value?.pending)}`, value: "0" },
   { label: `Processed${badge(counts.value?.processed)}`, value: "1" },
 ]);
+
+const filters = reactive({
+  // keep your existing filters (e.g., search text)...
+  worker_id: null, // <— NEW
+});
+
 function badge(n) {
   return typeof n === "number" ? ` (${n})` : "";
 }
@@ -671,6 +680,17 @@ const modals = reactive({
     header: {},
   },
 });
+
+const onWorkerChange = () => {
+  // If your table pulls from server, just trigger your existing loader
+  loadPatients();
+};
+
+const onWorkerClear = () => {
+  filters.worker_id = null;
+  loadPatients();
+};
+
 
 /* Lookups for remote selects (workers, rates, roles) */
 const workersOptions = ref([]); // [{value:id, label:name}]
@@ -753,6 +773,7 @@ async function loadPatients() {
       payroll_id: id,
       is_processed: patientsFilter.value,
       search: patientSearch.value,
+      worker_id: filters.worker_id,
     });
     patients.value = data?.patients || [];
     counts.value = data?.counts || null;

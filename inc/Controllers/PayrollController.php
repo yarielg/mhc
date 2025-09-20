@@ -348,8 +348,9 @@ class PayrollController
         $payroll_id   = isset($_REQUEST['payroll_id']) ? (int)$_REQUEST['payroll_id'] : 0;
         $is_processed = $_REQUEST['is_processed'] ?? 'all'; // 'all' | '0' | '1'
         $search = $_REQUEST['search'] ?? '';
+        $worker_id = isset($_REQUEST['worker_id'] )  ? (int)$_REQUEST['worker_id'] : 0;
         if ($payroll_id <= 0) wp_send_json_error(['message' => 'Missing payroll_id'], 400);
-        $patients = PatientPayroll::findByPayroll($payroll_id, ['is_processed' => $is_processed, 'search' => $search]);;
+        $patients = PatientPayroll::findByPayroll($payroll_id, ['is_processed' => $is_processed, 'search' => $search, 'worker_id' => $worker_id]);;
         $counts   = PatientPayroll::countsByStatus($payroll_id);
 
         wp_send_json_success([

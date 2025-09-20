@@ -16,24 +16,40 @@ class PatientPayroll {
         global $wpdb;
         $pfx = $wpdb->prefix;
 
-        $where = ["pp.payroll_id = %d"];
+        $where  = ["pp.payroll_id = %d"];
         $params = [$payroll_id];
 
+        // Filter: processed
         if (isset($args['is_processed']) && $args['is_processed'] !== '' && $args['is_processed'] !== 'all') {
-            $where[] = "pp.is_processed = %d";
-            $params[] = (int)$args['is_processed'];
+            $where[]  = "pp.is_processed = %d";
+            $params[] = (int) $args['is_processed'];
         }
 
-        // 🔹 Nuevo: búsqueda por nombre
+        // Filter: search by patient name
         if (!empty($args['search'])) {
-            $where[] = "(p.first_name LIKE %s OR p.last_name LIKE %s)";
-            $search = '%' . $wpdb->esc_like($args['search']) . '%';
-            $params[] = $search;
-            $params[] = $search;
+            $like     = '%' . $wpdb->esc_like($args['search']) . '%';
+            $where[]  = "(p.first_name LIKE %s OR p.last_name LIKE %s)";
+            $params[] = $like;
+            $params[] = $like;
+        }
+
+        // Filter: worker, constrained to payroll dates
+        $joinWpr = '';
+        if (!empty($args['worker_id'])) {
+            $worker_id = (int) $args['worker_id'];
+            $where[]   = $wpdb->prepare("wpr.worker_id = %d", $worker_id);
+
+            // Date overlap between WPR assignment and payroll period:
+            // wpr.start_date <= payroll.end_date
+            // AND (wpr.end_date IS NULL OR wpr.end_date >= payroll.start_date)
+            $where[] = "(wpr.start_date <= pr.end_date AND (wpr.end_date IS NULL OR wpr.end_date >= pr.start_date))";
+
+            $joinWpr = "INNER JOIN {$pfx}mhc_worker_patient_roles wpr
+                      ON wpr.patient_id = pp.patient_id";
         }
 
         $sql = "
-        SELECT
+        SELECT DISTINCT
             pp.id,
             pp.payroll_id,
             pp.patient_id,
@@ -41,7 +57,11 @@ class PatientPayroll {
             p.first_name,
             p.last_name
         FROM {$pfx}mhc_patient_payrolls pp
-        INNER JOIN {$pfx}mhc_patients p ON p.id = pp.patient_id
+        INNER JOIN {$pfx}mhc_payrolls pr
+                ON pr.id = pp.payroll_id
+        INNER JOIN {$pfx}mhc_patients p
+                ON p.id = pp.patient_id
+        {$joinWpr}
         WHERE " . implode(' AND ', $where) . "
         ORDER BY p.last_name ASC, p.first_name ASC
     ";
