@@ -6,10 +6,10 @@
 
     <div class="mb-20">
       <el-row :gutter="20">
-        <el-col :span="8">
+        <el-col :span="6">
           <el-button type="primary" @click="openCreate">Add Client</el-button>
         </el-col>
-        <el-col :span="8">
+        <el-col :span="6">
           <div class="mb-3">
             <el-input v-model="state.search" placeholder="Search by name..." clearable @clear="fetchData(1)"
               @keyup.enter.native="fetchData(1)">
@@ -21,11 +21,18 @@
           </div>
 
         </el-col>
-        <el-col :span="8">
+        <el-col :span="6">
           <el-select-v2 v-model="filters.worker_id" placeholder="Search worker…"  clearable
                         @change="onWorkerChangeX" @clear="onWorkerClearX" filterable remote :remote-method="searchWorkers" :options="workersOptions" style="width: 100%" />
         </el-col>
-      </el-row>
+        <el-col :span="4">
+            <el-select v-model="filters.is_active" placeholder="Filter by status" style="width: 100%; margin-bottom: 8px;" @change="fetchData(1)">
+              <el-option label="All" value="" />
+              <el-option label="Active" value="1" />
+              <el-option label="Inactive" value="0" />
+            </el-select>
+          </el-col>
+      </el-row>        
     </div>
 
     <el-table :data="state.items" v-loading="state.loading" border style="width: 100%" size="small"
@@ -174,6 +181,7 @@ const form = reactive({
 const filters = reactive({
   // keep your existing filters (e.g., search text)...
   worker_id: null, // <— NEW
+  is_active: ''
 });
 
 const rules = {
@@ -290,6 +298,8 @@ async function fetchData(page = state.page) {
     fd.append('page', state.page)
     fd.append('per_page', state.per_page)
     fd.append('worker_id', filters.worker_id)
+    // Filtro Active/Inactive
+    if (filters.is_active !== '') fd.append('is_active', filters.is_active)
     if (state.search) fd.append('search', state.search)
 
     const { data } = await axios.post(parameters.ajax_url, fd)

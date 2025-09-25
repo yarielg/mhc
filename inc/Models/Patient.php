@@ -21,7 +21,7 @@ class Patient {
         return $row;
     }
 
-    public static function findAll($search = '', $page = 1, $per_page = 10, $worker_id = 0) {
+    public static function findAll($search = '', $page = 1, $per_page = 10, $worker_id = 0, $is_active = null) {
         global $wpdb;
         $pfx   = $wpdb->prefix;
         $table = "{$pfx}mhc_patients";
@@ -40,6 +40,12 @@ class Patient {
             $params[] = $like; // last_name
             $params[] = $like; // full name
             $params[] = $like; // record_number
+        }
+
+        // Filtro por estado activo/inactivo
+        if ($is_active !== null && $is_active !== '') {
+            $where[] = "p.is_active = %d";
+            $params[] = (int)$is_active;
         }
 
         // Filter: only patients with an active relationship to this worker

@@ -37,7 +37,8 @@ class PatientsController{
         $per_page = min(100, max(1, intval($_POST['per_page'] ?? 10)));
         $search = isset($_POST['search']) ? trim(wp_unslash($_POST['search'])) : '';
         $worker_id = isset($_REQUEST['worker_id'] )  ? (int)$_REQUEST['worker_id'] : 0;
-        $result = Patient::findAll($search, $page, $per_page, $worker_id);
+        $is_active = isset($_POST['is_active']) && $_POST['is_active'] !== '' ? $_POST['is_active'] : null;
+        $result = Patient::findAll($search, $page, $per_page, $worker_id, $is_active);
         wp_send_json_success([
             'items' => $result['items'],
             'total' => $result['total'],
