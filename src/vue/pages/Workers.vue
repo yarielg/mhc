@@ -33,14 +33,14 @@
       <el-table-column prop="company" label="Company" width="200" show-overflow-tooltip />
 
       <!-- New: Supervisor -->
-      <el-table-column label="Supervisor" min-width="210" show-overflow-tooltip>
+      <!--<el-table-column label="Supervisor" min-width="210" show-overflow-tooltip class="d-none">
         <template #default="{ row }">
           <span v-if="row.supervisor_id">
             {{ row.supervisor_full_name || (row.supervisor_first_name + ' ' + row.supervisor_last_name).trim() }}
           </span>
           <span v-else class="text-gray-400">—</span>
         </template>
-      </el-table-column>
+      </el-table-column>-->
 
       <!-- Roles with labels + rates -->
       <el-table-column label="Roles" min-width="100">
@@ -95,7 +95,8 @@
         </el-form-item>
 
         <!-- New: Supervisor (remote autocomplete) -->
-        <el-form-item label="Supervisor">
+         <!--Hide this-->
+        <el-form-item label="Supervisor" class="d-none">
           <el-select v-model="form.supervisor_id" filterable remote clearable placeholder="Type a name..."
             :remote-method="searchSupervisors" :loading="state.loadingSupers" style="width:100%;">
             <el-option v-for="opt in supervisorOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
@@ -489,6 +490,9 @@ onMounted(() => {
 
 .text-gray-400 {
   color: #a0aec0;
+}
+.d-none{
+  display: none;
 }
 
 h2 {
