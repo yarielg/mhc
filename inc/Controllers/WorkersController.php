@@ -52,7 +52,9 @@ class WorkersController
         $per_page = min(100, max(1, intval($_POST['per_page'] ?? 10)));
         $search   = isset($_POST['search']) ? trim(wp_unslash($_POST['search'])) : '';
         $role_id  = isset($_POST['role_id']) ? (int)$_POST['role_id'] : null;
-        $result   = Worker::findAll($search, $page, $per_page, $role_id);
+        $is_active = isset($_POST['is_active']) && $_POST['is_active'] !== '' ? $_POST['is_active'] : null;
+
+        $result   = Worker::findAll($search, $page, $per_page, $role_id, $is_active);
         wp_send_json_success([
             'items'     => $result['items'],
             'total'     => $result['total'],

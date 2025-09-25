@@ -88,7 +88,7 @@ class Worker {
         return $row;
     }
 
-    public static function findAll($search = '', $page = 1, $per_page = 10, $role_id = null) {
+    public static function findAll($search = '', $page = 1, $per_page = 10, $role_id = null, $is_active = null) {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $table = "{$pfx}mhc_workers";
@@ -102,6 +102,11 @@ class Worker {
             $where .= " AND (w.first_name LIKE %s OR w.last_name LIKE %s OR CONCAT(w.first_name,' ',w.last_name) LIKE %s)";
             $like = '%' . $wpdb->esc_like($search) . '%';
             array_push($params, $like, $like, $like);
+        }
+        // Filtro por estado si viene
+        if ($is_active !== null && $is_active !== '') {
+            $where .= " AND w.is_active = %d";
+            $params[] = (int)$is_active;
         }
         // Filtro por rol si viene
         $join_roles = '';

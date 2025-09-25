@@ -18,6 +18,12 @@
                 <el-button @click="fetchData(1)">Search</el-button>
               </template>
             </el-input>
+              <!-- Filtro Active/Inactive -->
+              <el-select v-model="state.filterActive" placeholder="Filter by status" style="width: 100%; margin-top: 8px;" @change="fetchData(1)">
+                <el-option label="All" value="" />
+                <el-option label="Active" value="1" />
+                <el-option label="Inactive" value="0" />
+              </el-select>
           </div>
         </el-col>
       </el-row>
@@ -176,6 +182,9 @@ const state = reactive({
 
   // supervisors search
   loadingSupers: false,
+
+  // Filtro Active/Inactive
+  filterActive: '',
 })
 
 /** ROLES OPTIONS for selector */
@@ -354,6 +363,9 @@ async function fetchData(page = state.page) {
     fd.append('page', state.page)
     fd.append('per_page', state.per_page)
     if (state.search) fd.append('search', state.search)
+
+    // Filtro Active/Inactive
+    if (state.filterActive !== '') fd.append('is_active', state.filterActive)
 
     const { data } = await axios.post(parameters.ajax_url, fd)
     if (!data.success) throw new Error(data.data?.message || 'Failed to load')
