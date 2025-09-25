@@ -410,8 +410,8 @@ async function submit() {
     const role = a._rolesForWorker?.find(r => r.role_id === a.role_id)
     return role && (role.role_code === 'BCBA' || role.role_name === 'BCBA')
   })
-  if (!hasRBT || !hasBCBA) {
-    ElMessage.error('You must assign at least one worker with role RBT and one with role BCBA.')
+  if (!hasRBT) {
+    ElMessage.error('You must assign at least one worker with role RBT.')
     return
   }
 
