@@ -13,6 +13,7 @@ if (!defined('ABSPATH')) exit;
 
 class PayrollController
 {
+    protected static $last_mail_error = null;
 
     public static function register()
     {
@@ -56,9 +57,18 @@ class PayrollController
         // PDF generation
         add_action('wp_ajax_mhc_payroll_send_all_slips', [__CLASS__, 'ajax_send_all_slips']);
         add_action('wp_ajax_mhc_payroll_send_worker_slip', [__CLASS__, 'ajax_send_worker_slip']);
+        add_action('wp_ajax_mhc_payroll_send_all_worker_slips', [__CLASS__, 'ajax_send_all_worker_slips']);
+
     }
 
     /* ========================= Helpers ========================= */
+
+    public static function hook_capture_mail_errors() {
+        add_action('wp_mail_failed', function($wp_error){
+            // Store most recent error message for the controller
+            self::$last_mail_error = is_wp_error($wp_error) ? $wp_error->get_error_message() : 'Unknown mail error';
+        });
+    }
 
     private static function check()
     {
@@ -863,4 +873,117 @@ class PayrollController
             wp_send_json_error(['message' => 'Email sending failed'], 500);
         }
     }
+
+    protected static function send_worker_slip_email(int $payroll_id, int $worker_id, array $opts = []): array {
+
+        if ($payroll_id <= 0 || $worker_id <= 0) wp_send_json_error(['message' => 'payroll_id and worker_id required'], 400);
+
+        global $wpdb;
+        $t = $wpdb->prefix . 'mhc_workers';
+        $worker = $wpdb->get_row($wpdb->prepare("SELECT email, CONCAT(first_name,' ',last_name) AS name FROM {$t} WHERE id=%d AND is_active=1 AND email <> ''", $worker_id), ARRAY_A);
+        if (!$worker) wp_send_json_error(['message' => 'Worker not found or no email'], 404);
+        $email = $worker['email'];
+        $name = $worker['name'];
+        // PDF generation is centralized in PdfController
+        $pdfPath = \Mhc\Inc\Controllers\PdfController::generateWorkerSlipPdf([
+            'payroll_id' => $payroll_id,
+            'worker_id' => $worker_id,
+            'worker_name' => $name
+        ]);
+
+        if (!file_exists($pdfPath)) wp_send_json_error(['message' => 'PDF generation failed'], 500);
+
+        $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
+        $result = mhc_send_email(
+            $email,
+            'Hello ' . esc_html($name),
+            'Your Payroll Slip',
+            'Attached is your payroll slip PDF.',
+            [$pdfPath],
+            $logo_path
+        );
+        unlink($pdfPath);
+        if (!$result) {
+            return ['ok' => false, 'message' => 'wp_mail failed'];
+        }
+
+        return ['ok' => true, 'message' => 'sent'];
+
+    }
+
+
+    public static function ajax_send_all_worker_slips() {
+        self::check(); // your nonce/capability checker
+        self::hook_capture_mail_errors();
+
+        $payroll_id = (int)($_POST['payroll_id'] ?? 0);
+        if ($payroll_id <= 0) {
+            wp_send_json_error(['message' => 'payroll_id Required'], 400);
+        }
+
+        global $wpdb;
+        $pfx = $wpdb->prefix;
+
+        // 1) Workers with HOURS in this payroll (hours -> segment -> payroll)
+        //    he.worker_patient_role_id -> wpr.id -> wpr.worker_id
+        $workers_from_hours = $wpdb->get_col($wpdb->prepare("
+        SELECT DISTINCT wpr.worker_id
+        FROM {$pfx}mhc_hours_entries he
+        INNER JOIN {$pfx}mhc_payroll_segments s  ON s.id = he.segment_id
+        INNER JOIN {$pfx}mhc_worker_patient_roles wpr ON wpr.id = he.worker_patient_role_id
+        WHERE s.payroll_id = %d
+    ", $payroll_id));
+
+        // 2) Workers with EXTRA PAYMENTS in this payroll
+        $workers_from_extras = $wpdb->get_col($wpdb->prepare("
+        SELECT DISTINCT ep.worker_id
+        FROM {$pfx}mhc_extra_payments ep
+        WHERE ep.payroll_id = %d
+          AND ep.amount <> 0
+    ", $payroll_id));
+
+        // Merge unique, keep integers
+        $eligible_worker_ids = array_values(array_unique(array_map('intval', array_merge(
+            $workers_from_hours ?: [],
+            $workers_from_extras ?: []
+        ))));
+
+        if (empty($eligible_worker_ids)) {
+            wp_send_json_success([
+                'sent'    => 0,
+                'skipped' => 0,
+                'details' => [],
+                'message' => 'No workers with registered time/extra payments.'
+            ]);
+        }
+
+        $sent = 0;
+        $skipped = 0;
+        $details = [];
+
+        // Optional: throttle slightly to be nice with SMTP providers
+        $sleep_ms = 900; // ~0.15s between sends
+
+        foreach ($eligible_worker_ids as $wid) {
+            $res = self::send_worker_slip_email($payroll_id, $wid);
+            if (!empty($res['ok'])) {
+                $sent++;
+                $details[] = ['worker_id' => $wid, 'status' => 'sent'];
+            } else {
+                $skipped++;
+                $details[] = ['worker_id' => $wid, 'status' => 'error', 'message' => $res['message'] ?? 'unknown'];
+                usleep(1800 * 1000); // 1.8s
+            }
+            usleep($sleep_ms * 1000);
+        }
+
+        wp_send_json_success([
+            'sent'    => $sent,
+            'skipped' => $skipped,
+            'details' => $details,
+            'message' => sprintf('Processed %d workers: %d sent, %d skipped.', count($eligible_worker_ids), $sent, $skipped),
+        ]);
+    }
+
+
 }

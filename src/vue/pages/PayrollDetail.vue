@@ -219,6 +219,9 @@
                 <div class="mb-2 text-sm text-gray-600">
                   Totals per worker (regular + additionals).
 
+
+
+
                   <el-input v-model="workerSearch" placeholder="Search worker..." clearable size="small"
                     @input="loadSummary" style="width: 200px; float: right">
                     <template #prefix>
@@ -233,7 +236,18 @@
                       <Download />
                     </el-icon>
                   </el-button>
+
                 </div>
+
+                <el-button
+                    type="primary"
+                    size="small"
+                    class="send_all_slip"
+                    :loading="sendingAll"
+                    @click="confirmSendAll"
+                >
+                  Send all slips
+                </el-button>
 
                 <el-table :data="summary.items" size="small" border v-loading="loading.summary" empty-text="No data">
                   <el-table-column prop="worker_name" label="Worker" min-width="180" show-overflow-tooltip />
@@ -481,8 +495,43 @@ const debouncers = {};
 const patientSearch = ref("");
 const workerSearch = ref("");
 
+const sendingAll = ref(false);
+
 function getWprId(row) {
   return row.worker_patient_role_id || row.id || row.wpr_id;
+}
+
+function confirmSendAll() {
+  ElMessageBox.confirm(
+      'This will email a payment slip to every worker in this payroll who has hours or extra payments. Continue?',
+      'Send all slips',
+      { type: 'warning', confirmButtonText: 'Send', cancelButtonText: 'Cancel' }
+  ).then(() => sendAllSlips())
+      .catch(() => {});
+}
+
+async function sendAllSlips() {
+  sendingAll.value = true;
+  try {
+    const form = new FormData();
+    form.append('action', 'mhc_payroll_send_all_worker_slips');
+    form.append('payroll_id', String(id.value || props.id)); // use your existing id reference
+    form.append('nonce', NONCE); // adapt to your nonce variable
+
+    const res = await fetch(AJAX_URL, { method: 'POST', body: form, credentials: 'same-origin' });
+    const json = await res.json();
+
+    if (!json?.success) {
+      throw new Error(json?.data?.message || 'Failed sending slips.');
+    }
+
+    const { sent = 0, skipped = 0, message = '' } = json.data || {};
+    ElMessage.success(message || `Sent: ${sent} • Skipped: ${skipped}`);
+  } catch (err) {
+    ElMessage.error(err.message || 'Error sending slips.');
+  } finally {
+    sendingAll.value = false;
+  }
 }
 
 const segHours = reactive({});
@@ -1520,5 +1569,9 @@ function downloadWorkerSlip(row) {
 
 .ml-2 {
   margin-left: 0.5rem;
+}
+
+.send_all_slip{
+  float: right;
 }
 </style>
