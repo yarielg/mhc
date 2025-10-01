@@ -236,18 +236,19 @@
                       <Download />
                     </el-icon>
                   </el-button>
-
-                </div>
-
-                <el-button
+                  <el-button
                     type="primary"
                     size="small"
                     class="send_all_slip"
+                    style="margin-right: 8px;"
                     :loading="sendingAll"
                     @click="confirmSendAll"
-                >
-                  Send all slips
-                </el-button>
+                    >
+                      Send all slips
+                  </el-button>
+                </div>
+
+                
 
                 <el-table :data="summary.items" size="small" border v-loading="loading.summary" empty-text="No data">
                   <el-table-column prop="worker_name" label="Worker" min-width="180" show-overflow-tooltip />
