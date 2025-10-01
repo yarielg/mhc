@@ -136,9 +136,42 @@ class Patient {
         if ($ok === false) return false;
         // Actualizar asignaciones si existen
         if (isset($data['assignments']) && is_array($data['assignments'])) {
-            // Eliminar asignaciones previas
-            $wpdb->delete($wpr, ['patient_id' => intval($id)], ['%d']);
-            self::assignWorkers($id, $data['assignments']);
+            foreach ($data['assignments'] as $a) {
+                $worker_id = isset($a['worker_id']) ? intval($a['worker_id']) : 0;
+                $role_id   = isset($a['role_id'])   ? intval($a['role_id'])   : 0;
+                $rate      = isset($a['rate']) && $a['rate'] !== '' ? floatval($a['rate']) : null;
+                if ($worker_id <= 0 || $role_id <= 0) continue;
+                // Buscar si ya existe la asignación
+                $exists = $wpdb->get_var($wpdb->prepare(
+                    "SELECT id FROM $wpr WHERE patient_id=%d AND worker_id=%d",
+                    intval($id), $worker_id
+                ));
+                if ($exists) {
+                    // Actualizar role_id y rate
+                    $wpdb->update($wpr, [
+                        'role_id' => $role_id,
+                        'rate'    => $rate
+                    ], [
+                        'id' => $exists
+                    ], [
+                        '%d', $rate === null ? 'NULL' : '%f'
+                    ], [
+                        '%d'
+                    ]);
+                } else {
+                    // Insertar nueva asignación
+                    $wpdb->insert($wpr, [
+                        'worker_id'  => $worker_id,
+                        'patient_id' => intval($id),
+                        'role_id'    => $role_id,
+                        'rate'       => $rate,
+                        'start_date' => current_time('Y-m-d'),
+                        'created_at' => current_time('mysql'),
+                    ], [
+                        '%d','%d','%d', $rate === null ? 'NULL' : '%f', '%s','%s'
+                    ]);
+                }
+            }
         }
         return self::findById($id);
     }

@@ -231,6 +231,16 @@ class HoursEntry
 
         $total = round($hours * $usedRate, 2);
 
+        //print r($exists, $hours, $usedRate, $total); exit;
+        error_log("setHours: seg={$segmentId} wpr={$wprId} hours={$hours} rate={$usedRate} total={$total} exists={$exists}");
+        if ($hours == 0) {
+            if ($exists) {
+                $ok = $wpdb->delete($t, ['id' => $exists], ['%d']);
+                if ($ok === false) return new WP_Error('db_delete_failed', 'No se pudo eliminar la entrada de horas.');
+            }
+            return true;
+        }
+
         if ($exists) {
             $ok = $wpdb->update($t, [
                 'hours'     => $hours,
