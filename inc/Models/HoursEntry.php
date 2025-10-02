@@ -229,10 +229,8 @@ class HoursEntry
             $segmentId, $wprId
         ));
 
-        $total = round($hours * $usedRate, 2);
-
-        //print r($exists, $hours, $usedRate, $total); exit;
-        error_log("setHours: seg={$segmentId} wpr={$wprId} hours={$hours} rate={$usedRate} total={$total} exists={$exists}");
+        $total = round($hours * $usedRate, 2);       
+        
         if ($hours == 0) {
             if ($exists) {
                 $ok = $wpdb->delete($t, ['id' => $exists], ['%d']);
