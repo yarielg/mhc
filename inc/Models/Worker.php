@@ -96,26 +96,32 @@ class Worker {
         $r     = "{$pfx}mhc_roles";
         $offset = ($page - 1) * $per_page;
 
+
         $where = "WHERE 1=1";
         $params = [];
+        $join_roles = '';
+        // Filtro por rol SIEMPRE primero en params si existe
+        if (!empty($role_id)) {
+            $join_roles = " INNER JOIN $wr AS wrf ON wrf.worker_id = w.id AND wrf.role_id = %d ";
+            $params[] = (int)$role_id;
+        }
+        // Luego filtros de búsqueda
         if ($search !== '') {
             $where .= " AND (w.first_name LIKE %s OR w.last_name LIKE %s OR CONCAT(w.first_name,' ',w.last_name) LIKE %s)";
             $like = '%' . $wpdb->esc_like($search) . '%';
             array_push($params, $like, $like, $like);
         }
-        // Filtro por estado si viene
+        // Filtro por estado
         if ($is_active !== null && $is_active !== '') {
             $where .= " AND w.is_active = %d";
             $params[] = (int)$is_active;
         }
-        // Filtro por rol si viene
-        $join_roles = '';
-        if (!empty($role_id)) {
-            $join_roles = " INNER JOIN $wr AS wrf ON wrf.worker_id = w.id AND wrf.role_id = %d ";
-            $params[] = (int)$role_id;
-        }
 
         $total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT w.id) FROM $table AS w $join_roles $where", $params));
+
+        //return value to debug
+        /* wp_send_json_success(["total"=>$total]);
+        exit; */
 
         // Include supervisor name columns
         $rows = $wpdb->get_results(
