@@ -236,6 +236,12 @@
                       <Download />
                     </el-icon>
                   </el-button>
+                  <el-button size="small" type="primary" style="float: right; margin-right: 8px;"
+                    @click="downloadAllSlips">
+                    <el-icon>
+                      <Printer />
+                    </el-icon>
+                  </el-button>
                   <el-button
                     type="primary"
                     size="small"
@@ -461,6 +467,7 @@ import {
   Edit,
   Download,
   Search,
+  Printer,
 } from "@element-plus/icons-vue";
 
 const sendingSlip = reactive({});
@@ -479,6 +486,22 @@ function downloadSummaryPdf() {
   }
   window.open(url.toString(), "_blank");
 }
+function downloadAllSlips() {
+  const payrollId = typeof id !== "undefined" ? id : props?.id || null;
+  if (!payrollId) return;
+  const ajaxUrl = typeof parameters !== "undefined" && parameters?.ajax_url
+    ? parameters.ajax_url
+    : window.ajaxurl || "/wp-admin/admin-ajax.php";
+  const url = new URL(ajaxUrl, window.location.origin);
+  url.searchParams.set("action", "mhc_all_slips_pdf");
+  url.searchParams.set("payroll_id", payrollId);
+  if (typeof parameters !== "undefined" && parameters?.nonce) {
+    url.searchParams.set("nonce", parameters.nonce);
+  }
+  window.open(url.toString(), "_blank");
+}
+
+
 
 /* ======= WP ajax setup ======= */
 const props = defineProps({ id: { type: Number, required: true } });

@@ -27,6 +27,7 @@ class PdfController
     add_action('wp_ajax_mhc_show_slim_pdf', [__CLASS__, 'ajax_show_slim_pdf']);
     add_action('wp_ajax_mhc_payroll_summary_pdf', [__CLASS__, 'ajax_payroll_summary_pdf']);
     add_action('wp_ajax_mhc_worker_slip_pdf', [__CLASS__, 'ajax_worker_slip_pdf']);
+    add_action('wp_ajax_mhc_all_slips_pdf', [__CLASS__, 'ajax_all_slips_pdf']);
   }
   /**
    * Checks AJAX access for logged-in users only.
@@ -143,6 +144,43 @@ class PdfController
     $start = $payroll->start_date ?? date('Y-m-d');
     $end   = $payroll->end_date   ?? date('Y-m-d');
 
+    $html = self::renderWorkerSlipHtml($data, $worker_name, $company_name, $start, $end);
+
+    // ====== mPDF ======
+    // tempDir: usa una carpeta escribible (ajústala si quieres)
+    $mpdf = new Mpdf([
+      'mode' => 'utf-8',
+      'format' => 'A4',
+      'margin_left'   => 10,
+      'margin_right'  => 10,
+      'margin_top'    => 20,
+      'margin_bottom' => 15,
+      'tempDir' => WP_CONTENT_DIR . '/uploads/mpdf', // asegúrate que exista y sea escribible
+    ]);
+    $mpdf->SetTitle('Worker Slip PDF');
+    $mpdf->SetAuthor('MHC');
+    $mpdf->SetCreator('MHC Payroll');
+    $mpdf->autoLangToFont = true; // para acentos/ñ
+
+    $mpdf->WriteHTML($html);
+
+    // Guardar en archivo temporal y devolver ruta (igual que antes)
+    $worker_name_clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $worker_name);
+    $filename = $worker_name_clean . '_' . $start . '-' . $end . '.pdf';
+    $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $filename;
+
+    $mpdf->Output($tmp, Destination::FILE);
+    return $tmp;
+  }
+
+  /**
+   * Renderiza el HTML del slip de trabajador (extraído de generateWorkerSlipPdf)
+   */
+  public static function renderWorkerSlipHtml($data, $worker_name, $company_name, $start, $end)
+  {
+    $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
+    $hours = $data['hours'];
+    $extras = $data['extras'];
     // Logo (ruta absoluta de archivo para mPDF)
     $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
 
@@ -296,32 +334,7 @@ class PdfController
     Slip generated automatically - Agency of Mental Health Services © ' . date("Y") . '
   </div>
 </div>';
-
-    // ====== mPDF ======
-    // tempDir: usa una carpeta escribible (ajústala si quieres)
-    $mpdf = new Mpdf([
-      'mode' => 'utf-8',
-      'format' => 'A4',
-      'margin_left'   => 10,
-      'margin_right'  => 10,
-      'margin_top'    => 20,
-      'margin_bottom' => 15,
-      'tempDir' => WP_CONTENT_DIR . '/uploads/mpdf', // asegúrate que exista y sea escribible
-    ]);
-    $mpdf->SetTitle('Worker Slip PDF');
-    $mpdf->SetAuthor('MHC');
-    $mpdf->SetCreator('MHC Payroll');
-    $mpdf->autoLangToFont = true; // para acentos/ñ
-
-    $mpdf->WriteHTML($html);
-
-    // Guardar en archivo temporal y devolver ruta (igual que antes)
-    $worker_name_clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $worker_name);
-    $filename = $worker_name_clean . '_' . $start . '-' . $end . '.pdf';
-    $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $filename;
-
-    $mpdf->Output($tmp, Destination::FILE);
-    return $tmp;
+    return $html;
   }
 
   public static function format_week_range($start, $end)
@@ -555,5 +568,83 @@ class PdfController
     $tmp = tempnam(sys_get_temp_dir(), 'payrollsummary_') . '.pdf';
     $mpdf->Output($tmp, Destination::FILE);
     return $tmp;
+  }
+
+  public static function ajax_all_slips_pdf()
+  {
+    self::check();
+    global $wpdb;
+
+    $payrollId = intval($_GET['payroll_id'] ?? 0);
+    if (!$payrollId) {
+      wp_send_json_error(['message' => 'Missing payroll_id']);
+    }
+
+
+    // Buscar todos los trabajadores en este payroll (JOIN correcto)
+    $workers = $wpdb->get_results(
+      $wpdb->prepare("
+        SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name
+        FROM {$wpdb->prefix}mhc_hours_entries he
+        INNER JOIN {$wpdb->prefix}mhc_worker_patient_roles wpr ON wpr.id = he.worker_patient_role_id
+        INNER JOIN {$wpdb->prefix}mhc_workers w ON w.id = wpr.worker_id
+        INNER JOIN {$wpdb->prefix}mhc_payroll_segments seg ON seg.id = he.segment_id
+        WHERE seg.payroll_id = %d
+      ", $payrollId)
+    );
+
+    if (!$workers) {
+      wp_send_json_error(['message' => 'No workers found for this payroll']);
+    }
+
+    try {
+      $mpdf = new \Mpdf\Mpdf();
+
+      foreach ($workers as $i => $worker) {
+        // Generar los datos igual que en generateWorkerSlipPdf
+        $hours  = \Mhc\Inc\Models\HoursEntry::listDetailedForPayroll($payrollId, ['worker_id' => $worker->id]);
+        $extras = \Mhc\Inc\Models\ExtraPayment::listDetailedForPayroll($payrollId, ['worker_id' => $worker->id]);
+        $th = 0.0;
+        $ta = 0.0;
+        $te = 0.0;
+        foreach ($hours as $h) {
+          $th += (float)$h->hours;
+          $ta += (float)$h->total;
+        }
+        foreach ($extras as $e) {
+          $te += (float)$e->amount;
+        }
+        $company_name = '';
+        if (!empty($hours)) {
+          $company_name = $hours[0]->worker_company ?? '';
+        }
+        $data = [
+          'payroll_id' => $payrollId,
+          'worker_id' => $worker->id,
+          'hours' => $hours,
+          'extras' => $extras,
+          'totals' => [
+            'total_hours'   => round($th, 2),
+            'hours_amount'  => round($ta, 2),
+            'extras_amount' => round($te, 2),
+            'grand_total'   => round($ta + $te, 2),
+          ],
+        ];
+        $payroll = \Mhc\Inc\Models\Payroll::findById($payrollId);
+        $start = $payroll->start_date ?? date('Y-m-d');
+        $end   = $payroll->end_date   ?? date('Y-m-d');
+        $html = self::renderWorkerSlipHtml($data, $worker->worker_name, $company_name, $start, $end);
+        if ($i > 0) {
+          $mpdf->AddPage();
+        }
+        $mpdf->WriteHTML($html);
+      }
+
+      $filename = "Payroll_{$payrollId}_AllSlips.pdf";
+      $mpdf->Output($filename, \Mpdf\Output\Destination::DOWNLOAD);
+      exit;
+    } catch (\Exception $e) {
+      wp_send_json_error(['message' => $e->getMessage()]);
+    }
   }
 }
