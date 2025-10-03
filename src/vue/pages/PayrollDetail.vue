@@ -126,9 +126,25 @@
                       empty-text="No workers assigned yet">
                       <el-table-column prop="worker_name" label="Worker" min-width="120" show-overflow-tooltip />
                       <el-table-column prop="role_code" label="Role" width="120" />
-                      <el-table-column label="Rate" width="110">
+<!--                      <el-table-column label="Rate" width="110">
                         <template #default="{ row }">
                           {{ money(row.effective_rate) }}
+                        </template>
+                      </el-table-column>-->
+
+                      <!-- Rate (editable) -->
+                      <el-table-column label="Rate" width="180" prop="effective_rate">
+                        <template #default="{ row }">
+                          <el-input-number
+                              v-model="row.effective_rate"
+                              :precision="2"
+                              :step="0.25"
+                              :min="0"
+                              :controls="true"
+                              class="w-full"
+                              @change="queueRateSave(row)"
+                              @blur="queueRateSave(row)"
+                          />
                         </template>
                       </el-table-column>
 
@@ -152,6 +168,29 @@
                               Number(row.effective_rate || 0)
                             )
                           }}
+                        </template>
+                      </el-table-column>
+
+                      <el-table-column label="Actions" width="80" fixed="right">
+                        <template #default="{ row }">
+                          <el-popconfirm
+                              title="Delete this assigned worker?"
+                              confirm-button-text="Delete"
+                              cancel-button-text="Cancel"
+                              confirm-button-type="danger"
+                              @confirm="deleteAssignedWorked(row)"
+                          >
+                            <template #reference>
+                              <el-button
+                                  v-if="row.end_date !== null"
+                                  size="small"
+                                  type="danger"
+                                  plain
+                              >
+                                <el-icon><Delete /></el-icon>
+                              </el-button>
+                            </template>
+                          </el-popconfirm>
                         </template>
                       </el-table-column>
                     </el-table>
@@ -1398,6 +1437,17 @@ async function deleteExtra(row) {
   } catch (e) {
     ElMessage.error(e.message || "Delete failed");
   }
+}
+
+async function deleteAssignedWorked(row) {
+  console.log(row.end_date)
+  /*try {
+    await ajaxPostForm("mhc_patients_delete_assignment", { id: row.id });
+    await loadPatientWorkers()
+    ElMessage.success("Deleted");
+  } catch (e) {
+    ElMessage.error(e.message || "Delete failed");
+  }*/
 }
 
 /* ======= Special rates & workers lookups ======= */

@@ -87,8 +87,8 @@ class WorkerPatientRole
                 AND (
                       wpr.end_date IS NULL
                    OR (wpr.start_date <= %s AND (wpr.end_date IS NULL OR wpr.end_date >= %s))
-                )
-              ORDER BY w_ln ASC, w_fn ASC, r.name ASC",
+                ) AND wpr.deleted_at IS NULL
+              ORDER BY wpr.id ASC, w_ln ASC, w_fn ASC, r.name ASC",
                 $patientId, $e, $s
             ),
             ARRAY_A
