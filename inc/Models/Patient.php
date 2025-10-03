@@ -4,7 +4,7 @@ namespace Mhc\Inc\Models;
 class Patient {
 
 
-    public static function findById($id) {
+    public static function findById($id, $ended = true) {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $table = "{$pfx}mhc_patients";
@@ -13,10 +13,19 @@ class Patient {
         if ($id <= 0) return null;
         $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id=%d", $id), ARRAY_A);
         if (!$row) return null;
-        $row['assignments'] = $wpdb->get_results(
-            $wpdb->prepare("SELECT worker_id, role_id, rate FROM $wpr WHERE patient_id=%d", $id),
-            ARRAY_A
-        );
+        // Attach all only assignments without end_date if $ended is false
+        // If $ended is true, attach all assignments including those with end_date
+        if ($ended) {
+            $row['assignments'] = $wpdb->get_results(
+                $wpdb->prepare("SELECT worker_id, role_id, rate, id AS wpr_id FROM $wpr WHERE patient_id=%d", $id),
+                ARRAY_A
+            );            
+        }else {
+            $row['assignments'] = $wpdb->get_results(
+                $wpdb->prepare("SELECT worker_id, role_id, rate, id AS wpr_id FROM $wpr WHERE patient_id=%d AND end_date IS NULL", $id),
+                ARRAY_A
+            );            
+        }        
         //error_log(print_r($row, true));
         return $row;
     }
@@ -77,7 +86,7 @@ class Patient {
         foreach ($rows as &$row) {
             $row['assignments'] = $wpdb->get_results(
                 $wpdb->prepare(
-                    "SELECT worker_id, role_id, rate
+                    "SELECT worker_id, role_id, rate, id AS wpr_id
                  FROM {$wpr}
                  WHERE patient_id = %d AND end_date IS NULL",
                     $row['id']
@@ -93,6 +102,27 @@ class Patient {
         ];
     }
 
+    //soft delete assignments by id
+    public static function deleteAssignment($id) {
+        global $wpdb;
+        $pfx = $wpdb->prefix;
+        $wpr = "{$pfx}mhc_worker_patient_roles";
+        $id = intval($id);
+        if ($id <= 0) return false;
+        $ok = $wpdb->update($wpr, ['deleted_at' => current_time('mysql')], ['id' => $id], ['%s'], ['%d']);
+        return $ok !== false;
+    }
+
+    //set end_date for assignments by id
+    public static function endAssignment($id) {
+        global $wpdb;
+        $pfx = $wpdb->prefix;
+        $wpr = "{$pfx}mhc_worker_patient_roles";
+        $id = intval($id);
+        if ($id <= 0) return false;
+        $ok = $wpdb->update($wpr, ['end_date' => current_time('mysql')], ['id' => $id], ['%s'], ['%d']);
+        return $ok !== false;
+    }
 
     public static function create($data) {
         global $wpdb;
@@ -135,29 +165,67 @@ class Patient {
         $ok = $wpdb->update($table, $fields, ['id' => intval($id)], $fmts, ['%d']);
         if ($ok === false) return false;
         // Actualizar asignaciones si existen
+
         if (isset($data['assignments']) && is_array($data['assignments'])) {
+            $hours_entry = $wpdb->prefix . 'mhc_hours_entries';
             foreach ($data['assignments'] as $a) {
                 $worker_id = isset($a['worker_id']) ? intval($a['worker_id']) : 0;
                 $role_id   = isset($a['role_id'])   ? intval($a['role_id'])   : 0;
                 $rate      = isset($a['rate']) && $a['rate'] !== '' ? floatval($a['rate']) : null;
+                $wpr_id    = isset($a['wpr_id']) ? intval($a['wpr_id']) : 0;
                 if ($worker_id <= 0 || $role_id <= 0) continue;
                 // Buscar si ya existe la asignación
-                $exists = $wpdb->get_var($wpdb->prepare(
-                    "SELECT id FROM $wpr WHERE patient_id=%d AND worker_id=%d",
-                    intval($id), $worker_id
-                ));
+                if ($wpr_id > 0) {
+                    $exists = $wpdb->get_row($wpdb->prepare(
+                        "SELECT id, end_date FROM $wpr WHERE id=%d AND (deleted_at IS NULL OR deleted_at = '') LIMIT 1",
+                        $wpr_id
+                    ), ARRAY_A);
+                }else {
+                    $exists = false;
+                } 
                 if ($exists) {
-                    // Actualizar role_id y rate
-                    $wpdb->update($wpr, [
-                        'role_id' => $role_id,
-                        'rate'    => $rate
-                    ], [
-                        'id' => $exists
-                    ], [
-                        '%d', $rate === null ? 'NULL' : '%f'
-                    ], [
-                        '%d'
-                    ]);
+                    $has_hours = false;
+                    if ($wpr_id > 0) {
+                        $has_hours = (bool)$wpdb->get_var($wpdb->prepare(
+                            "SELECT COUNT(*) FROM $hours_entry WHERE worker_patient_role_id = %d",
+                            $wpr_id
+                        ));
+                    }
+                    if ($has_hours) {
+                        // Cerrar el actual (end_date)
+                        $wpdb->update($wpr, [
+                            'end_date' => current_time('Y-m-d')
+                        ], [
+                            'id' => $wpr_id
+                        ], [
+                            '%s'
+                        ], [
+                            '%d'
+                        ]);
+                        // Insertar nueva asignación
+                        $wpdb->insert($wpr, [
+                            'worker_id'  => $worker_id,
+                            'patient_id' => intval($id),
+                            'role_id'    => $role_id,
+                            'rate'       => $rate,
+                            'start_date' => current_time('Y-m-d'),
+                            'created_at' => current_time('mysql'),
+                        ], [
+                            '%d','%d','%d', $rate === null ? 'NULL' : '%f', '%s','%s'
+                        ]);
+                    } else {
+                        // Actualizar normalmente
+                        $wpdb->update($wpr, [
+                            'role_id' => $role_id,
+                            'rate'    => $rate
+                        ], [
+                            'id' => $exists['id']
+                        ], [
+                            '%d', $rate === null ? 'NULL' : '%f'
+                        ], [
+                            '%d'
+                        ]);
+                    }
                 } else {
                     // Insertar nueva asignación
                     $wpdb->insert($wpr, [
@@ -173,7 +241,7 @@ class Patient {
                 }
             }
         }
-        return self::findById($id);
+        return self::findById($id, false);
     }
 
     public static function delete($id) {

@@ -17,7 +17,7 @@ class Activate
 
     public static function get_db_version()
     {
-        return '1.3.0'; // increment on DB schema changes
+        return '1.4.0'; // increment on DB schema changes
     }
 
     public static function activate()
@@ -106,6 +106,7 @@ class Activate
             end_date DATE NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            deleted_at DATETIME NULL DEFAULT NULL,
             PRIMARY KEY  (id),
             KEY idx_worker (worker_id),
             KEY idx_patient (patient_id),
@@ -295,6 +296,7 @@ class Activate
         if ($installed_ver !== $current_ver) {
             $pfx = $wpdb->prefix;
             // Agregar columnas solo si no existen
+            // 1. Extra payments: hours y hours_rate
             $columns = $wpdb->get_col("SHOW COLUMNS FROM {$pfx}mhc_extra_payments", 0);
             if (!in_array('hours', $columns)) {
                 $wpdb->query("ALTER TABLE {$pfx}mhc_extra_payments ADD COLUMN hours DECIMAL(8,2) NULL AFTER amount");
@@ -302,6 +304,13 @@ class Activate
             if (!in_array('hours_rate', $columns)) {
                 $wpdb->query("ALTER TABLE {$pfx}mhc_extra_payments ADD COLUMN hours_rate DECIMAL(10,2) NULL AFTER hours");
             }
+
+            // 2. WorkerPatientRoles: deleted_at para soft delete
+            $columns_wpr = $wpdb->get_col("SHOW COLUMNS FROM {$pfx}mhc_worker_patient_roles", 0);
+            if (!in_array('deleted_at', $columns_wpr)) {
+                $wpdb->query("ALTER TABLE {$pfx}mhc_worker_patient_roles ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL AFTER updated_at");
+            }
+
             update_option('mhc_db_version', $current_ver);
         }
     }

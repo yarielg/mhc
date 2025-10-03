@@ -21,6 +21,8 @@ class PatientsController{
         add_action('wp_ajax_mhc_patients_update', [$this, 'update']);
         add_action('wp_ajax_mhc_patients_delete', [$this, 'delete']);
         add_action('wp_ajax_mhc_patients_get',    [$this, 'getById']);
+        add_action('wp_ajax_mhc_patients_delete_assignment', [$this, 'deleteAssignment']);
+        add_action('wp_ajax_mhc_patients_end_assignment', [$this, 'endAssignment']);
 
     }
 
@@ -109,6 +111,10 @@ class PatientsController{
         if (!empty($assignments)) {
             $data['assignments'] = $assignments;
         }
+        //return assigment for debug
+        /* wp_send_json_success(['data' => $data]);
+        exit; */
+
         if (!$data) wp_send_json_error(['message' => 'Nothing to update'], 400);
         $item = Patient::update($id, $data);
         if (!$item) wp_send_json_error(['message' => 'DB error updating patient'], 500);
@@ -121,6 +127,26 @@ class PatientsController{
         if ($id <= 0) wp_send_json_error(['message' => 'Invalid id'], 400);
         $ok = Patient::delete($id);
         if (!$ok) wp_send_json_error(['message' => 'Unable to delete patient'], 500);
+        wp_send_json_success(['id' => $id]);
+    }
+
+    //delete assignment by id
+    public static function deleteAssignment() {
+        self::check();
+        $id = intval($_POST['id'] ?? 0);
+        if ($id <= 0) wp_send_json_error(['message' => 'Invalid id'], 400);
+        $ok = Patient::deleteAssignment($id);
+        if (!$ok) wp_send_json_error(['message' => 'Unable to delete assignment'], 500);
+        wp_send_json_success(['id' => $id]);
+    }
+
+    //end assignment by id
+    public static function endAssignment() {
+        self::check();
+        $id = intval($_POST['wpr_id'] ?? 0);
+        if ($id <= 0) wp_send_json_error(['message' => 'Invalid id'], 400);
+        $ok = Patient::endAssignment($id);
+        if (!$ok) wp_send_json_error(['message' => 'Unable to end assignment'], 500);
         wp_send_json_success(['id' => $id]);
     }
 

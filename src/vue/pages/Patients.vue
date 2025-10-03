@@ -116,8 +116,8 @@
             </el-table-column>
 
             <el-table-column label="" width="80" fixed="right">
-              <template #default="{ $index }">
-                <el-button type="danger" link @click="removeAssignment($index)">
+              <template #default="{ $index, row }">
+                <el-button type="danger" link @click="removeAssignment($index, row)">
                   Remove
                 </el-button>
               </template>
@@ -144,6 +144,7 @@
 import { reactive, ref, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { en } from 'element-plus/es/locales.mjs';
 
 const state = reactive({
   items: [],
@@ -228,6 +229,7 @@ async function openEdit(row) {
     worker_id: a.worker_id,
     role_id: a.role_id,
     rate: a.rate,
+    wpr_id: a.wpr_id,
     _workerOptions: [],
     _workerLoading: false,
     _rolesForWorker: [],
@@ -319,6 +321,7 @@ function addAssignment() {
     worker_id: null,
     role_id: null,
     rate: null,
+    wpr_id: null,
     _workerOptions: [],
     _workerLoading: false,
     _rolesForWorker: [],
@@ -326,8 +329,16 @@ function addAssignment() {
   })
 }
 
-function removeAssignment(idx) {
+function removeAssignment(idx, row) {
   form.assignments.splice(idx, 1)
+  if (row && row.wpr_id) {
+    try {
+      endAssignment(row)
+    } catch (e) {
+      console.error(e)
+      ElMessage.error(e.message || 'Error removing assignment')
+    }
+  }
 }
 
 async function remoteSearchWorkers(query, row) {
@@ -447,6 +458,7 @@ async function submit() {
       worker_id: Number(a.worker_id),
       role_id: Number(a.role_id),
       rate: a.rate != null ? Number(a.rate) : null,
+      wpr_id: a.wpr_id != null ? Number(a.wpr_id) : null,
     }))
     fd.append('assignments', JSON.stringify(cleanAssignments))
 
@@ -478,6 +490,25 @@ async function remove(row) {
     fd.append('action', 'mhc_patients_delete')
     fd.append('nonce', parameters.nonce)
     fd.append('id', row.id)
+
+    const { data } = await axios.post(parameters.ajax_url, fd)
+    if (!data.success) throw new Error(data.data?.message || 'Delete failed')
+
+    state.items = state.items.filter(r => r.id !== row.id)
+    state.total -= 1
+    ElMessage.success('Deleted')
+  } catch (e) {
+    console.error(e)
+    ElMessage.error(e.message || 'Error deleting')
+  }
+}
+
+async function endAssignment(row) {
+  try {
+    const fd = new FormData()
+    fd.append('action', 'mhc_patients_end_assignment')
+    fd.append('nonce', parameters.nonce)
+    fd.append('wpr_id', row.wpr_id)
 
     const { data } = await axios.post(parameters.ajax_url, fd)
     if (!data.success) throw new Error(data.data?.message || 'Delete failed')
