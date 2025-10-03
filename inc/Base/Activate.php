@@ -1,4 +1,5 @@
 <?php
+
 namespace Mhc\Inc\Base;
 
 defined('ABSPATH') || exit;
@@ -11,9 +12,16 @@ defined('ABSPATH') || exit;
  * - We avoid FOREIGN KEY constraints because WordPress/dbDelta does not manage them well.
  *   Instead, we create proper indexes to keep performance and enforce integrity in code.
  */
-class Activate {
+class Activate
+{
 
-    public static function activate() {
+    public static function get_db_version()
+    {
+        return '1.3.0'; // increment on DB schema changes
+    }
+
+    public static function activate()
+    {
         global $wpdb;
 
         $charset_collate = $wpdb->get_charset_collate();
@@ -22,7 +30,7 @@ class Activate {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
         $sql = [];
-            
+
         // 1) Roles (RBT, BCaBA, BCBA, etc.)
         $sql[] = "CREATE TABLE {$pfx}mhc_roles (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -103,7 +111,7 @@ class Activate {
             KEY idx_patient (patient_id),
             KEY idx_role (role_id),
             KEY idx_worker_patient_role_dates (worker_id, patient_id, role_id, start_date)
-        ) {$charset_collate};";        
+        ) {$charset_collate};";
 
         // 7) Payrolls
         $sql[] = "CREATE TABLE {$pfx}mhc_payrolls (
@@ -155,6 +163,8 @@ class Activate {
             patient_id BIGINT UNSIGNED NULL, -- optional (assessment/pending)
             special_rate_id BIGINT UNSIGNED NOT NULL, -- referencia a mhc_special_rates.id
             amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            hours DECIMAL(8,2) NULL,             -- NUEVO
+            hours_rate DECIMAL(10,2) NULL,       -- NUEVO
             notes VARCHAR(255) NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -171,7 +181,7 @@ class Activate {
             code VARCHAR(50) NOT NULL,
             label VARCHAR(255) NOT NULL,
             cpt_code VARCHAR(50) NULL,
-            unit_rate DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            unit_rate DECIMAL(10,2) NOT NULL DEFAULT 0.00,            
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -257,6 +267,42 @@ class Activate {
                 'unit_rate' => 0.00,
                 'is_active' => 1,
             ]);
+            // New in v1.3.0 to support hours-based extras
+            $wpdb->insert("{$pfx}mhc_special_rates", [
+                'code' => 'pending_pos_hourly',
+                'label' => 'Pending Adjustment (+) (hourly)',
+                'unit_rate' => 0.00,
+                'is_active' => 1,
+            ]);
+            $wpdb->insert("{$pfx}mhc_special_rates", [
+                'code' => 'pending_neg_hourly',
+                'label' => 'Pending Adjustment (-) (hourly)',
+                'unit_rate' => 0.00,
+                'is_active' => 1,
+            ]);
+        }
+
+        update_option('mhc_db_version', self::get_db_version());
+    }
+
+    public static function check_db_upgrade()
+    {
+        global $wpdb;
+
+        $installed_ver = get_option('mhc_db_version');
+        $current_ver   = self::get_db_version();
+
+        if ($installed_ver !== $current_ver) {
+            $pfx = $wpdb->prefix;
+            // Agregar columnas solo si no existen
+            $columns = $wpdb->get_col("SHOW COLUMNS FROM {$pfx}mhc_extra_payments", 0);
+            if (!in_array('hours', $columns)) {
+                $wpdb->query("ALTER TABLE {$pfx}mhc_extra_payments ADD COLUMN hours DECIMAL(8,2) NULL AFTER amount");
+            }
+            if (!in_array('hours_rate', $columns)) {
+                $wpdb->query("ALTER TABLE {$pfx}mhc_extra_payments ADD COLUMN hours_rate DECIMAL(10,2) NULL AFTER hours");
+            }
+            update_option('mhc_db_version', $current_ver);
         }
     }
 }

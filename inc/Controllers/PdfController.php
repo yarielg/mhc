@@ -286,17 +286,26 @@ class PdfController
         $j++;
         $rowBg = ($j % 2 === 0) ? ' style="background:#fbfbfb;"' : '';
         $entity_name = '';
+        $htmlHour = '';
         if (!empty($e->supervised_worker_name)) {
           $entity_name = $e->supervised_worker_name;
         } elseif (!empty($e->patient_name)) {
           $entity_name = $e->patient_record_number;
         }
+        if (isset($e->code) && in_array($e->code, ['pending_pos_hourly', 'pending_neg_hourly'])) {
+          $hrs = isset($e->hours) ? (float)$e->hours : null;
+          $rate = isset($e->hours_rate) ? (float)$e->hours_rate : null;
+          if ($hrs !== null && $rate !== null) {
+            $htmlHour = '<div style="font-size:9px; color:#006699; margin-top:2px;">(' . number_format($hrs, 2) . ' hrs × $' . number_format($rate, 2) . ')</div>';
+          }
+        }
+
         $html .= '<tr' . $rowBg . '>
               <td style="white-space:nowrap;">' . htmlspecialchars($e->label) . ' ' . htmlspecialchars($e->cpt_code) . '</td>
               <td>' . htmlspecialchars($entity_name) . '</td>
-              <td align="right">$' . number_format($e->amount, 2) . '</td>
-              <td>' . htmlspecialchars($e->notes) . '</td>
-            </tr>';
+              <td align="right">$' . number_format($e->amount, 2) . '<br>' . $htmlHour . '</td>
+              <td>' . htmlspecialchars($e->notes);
+        $html .= '</td></tr>';
       }
 
 
@@ -476,10 +485,23 @@ class PdfController
     foreach ($extras as $e) {
       $wid = (int)$e['worker_id'];
       if (!isset($map[$wid])) {
+        // Try to get name/company from extras row if available
+        $worker_name = $e['worker_name'] ?? '';
+        $company = $e['worker_company'] ?? '';
+        // If not present, try to fetch from DB
+        if ((!$worker_name || !$company) && $wid) {
+          global $wpdb;
+          $t = $wpdb->prefix . 'mhc_workers';
+          $row = $wpdb->get_row($wpdb->prepare("SELECT CONCAT(first_name,' ',last_name) AS name, company FROM {$t} WHERE id=%d", $wid));
+          if ($row) {
+            $worker_name = (string)$row->name;
+            $company = (string)$row->company;
+          }
+        }
         $map[$wid] = [
           'worker_id'     => $wid,
-          'worker_name'   => '',
-          'company'       => '',
+          'worker_name'   => $worker_name,
+          'company'       => $company,
           'hours_hours'   => 0.0,
           'hours_amount'  => 0.0,
           'extras_amount' => 0.0,
@@ -581,10 +603,13 @@ class PdfController
     }
 
 
-    // Buscar todos los trabajadores en este payroll (JOIN correcto)
-    $workers = $wpdb->get_results(
+    // Buscar todos los trabajadores con horas o extras en este payroll
+    $workers = [];
+    $worker_ids = [];
+    // 1. Workers with hours
+    $res1 = $wpdb->get_results(
       $wpdb->prepare("
-        SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name
+        SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name, w.company
         FROM {$wpdb->prefix}mhc_hours_entries he
         INNER JOIN {$wpdb->prefix}mhc_worker_patient_roles wpr ON wpr.id = he.worker_patient_role_id
         INNER JOIN {$wpdb->prefix}mhc_workers w ON w.id = wpr.worker_id
@@ -592,7 +617,25 @@ class PdfController
         WHERE seg.payroll_id = %d
       ", $payrollId)
     );
-
+    foreach ($res1 as $w) {
+      $workers[] = $w;
+      $worker_ids[$w->id] = true;
+    }
+    // 2. Workers with only extras
+    $res2 = $wpdb->get_results(
+      $wpdb->prepare("
+        SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name, w.company
+        FROM {$wpdb->prefix}mhc_extra_payments ep
+        INNER JOIN {$wpdb->prefix}mhc_workers w ON w.id = ep.worker_id
+        WHERE ep.payroll_id = %d
+      ", $payrollId)
+    );
+    foreach ($res2 as $w) {
+      if (!isset($worker_ids[$w->id])) {
+        $workers[] = $w;
+        $worker_ids[$w->id] = true;
+      }
+    }
     if (!$workers) {
       wp_send_json_error(['message' => 'No workers found for this payroll']);
     }
@@ -614,9 +657,12 @@ class PdfController
         foreach ($extras as $e) {
           $te += (float)$e->amount;
         }
+        // Prefer company from hours, else from worker row
         $company_name = '';
         if (!empty($hours)) {
           $company_name = $hours[0]->worker_company ?? '';
+        } elseif (!empty($worker->company)) {
+          $company_name = $worker->company;
         }
         $data = [
           'payroll_id' => $payrollId,

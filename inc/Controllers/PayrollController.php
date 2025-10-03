@@ -712,13 +712,25 @@ class PayrollController
         $patient_id  = isset($_POST['patient_id']) ? (int)$_POST['patient_id'] : null; // opcional
         $supervised  = isset($_POST['supervised_worker_id']) ? (int)$_POST['supervised_worker_id'] : null; // opcional
         $notes       = isset($_POST['notes']) ? sanitize_text_field(wp_unslash($_POST['notes'])) : '';
+        $hours       = isset($_POST['hours']) ? (float)$_POST['hours'] : null;
+        $hours_rate  = isset($_POST['hours_rate']) ? (float)$_POST['hours_rate'] : null;
 
-        if ($payroll_id <= 0 || $worker_id <= 0 || $rate_id <= 0 || $amount === null)
-            wp_send_json_error(['message' => 'payroll_id, worker_id, special_rate_id y amount are required'], 400);
+        if ($payroll_id <= 0 || $worker_id <= 0 || $rate_id <= 0)
+            wp_send_json_error(['message' => 'payroll_id, worker_id, special_rate_id are required'], 400);
 
         // Obtener el código del special rate
         $special_rate = \Mhc\Inc\Models\SpecialRate::findById($rate_id);
-        if ($special_rate && isset($special_rate['code']) && $special_rate['code'] === 'pending_negative' && $amount > 0) {
+        $code = $special_rate['code'] ?? '';
+        // Si es hourly, calcular amount
+        if (($code === 'pending_pos_hourly' || $code === 'pending_neg_hourly')) {
+            if ($hours === null || $hours_rate === null) {
+                wp_send_json_error(['message' => 'Add hours and rate for this adjustment type'], 400);
+            }
+            $amount = round($hours * $hours_rate, 2);
+            if ($code === 'pending_neg_hourly' && $amount > 0) {
+                $amount = -1 * $amount;
+            }
+        } else if ($code === 'pending_negative' && $amount > 0) {
             $amount = -1 * $amount;
         }
 
@@ -730,6 +742,8 @@ class PayrollController
             'patient_id'          => $patient_id,
             'supervised_worker_id' => $supervised,
             'notes'               => $notes,
+            'hours'               => $hours,
+            'hours_rate'          => $hours_rate,
         ]);
         if ($id instanceof \WP_Error) wp_send_json_error(['message' => $id->get_error_message()], 400);
 
@@ -744,13 +758,14 @@ class PayrollController
         $id          = (int)($_POST['id'] ?? 0);
         if ($id <= 0) wp_send_json_error(['message' => 'id required'], 400);
 
-
         $upd = [];
         foreach (['payroll_id', 'worker_id', 'patient_id', 'supervised_worker_id', 'special_rate_id'] as $k) {
             if (isset($_POST[$k])) $upd[$k] = (int)$_POST[$k];
         }
         if (isset($_POST['amount'])) $upd['amount'] = round((float)$_POST['amount'], 2);
         if (isset($_POST['notes']))  $upd['notes']  = sanitize_text_field(wp_unslash($_POST['notes']));
+        if (isset($_POST['hours'])) $upd['hours'] = (float)$_POST['hours'];
+        if (isset($_POST['hours_rate'])) $upd['hours_rate'] = (float)$_POST['hours_rate'];
 
         // Si el special_rate_id está en el update, úsalo; si no, busca el actual
         $rate_id = isset($upd['special_rate_id']) ? $upd['special_rate_id'] : null;
@@ -762,7 +777,19 @@ class PayrollController
         }
         // Obtener el código del special rate
         $special_rate = \Mhc\Inc\Models\SpecialRate::findById($rate_id);
-        if ($special_rate && isset($special_rate['code']) && $special_rate['code'] === 'pending_negative' && isset($upd['amount']) && $upd['amount'] > 0) {
+        $code = $special_rate['code'] ?? '';
+        // Si es hourly, calcular amount
+        if (($code === 'pending_pos_hourly' || $code === 'pending_neg_hourly')) {
+            $hours = $upd['hours'] ?? null;
+            $hours_rate = $upd['hours_rate'] ?? null;
+            if ($hours === null || $hours_rate === null) {
+                wp_send_json_error(['message' => 'Add hours and rate for this adjustment type'], 400);
+            }
+            $upd['amount'] = round($hours * $hours_rate, 2);
+            if ($code === 'pending_neg_hourly' && $upd['amount'] > 0) {
+                $upd['amount'] = -1 * $upd['amount'];
+            }
+        } else if ($code === 'pending_negative' && isset($upd['amount']) && $upd['amount'] > 0) {
             $upd['amount'] = -1 * $upd['amount'];
         }
 

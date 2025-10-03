@@ -41,6 +41,9 @@ include 'inc/util/helpers.php';
 if( class_exists( 'Mhc\\Inc\\Init' ) ){
     register_activation_hook( __FILE__ , array('Mhc\\Inc\\Base\\Activate','activate') );
     register_deactivation_hook( __FILE__ , array('Mhc\\Inc\\Base\\Deactivate','deactivate') );
+
+    add_action('plugins_loaded', ['Mhc\\Inc\\Base\\Activate', 'check_db_upgrade']);
+    
     Mhc\Inc\Init::register_services();
 }
 

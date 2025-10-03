@@ -181,9 +181,14 @@
                   <el-table-column prop="worker_name" label="Worker" min-width="160" show-overflow-tooltip />
                   <el-table-column prop="label" label="Rate" min-width="160" show-overflow-tooltip />
                   <el-table-column prop="amount" label="Amount" width="120">
-                    <template #default="{ row }">{{
-                      money(row.amount)
-                    }}</template>
+                    <template #default="{ row }">
+                      <div>
+                        {{ money(row.amount) }}
+                        <div v-if="row.code === 'pending_pos_hourly' || row.code === 'pending_neg_hourly'" style="font-size:11px; color:#006699; margin-top:2px;">
+                          ({{ Number(row.hours || 0).toFixed(2) }} hrs × ${{ Number(row.hours_rate || 0).toFixed(2) }})
+                        </div>                        
+                      </div>
+                    </template>
                   </el-table-column>
                   <el-table-column label="Applies To" min-width="140" show-overflow-tooltip>
                     <template #default="{ row }">
@@ -365,7 +370,7 @@
 
         <el-form-item label="Amount">
           <el-input-number v-model="modals.extra.form.amount" :min="0" :step="1" :precision="2" style="width: 100%"
-            :disabled="payroll.status === 'finalized' || amountLocked" />
+            :disabled="payroll.status === 'finalized' || amountLocked || isPendingHrsAdjustment" />
         </el-form-item>
 
         <!-- Show patient/client select only if initialassesment or reassesment special rate -->
@@ -383,6 +388,16 @@
             style="width: 100%" filterable remote clearable :multiple="!modals.extra.editing"
             :remote-method="(q) => searchWorkers(q, 1)" :options="workersOptions"
             :disabled="payroll.status === 'finalized'" />
+        </el-form-item>
+
+        <!-- Show hours + rate inputs only if pending_pos_hourly or pending_neg_hourly special rate -->
+        <el-form-item v-if="isPendingHrsAdjustment" label="Hours">
+          <el-input-number v-model="modals.extra.form.hours" :min="0" :step="0.25" :precision="2" style="width: 100%"
+            :disabled="payroll.status === 'finalized'" @change="onExtraHoursOrRateChange" />
+        </el-form-item>
+        <el-form-item v-if="isPendingHrsAdjustment" label="Hourly rate">
+          <el-input-number v-model="modals.extra.form.hours_rate" :min="0" :step="1" :precision="2"
+            style="width: 100%" :disabled="payroll.status === 'finalized'" @change="onExtraHoursOrRateChange" />
         </el-form-item>
 
         <el-form-item label="Notes">
@@ -436,7 +451,14 @@
             </template>
           </el-table-column>
           <el-table-column prop="amount" label="Amount" width="120">
-            <template #default="{ row }">{{ money(row.amount) }}</template>
+            <template #default="{ row }">
+              <div>
+                {{ money(row.amount) }}
+                <div v-if="row.code === 'pending_pos_hourly' || row.code === 'pending_neg_hourly'" style="font-size:11px; color:#006699; margin-top:2px;">
+                  ({{ Number(row.hours || 0).toFixed(2) }} hrs × ${{ Number(row.hours_rate || 0).toFixed(2) }})
+                </div>
+              </div>
+            </template>
           </el-table-column>
           <el-table-column prop="notes" label="Notes" min-width="180" show-overflow-tooltip />
         </el-table>
@@ -742,6 +764,8 @@ const modals = reactive({
       amount: null,
       patient_id: null,
       supervised_worker_id: null,
+      hours: null,
+      hours_rate: null,
       notes: "",
     },
   },
@@ -785,6 +809,13 @@ const isAssessmentRate = computed(() => {
   const r = selectedRate.value;
   return r && (r.code === "initial_assessment" || r.code === "reassessment");
 });
+
+//add condition for pending adjustment hours + or -
+const isPendingHrsAdjustment = computed(() => {
+  const r = selectedRate.value;
+  return r && (r.code === "pending_pos_hourly" || r.code === "pending_neg_hourly");
+});
+
 const isSupervisionRate = computed(() => {
   const r = selectedRate.value;
   return r && r.code === "supervision";
@@ -819,6 +850,19 @@ function money(n) {
   return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
 }
 
+function onExtraHoursOrRateChange() {
+  // Only auto-calculate for pending_pos_hourly or pending_neg_hourly
+  const r = selectedRate.value;
+  if (!r) return;
+  // Accept both possible typos in code (pending_pos_hourly, pending_pos_hours, etc)
+  const code = r.code || '';
+  if (code === 'pending_pos_hourly' || code === 'pending_neg_hourly' || code === 'pending_pos_hours' || code === 'pending_neg_hourlys') {
+    const f = modals.extra.form;
+    const hrs = Number(f.hours) || 0;
+    const rate = Number(f.hours_rate) || 0;
+    f.amount = +(hrs * rate).toFixed(2);
+  }
+}
 // ...existing code...
 
 /* ======= Loaders ======= */
@@ -1234,6 +1278,8 @@ function editExtra(row) {
     patient_id: row.patient_id || null,
     patient_name: row.patient_name || null,
     supervised_worker_id: row.supervised_worker_id || null,
+    hours: row.hours || "",
+    hours_rate: row.hours_rate || "",
     notes: row.notes || "",
   };
   // Pre-fill dropdowns caches
@@ -1317,6 +1363,7 @@ async function saveExtra() {
       // Si no aplica, usar array con un solo elemento
       if (!isAssessmentRate.value) patientIds = [null];
       if (!isSupervisionRate.value) supervisedIds = [null];
+
       // Si ambos son multiselect, hacer combinaciones
       for (const pid of patientIds) {
         for (const sid of supervisedIds) {
@@ -1327,6 +1374,8 @@ async function saveExtra() {
             amount: f.amount,
             patient_id: pid || "",
             supervised_worker_id: sid || "",
+            hours: f.hours || "",
+            hours_rate: f.hours_rate || "",
             notes: f.notes || "",
           });
         }

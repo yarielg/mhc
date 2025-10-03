@@ -41,6 +41,8 @@ class ExtraPayment
         $row->patient_id          = isset($row->patient_id) ? (int) $row->patient_id : null;
         $row->special_rate_id     = (int) $row->special_rate_id;
         $row->amount              = (float) $row->amount;
+        $row->hours               = isset($row->hours) ? (float)$row->hours : null;
+        $row->hours_rate          = isset($row->hours_rate) ? (float)$row->hours_rate : null;
         $row->notes               = (string) ($row->notes ?? '');
         // Si el SELECT viene con code/label/unit_rate desde el JOIN, normalízalos:
         if (isset($row->code))      $row->code      = (string)$row->code;
@@ -146,6 +148,8 @@ class ExtraPayment
                                         ? absint($data['patient_id']) : null,
             'special_rate_id'     => isset($data['special_rate_id']) ? absint($data['special_rate_id']) : 0,
             'amount'              => isset($data['amount']) ? (float)$data['amount'] : 0.0,
+            'hours'               => isset($data['hours']) ? (float)$data['hours'] : null,
+            'hours_rate'          => isset($data['hours_rate']) ? (float)$data['hours_rate'] : null,
             'notes'               => isset($data['notes']) ? sanitize_text_field((string)$data['notes']) : '',
             'created_at'          => self::now(),
             'updated_at'          => self::now(),
@@ -156,9 +160,9 @@ class ExtraPayment
         }
 
         // Construye dinámicamente columnas y formatos (manejo de NULL correcto)
-        $columns = ['payroll_id','worker_id','special_rate_id','amount','notes','created_at','updated_at'];
-        $values  = [$payload['payroll_id'],$payload['worker_id'],$payload['special_rate_id'],$payload['amount'],$payload['notes'],$payload['created_at'],$payload['updated_at']];
-        $format  = ['%d','%d','%d','%f','%s','%s','%s'];
+        $columns = ['payroll_id','worker_id','special_rate_id','amount','hours','hours_rate','notes','created_at','updated_at'];
+        $values  = [$payload['payroll_id'],$payload['worker_id'],$payload['special_rate_id'],$payload['amount'],$payload['hours'],$payload['hours_rate'],$payload['notes'],$payload['created_at'],$payload['updated_at']];
+        $format  = ['%d','%d','%d','%f','%f','%f','%s','%s','%s'];
 
         if ($payload['supervised_worker_id'] !== null) {
             $columns[] = 'supervised_worker_id';
@@ -169,6 +173,16 @@ class ExtraPayment
             $columns[] = 'patient_id';
             $values[]  = $payload['patient_id'];
             $format[]  = '%d';
+        }
+        if ($payload['hours'] !== null) {
+            $columns[] = 'hours';
+            $values[]  = $payload['hours'];
+            $format[]  = '%f';
+        }
+        if ($payload['hours_rate'] !== null) {
+            $columns[] = 'hours_rate';
+            $values[]  = $payload['hours_rate'];
+            $format[]  = '%f';
         }
 
         $ok = $wpdb->insert($t, array_combine($columns,$values), $format);
@@ -185,7 +199,7 @@ class ExtraPayment
         $t  = self::table();
         $id = absint($id);
 
-        $allowed = ['payroll_id','worker_id','supervised_worker_id','patient_id','special_rate_id','amount','notes'];
+        $allowed = ['payroll_id','worker_id','supervised_worker_id','patient_id','special_rate_id','amount','notes','hours','hours_rate'];
         $set   = [];
         $fmt   = [];
 
@@ -212,7 +226,9 @@ class ExtraPayment
                     }
                     break;
                 case 'amount':
-                    $set[$k] = (float)$v;
+                case 'hours':
+                case 'hours_rate':
+                    $set[$k] = ($v !== null && $v !== '') ? (float)$v : null;
                     $fmt[]   = '%f';
                     break;
                 case 'notes':
@@ -255,13 +271,18 @@ class ExtraPayment
     public static function totalsByWorkerForPayroll(int $payrollId): array {
         global $wpdb;
         $t = self::table();
+        $sr = self::tableSR();
+        // Suma total_amount, total_hours_extras y total_extras_items
         $sql = $wpdb->prepare(
-            "SELECT worker_id,
-                    SUM(amount) AS total_amount,
-                    COUNT(*)    AS items
-             FROM {$t}
-             WHERE payroll_id=%d
-             GROUP BY worker_id",
+            "SELECT ep.worker_id,
+                    SUM(ep.amount) AS total_amount,
+                    COUNT(*)    AS items,
+                    SUM(CASE WHEN sr.code IN ('pending_pos_hourly','pending_neg_hourly') THEN ep.hours ELSE 0 END) AS total_hours_extras,
+                    SUM(CASE WHEN sr.code IN ('pending_pos_hourly','pending_neg_hourly') THEN ep.amount ELSE 0 END) AS total_amount_hourly_extras
+             FROM {$t} ep
+             JOIN {$sr} sr ON sr.id = ep.special_rate_id
+             WHERE ep.payroll_id=%d
+             GROUP BY ep.worker_id",
             $payrollId
         );
         $rows = $wpdb->get_results($sql, ARRAY_A);
@@ -269,6 +290,8 @@ class ExtraPayment
             $r['worker_id']    = (int)$r['worker_id'];
             $r['total_amount'] = (float)$r['total_amount'];
             $r['items']        = (int)$r['items'];
+            $r['total_hours_extras'] = isset($r['total_hours_extras']) ? (float)$r['total_hours_extras'] : 0.0;
+            $r['total_amount_hourly_extras'] = isset($r['total_amount_hourly_extras']) ? (float)$r['total_amount_hourly_extras'] : 0.0;
         }
         return $rows ?: [];
     }
