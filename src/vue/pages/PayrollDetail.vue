@@ -687,6 +687,8 @@ async function rateSave(row, segments, newVal) {
       segments: JSON.stringify(segments),
     });
 
+    hoursTotals.value = data?.totals || { total_hours: 0, total_amount: 0 };
+
   } catch (e) {
     ElMessage.error(e.message || "Failed to load patients");
   } finally {
@@ -1464,14 +1466,13 @@ async function deleteExtra(row) {
 }
 
 async function deleteAssignedWorked(row) {
-  console.log(row.end_date)
-  /*try {
+  try {
     await ajaxPostForm("mhc_patients_delete_assignment", { id: row.id });
     await loadPatientWorkers()
     ElMessage.success("Deleted");
   } catch (e) {
     ElMessage.error(e.message || "Delete failed");
-  }*/
+  }
 }
 
 /* ======= Special rates & workers lookups ======= */
