@@ -39,6 +39,7 @@ class PayrollController
         // Horas por paciente en el payroll
         add_action('wp_ajax_mhc_payroll_hours_list',   [__CLASS__, 'ajax_hours_list']);
         add_action('wp_ajax_mhc_payroll_hours_upsert', [__CLASS__, 'ajax_hours_upsert']);
+        add_action('wp_ajax_mhc_payroll_hours_bulk_upsert', [__CLASS__, 'ajax_hours_bulk_upsert']);
         add_action('wp_ajax_mhc_payroll_hours_delete', [__CLASS__, 'ajax_hours_delete']);
 
         add_action('wp_ajax_mhc_payroll_workers',          [__CLASS__, 'ajax_workers']);          // resumen por trabajador
@@ -445,6 +446,56 @@ class PayrollController
         $tp = array_values(array_filter($totalsByPatient, fn($r) => (int)$r['patient_id'] === $patient_id));
         $patientTotals = $tp[0] ?? ['total_hours' => 0, 'total_amount' => 0];
         wp_send_json_success(['items' => $rows, 'totals' => $patientTotals]);
+    }
+
+    //POST: recive segments array along with payroll_id, worker_patient_role_id, hours, used_rate? (si no viene, calculamos)
+    public static function ajax_hours_bulk_upsert()
+    {
+        self::check();
+        $data = self::json_input();
+        $payroll_id = (int)($data['payroll_id'] ?? 0);
+        $wpr_id     = (int)($data['worker_patient_role_id'] ?? 0);
+        $segments   = $data['segments'] ?? [];
+        if ($payroll_id <= 0 || $wpr_id <= 0 || !is_array($segments) || empty($segments)) {
+            wp_send_json_error(['message' => 'payroll_id, worker_patient_role_id and segments array are required'], 400);
+        }
+
+        $savedEntries = [];
+        foreach ($segments as $seg) {
+            $segment_id = isset($seg['segment_id']) ? (int)$seg['segment_id'] : 0;
+            $hours      = isset($seg['hours']) ? (float)$seg['hours'] : 0.0;
+            $used_rate  = isset($seg['used_rate']) ? (float)$seg['used_rate'] : null;
+
+            if ($segment_id <= 0) {
+                continue; // skip invalid segment
+            }
+
+            // Resolve used_rate si no viene
+            if ($used_rate === null) {
+                $wpr = WorkerPatientRole::findById($wpr_id);
+                if (!$wpr) wp_send_json_error(['message' => 'Asignación (WPR) not found'], 404);
+                $payroll = Payroll::findById($payroll_id);
+                if (!$payroll) wp_send_json_error(['message' => 'Payroll not found'], 404);
+                $used_rate = WorkerPatientRole::resolveEffectiveRate($wpr, (array)$payroll);
+            }   
+            // Guarda/actualiza horas (idempotente por (payroll_id, wpr_id, segment_id))
+            $res = HoursEntry::setHours($segment_id, $wpr_id, $hours, $used_rate, null);
+            if ($res instanceof \WP_Error) {
+                wp_send_json_error(['message' => $res->get_error_message()], 400);
+            }
+            $savedEntries[] = ['segment_id' => $segment_id, 'hours' => $hours, 'used_rate' => $used_rate];
+        }
+        // Responder con la lista y totales actualizados para ese paciente
+        $wprInfo = HoursEntry::getWprInfo($wpr_id); //
+        $rows = HoursEntry::listDetailedForPayroll($payroll_id, ['patient_id' => $wprInfo['patient_id']]);
+        $totalsByPatient = HoursEntry::totalsByPatientForPayroll($payroll_id);
+        $tp = array_values(array_filter($totalsByPatient, fn($r) => (int)$r['patient_id'] === $wprInfo['patient_id']));
+        $patientTotals = $tp[0] ?? ['total_hours' => 0, 'total_amount' => 0];   
+        wp_send_json_success([
+            'saved'  => $savedEntries,
+            'items'  => $rows,
+            'totals' => $patientTotals
+        ]);
     }
 
     // POST: payroll_id, worker_patient_role_id, hours, used_rate? (si no viene, calculamos)
