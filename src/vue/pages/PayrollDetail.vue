@@ -142,8 +142,7 @@
                               :min="0"
                               :controls="true"
                               class="w-full"
-                              @change="queueRateSave(row)"
-                              @blur="queueRateSave(row)"
+                              @change="(val) => rateSave(row, segments, val)"
                           />
                         </template>
                       </el-table-column>
@@ -667,6 +666,35 @@ async function onSegHoursChange(row, seg, newVal) {
     setTimeout(() => {
       delete segSavedTick[key];
     }, 1200);
+  }
+}
+
+async function rateSave(row, segments, newVal) {
+  if (payroll.status === "finalized") return;
+  const wprId = getWprId(row);
+
+  for (const seg of segments) {
+    seg.used_rate = newVal;
+    seg.segment_id = seg.id;
+    seg.hours = segVal(row, seg);
+  }
+
+  console.log(segments);
+
+  try {
+    const data = await ajaxGet("mhc_payroll_hours_bulk_upsert", {
+      payroll_id: id,
+      used_rate: newVal,
+      worker_patient_role_id: wprId,
+      segments,
+    });
+
+    patients.value = data?.patients || [];
+    counts.value = data?.counts || null;
+  } catch (e) {
+    ElMessage.error(e.message || "Failed to load patients");
+  } finally {
+    loading.patients = false;
   }
 }
 
