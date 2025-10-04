@@ -455,7 +455,8 @@ class PayrollController
         $data = self::json_input();
         $payroll_id = (int)($data['payroll_id'] ?? 0);
         $wpr_id     = (int)($data['worker_patient_role_id'] ?? 0);
-        $segments   = $data['segments'] ?? [];
+        $segments_json = isset($data['segments']) ? wp_unslash($data['segments']) : '[]';
+        $segments = json_decode($segments_json, true);
         if ($payroll_id <= 0 || $wpr_id <= 0 || !is_array($segments) || empty($segments)) {
             wp_send_json_error(['message' => 'payroll_id, worker_patient_role_id and segments array are required'], 400);
         }
@@ -479,6 +480,7 @@ class PayrollController
                 $used_rate = WorkerPatientRole::resolveEffectiveRate($wpr, (array)$payroll);
             }   
             // Guarda/actualiza horas (idempotente por (payroll_id, wpr_id, segment_id))
+
             $res = HoursEntry::setHours($segment_id, $wpr_id, $hours, $used_rate, null);
             if ($res instanceof \WP_Error) {
                 wp_send_json_error(['message' => $res->get_error_message()], 400);

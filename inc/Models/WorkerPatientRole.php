@@ -137,6 +137,8 @@ class WorkerPatientRole
                 $k     = $wprId . ':' . $segId;
                 $hr    = $byKey[$k] ?? null;
 
+                $row['effective_rate'] = (isset($hr['used_rate']) && (float)$hr['used_rate'] > 0) ? (float)$hr['used_rate'] : $row['effective_rate'];
+
                 $row['segments'][] = [
                     'segment_id'    => $segId,
                     'segment_start' => $seg['segment_start'],

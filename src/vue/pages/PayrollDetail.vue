@@ -679,18 +679,14 @@ async function rateSave(row, segments, newVal) {
     seg.hours = segVal(row, seg);
   }
 
-  console.log(segments);
-
   try {
     const data = await ajaxGet("mhc_payroll_hours_bulk_upsert", {
       payroll_id: id,
       used_rate: newVal,
       worker_patient_role_id: wprId,
-      segments,
+      segments: JSON.stringify(segments),
     });
 
-    patients.value = data?.patients || [];
-    counts.value = data?.counts || null;
   } catch (e) {
     ElMessage.error(e.message || "Failed to load patients");
   } finally {
