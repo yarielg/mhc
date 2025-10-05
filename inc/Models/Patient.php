@@ -177,7 +177,7 @@ class Patient {
                 // Buscar si ya existe la asignación
                 if ($wpr_id > 0) {
                     $exists = $wpdb->get_row($wpdb->prepare(
-                        "SELECT id, end_date FROM $wpr WHERE id=%d AND deleted_at IS NULL LIMIT 1",
+                        "SELECT * FROM $wpr WHERE id=%d AND deleted_at IS NULL LIMIT 1",
                         $wpr_id
                     ), ARRAY_A);
                 }else {
@@ -186,13 +186,14 @@ class Patient {
                 if ($exists) {
                     $has_hours = false;
                     if ($wpr_id > 0) {
-                        $has_hours = (bool)$wpdb->get_var($wpdb->prepare(
-                            "SELECT COUNT(*) FROM $hours_entry WHERE worker_patient_role_id = %d",
-                            $wpr_id
-                        ));
-                        //check if role changed
-                        if ($exists['role_id'] != $role_id) {
-                            $has_hours = true;
+                        //check if any update has been made to role id or rate if not, do nothing
+                        if ($exists['role_id'] != $role_id || $exists['rate'] != $rate) {
+                            $has_hours = (bool)$wpdb->get_var($wpdb->prepare(
+                                "SELECT COUNT(*) FROM $hours_entry WHERE worker_patient_role_id = %d",
+                                $wpr_id
+                            ));
+                        }else {
+                            continue; // no changes, skip to next
                         }
                     }
                     if ($has_hours) {
