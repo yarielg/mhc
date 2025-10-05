@@ -190,6 +190,10 @@ class Patient {
                             "SELECT COUNT(*) FROM $hours_entry WHERE worker_patient_role_id = %d",
                             $wpr_id
                         ));
+                        //check if role changed
+                        if ($exists['role_id'] != $role_id) {
+                            $has_hours = true;
+                        }
                     }
                     if ($has_hours) {
                         // Cerrar el actual (end_date)
