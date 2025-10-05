@@ -2,6 +2,7 @@
 /node_modules
 vendor
 assets/dist
+composer.lock
 
 # IDEs and editors
 .idea
