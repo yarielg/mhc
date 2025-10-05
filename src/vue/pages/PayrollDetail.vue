@@ -142,7 +142,7 @@
                               :min="0"
                               :controls="true"
                               class="w-full"
-                              @change="(val) => rateSave(row, segments, val)"
+                              @change="(val) => rateSave(row, segments, val)"                              
                           />
                         </template>
                       </el-table-column>
@@ -655,6 +655,7 @@ async function onSegHoursChange(row, seg, newVal) {
         payroll_id: id,
         worker_patient_role_id: wprId,
         segment_id: seg.id,
+        used_rate: seg.used_rate,
         hours,
       });
       hydrateFromHoursResponse(res);
@@ -685,8 +686,7 @@ async function rateSave(row, segments, newVal) {
       used_rate: newVal,
       worker_patient_role_id: wprId,
       segments: JSON.stringify(segments),
-    });
-
+    });    
     hoursTotals.value = data?.totals || { total_hours: 0, total_amount: 0 };
 
   } catch (e) {
