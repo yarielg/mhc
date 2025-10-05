@@ -177,7 +177,7 @@ class Patient {
                 // Buscar si ya existe la asignación
                 if ($wpr_id > 0) {
                     $exists = $wpdb->get_row($wpdb->prepare(
-                        "SELECT id, end_date FROM $wpr WHERE id=%d AND (deleted_at IS NULL OR deleted_at = '') LIMIT 1",
+                        "SELECT id, end_date FROM $wpr WHERE id=%d AND deleted_at IS NULL LIMIT 1",
                         $wpr_id
                     ), ARRAY_A);
                 }else {
