@@ -17,7 +17,7 @@ class Activate
 
     public static function get_db_version()
     {
-        return '1.4.0'; // increment on DB schema changes
+        return '1.4.1'; // increment on DB schema changes
     }
 
     public static function activate()
