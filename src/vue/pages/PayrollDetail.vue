@@ -126,11 +126,6 @@
                       empty-text="No workers assigned yet">
                       <el-table-column prop="worker_name" label="Worker" min-width="120" show-overflow-tooltip />
                       <el-table-column prop="role_code" label="Role" width="120" />
-<!--                      <el-table-column label="Rate" width="110">
-                        <template #default="{ row }">
-                          {{ money(row.effective_rate) }}
-                        </template>
-                      </el-table-column>-->
 
                       <!-- Rate (editable) -->
                       <el-table-column label="Rate" width="180" prop="effective_rate">
@@ -170,7 +165,7 @@
                         </template>
                       </el-table-column>
 
-                      <el-table-column label="Actions" width="80" fixed="right">
+<!--                      <el-table-column label="Actions" width="80" fixed="right">
                         <template #default="{ row }">
                           <el-popconfirm
                               title="Delete this assigned worker?"
@@ -191,7 +186,7 @@
                             </template>
                           </el-popconfirm>
                         </template>
-                      </el-table-column>
+                      </el-table-column>-->
                     </el-table>
 
                     <div class="mt-2 text-sm text-gray-600" v-if="hoursTotals">
