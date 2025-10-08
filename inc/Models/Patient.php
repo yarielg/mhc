@@ -118,9 +118,12 @@ class Patient {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $wpr = "{$pfx}mhc_worker_patient_roles";
+        $last_payroll_end_date = $wpdb->get_var($wpdb->prepare(
+            "SELECT end_date FROM {$wpdb->prefix}mhc_payrolls ORDER BY end_date DESC LIMIT 1"
+        ));
         $id = intval($id);
         if ($id <= 0) return false;
-        $ok = $wpdb->update($wpr, ['end_date' => current_time('mysql')], ['id' => $id], ['%s'], ['%d']);
+        $ok = $wpdb->update($wpr, ['end_date' => $last_payroll_end_date ?? current_time('mysql')], ['id' => $id], ['%s'], ['%d']);
         return $ok !== false;
     }
 
@@ -166,6 +169,11 @@ class Patient {
         if ($ok === false) return false;
         // Actualizar asignaciones si existen
 
+        //get last payroll end date to put as end date for old assignments
+        $last_payroll_end_date = $wpdb->get_var($wpdb->prepare(
+            "SELECT end_date FROM {$wpdb->prefix}mhc_payrolls ORDER BY end_date DESC LIMIT 1"
+        ));
+
         if (isset($data['assignments']) && is_array($data['assignments'])) {
             $hours_entry = $wpdb->prefix . 'mhc_hours_entries';
             foreach ($data['assignments'] as $a) {
@@ -199,7 +207,7 @@ class Patient {
                     if ($has_hours) {
                         // Cerrar el actual (end_date)
                         $wpdb->update($wpr, [
-                            'end_date' => current_time('Y-m-d')
+                            'end_date' => $last_payroll_end_date ?? current_time('Y-m-d')
                         ], [
                             'id' => $wpr_id
                         ], [
@@ -264,7 +272,10 @@ class Patient {
         $workers = "{$pfx}mhc_workers";
         $roles   = "{$pfx}mhc_roles";
 
-        $today = current_time('Y-m-d');
+        //start date for new assignments is start date from last payroll or today if no payrolls yet
+        $last_payroll_start_date = $wpdb->get_var($wpdb->prepare(
+            "SELECT start_date FROM {$wpdb->prefix}mhc_payrolls ORDER BY end_date DESC LIMIT 1"
+        ));        
 
         foreach ($assignments as $a) {
             $worker_id = isset($a['worker_id']) ? intval($a['worker_id']) : 0;
@@ -283,7 +294,7 @@ class Patient {
                 'patient_id' => $patient_id,
                 'role_id'    => $role_id,
                 'rate'       => $rate,           // nullable; if null, later payroll logic can fall back to general_rate
-                'start_date' => $today,
+                'start_date' => $last_payroll_start_date ?? current_time('Y-m-d'),
                 'created_at' => current_time('mysql'),
             ], [
                 '%d','%d','%d', $rate === null ? 'NULL' : '%f', '%s','%s'

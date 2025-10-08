@@ -17,7 +17,7 @@ class Activate
 
     public static function get_db_version()
     {
-        return '1.4.1'; // increment on DB schema changes
+        return '1.4.2'; // increment on DB schema changes
     }
 
     public static function activate()
@@ -309,6 +309,12 @@ class Activate
             $columns_wpr = $wpdb->get_col("SHOW COLUMNS FROM {$pfx}mhc_worker_patient_roles", 0);
             if (!in_array('deleted_at', $columns_wpr)) {
                 $wpdb->query("ALTER TABLE {$pfx}mhc_worker_patient_roles ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL AFTER updated_at");
+            }
+
+            //3. Hours_entries: delete_at para soft delete (v1.4.2)
+            $columns_he = $wpdb->get_col("SHOW COLUMNS FROM {$pfx}mhc_hours_entries", 0);
+            if (!in_array('deleted_at', $columns_he)) {
+                $wpdb->query("ALTER TABLE {$pfx}mhc_hours_entries ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL AFTER updated_at");
             }
 
             update_option('mhc_db_version', $current_ver);
