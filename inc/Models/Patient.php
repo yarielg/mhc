@@ -173,6 +173,9 @@ class Patient {
         $last_payroll_end_date = $wpdb->get_var($wpdb->prepare(
             "SELECT end_date FROM {$wpdb->prefix}mhc_payrolls ORDER BY end_date DESC LIMIT 1"
         ));
+        $last_payroll_start_date = $wpdb->get_var($wpdb->prepare(
+            "SELECT start_date FROM {$wpdb->prefix}mhc_payrolls ORDER BY end_date DESC LIMIT 1"
+        ));
 
         if (isset($data['assignments']) && is_array($data['assignments'])) {
             $hours_entry = $wpdb->prefix . 'mhc_hours_entries';
@@ -221,7 +224,7 @@ class Patient {
                             'patient_id' => intval($id),
                             'role_id'    => $role_id,
                             'rate'       => $rate,
-                            'start_date' => current_time('Y-m-d'),
+                            'start_date' => $last_payroll_start_date ?? current_time('Y-m-d'),
                             'created_at' => current_time('mysql'),
                         ], [
                             '%d','%d','%d', $rate === null ? 'NULL' : '%f', '%s','%s'
