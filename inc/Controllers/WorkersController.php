@@ -112,13 +112,20 @@ class WorkersController
         if (isset($_POST['is_active']) && (int)$_POST['is_active'] === 0) {
             global $wpdb;
             $pfx = $wpdb->prefix;
-            $count = (int)$wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$pfx}mhc_worker_patient_roles WHERE worker_id = %d",
-                $id
-            ));
+            // Count only current (end_date IS NULL), not soft-deleted assignments
+            // and only where the linked patient is active in mhc_patients.
+            $count_sql = "SELECT COUNT(wpr.id)
+                FROM {$pfx}mhc_worker_patient_roles AS wpr
+                INNER JOIN {$pfx}mhc_patients AS p ON p.id = wpr.patient_id
+                WHERE wpr.worker_id = %d
+                  AND wpr.end_date IS NULL
+                  AND wpr.deleted_at IS NULL
+                  AND p.is_active = 1";
+
+            $count = (int)$wpdb->get_var($wpdb->prepare($count_sql, $id));
             if ($count > 0) {
                 wp_send_json_error([
-                    'message' => 'Este trabajador está asignado a uno o más pacientes. Asigne otro trabajador a los pacientes antes de inactivarlo.'
+                    'message' => 'This worker cannot be deactivated because they are assigned to one or more active patients.'
                 ], 400);
             }
         }
