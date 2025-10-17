@@ -640,6 +640,11 @@ class PdfController
       wp_send_json_error(['message' => 'No workers found for this payroll']);
     }
 
+    //ORDER workers by name
+    usort($workers, function ($a, $b) {
+      return strcmp($a->worker_name, $b->worker_name);
+    });
+
     try {
       $mpdf = new \Mpdf\Mpdf();
 
