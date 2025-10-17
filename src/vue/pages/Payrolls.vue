@@ -68,6 +68,8 @@
             <!-- Placeholder for navigation if you wire a details route later -->
             <el-button size="small" @click="goTo(row)">Open</el-button>
 
+          <el-button size="small" @click="openEdit(row)">Edit</el-button>
+
             <el-button
                 v-if="row.status !== 'finalized'"
                 type="success"
@@ -168,6 +170,43 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- Edit payroll modal -->
+    <el-dialog
+        v-model="modals.edit.visible"
+        title="Edit payroll note"
+        width="520px"
+        destroy-on-close
+    >
+      <el-form
+          ref="editFormRef"
+          :model="modals.edit.form"
+          :rules="editRules"
+          label-width="110px"
+      >
+        <el-form-item label="Notes" prop="notes">
+          <el-input
+              v-model="modals.edit.form.notes"
+              maxlength="255"
+              show-word-limit
+              type="textarea"
+              :rows="3"
+              placeholder="Optional note…"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="modals.edit.visible = false">Cancel</el-button>
+        <el-button
+            type="primary"
+            :loading="loading.edit"
+            @click="submitEdit"
+        >
+          Save
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -228,6 +267,7 @@ const loading = reactive({
   create: false,
   actionId: null,
   actionType: null,
+  edit: false,
 })
 
 const q = reactive({
@@ -252,8 +292,16 @@ const modals = reactive({
       notes: '',
     },
   },
+  edit: {
+    visible: false,
+    form: {
+      id: null,
+      notes: '',
+    },
+  },
 })
 const newFormRef = ref(null)
+const editFormRef = ref(null)
 
 const newRules = {
   start_date: [{ required: true, message: 'Start date is required', trigger: 'change' }],
@@ -268,6 +316,10 @@ const newRules = {
       trigger: 'change',
     },
   ],
+  notes: [{ min: 0, max: 255, message: 'Max 255 characters', trigger: 'blur' }],
+}
+
+const editRules = {
   notes: [{ min: 0, max: 255, message: 'Max 255 characters', trigger: 'blur' }],
 }
 
@@ -289,6 +341,39 @@ function openNewModal() {
   modals.new.form.end_date = ''
   modals.new.form.notes = ''
   modals.new.visible = true
+}
+
+function openEdit(row) {
+  modals.edit.form.id = row.id
+  modals.edit.form.notes = row.notes || ''
+  modals.edit.visible = true
+}
+
+async function submitEdit() {
+  try {
+    await editFormRef.value.validate()
+  } catch {
+    return
+  }
+  loading.edit = true
+  try {
+    const payload = {
+      id: modals.edit.form.id,
+      notes: modals.edit.form.notes?.trim() || '',
+    }
+    // Use form-data (asJson=false) so backend can read via $_REQUEST as well
+    await ajaxPost('mhc_payroll_update', payload, false)
+
+    // Refresh the list from backend to ensure data consistency
+    await fetchList()
+    // Close modal and show success
+    modals.edit.visible = false
+    ElMessage.success(`Payroll #${payload.id} updated`)
+  } catch (e) {
+    ElMessage.error(e.message || 'Failed to update payroll')
+  } finally {
+    loading.edit = false
+  }
 }
 
 async function submitNew() {

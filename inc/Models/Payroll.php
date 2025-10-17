@@ -5,14 +5,14 @@ use WP_Error;
 
 class Payroll
 {
-    /** Tabla */
+    /** Table */
     private static function table(): string {
         global $wpdb;
         return $wpdb->prefix . 'mhc_payrolls';
     }
     private static function now(): string { return current_time('mysql'); }
 
-    /** Normaliza tipos */
+    /** Normalize types */
     private static function normalizeRow($row) {
         if (!$row) return null;
         $row->id         = (int)$row->id;
@@ -34,12 +34,12 @@ class Payroll
         return self::normalizeRow($row);
     }
 
-    /**
-     * findAll con filtros:
-     *  - status: 'draft' | 'finalized' | 'locked' (o el que uses)
-     *  - date_overlaps: ['start'=>'YYYY-MM-DD','end'=>'YYYY-MM-DD'] (periodos que se solapan)
+    
+    /** findAll with filters:
+     *  - status: 'draft' | 'finalized' | 'locked' (or your values)
+     *  - date_overlaps: ['start'=>'YYYY-MM-DD','end'=>'YYYY-MM-DD'] (overlapping periods)
      *  - start_date_from, start_date_to
-     *  - search (en notes)
+     *  - search (in notes)
      *  - orderby: id|start_date|end_date|status|created_at|updated_at
      *  - order: ASC|DESC
      *  - limit, offset
@@ -106,8 +106,8 @@ class Payroll
 
         $start = isset($data['start_date']) ? (string)$data['start_date'] : '';
         $end   = isset($data['end_date'])   ? (string)$data['end_date']   : '';
-        if (!$start || !$end) return new WP_Error('invalid_dates', 'start_date y end_date son obligatorios.');
-        if ($end < $start)    return new WP_Error('invalid_range', 'end_date no puede ser menor que start_date.');
+    if (!$start || !$end) return new WP_Error('invalid_dates', 'start_date and end_date are required.');
+    if ($end < $start)    return new WP_Error('invalid_range', 'end_date cannot be less than start_date.');
 
         $payload = [
             'start_date' => $start,
@@ -119,7 +119,7 @@ class Payroll
         ];
 
         $ok = $wpdb->insert($t, $payload, ['%s','%s','%s','%s','%s','%s']);
-        if ($ok === false) return new WP_Error('db_insert_failed', 'No se pudo crear el payroll.');
+    if ($ok === false) return new WP_Error('db_insert_failed', 'Could not create payroll.');
 
         return (int)$wpdb->insert_id;
     }
@@ -129,10 +129,10 @@ class Payroll
         $t = self::table();
         $id = absint($id);
 
-        $current = self::findById($id);
-        if (!$current) return new WP_Error('not_found', 'Payroll no encontrado.');
+    $current = self::findById($id);
+    if (!$current) return new WP_Error('not_found', 'Payroll not found.');
 
-        // No permitimos cambiar fechas si está finalizado (puedes relajar esto)
+    // Do not allow changing dates if it's finalized (you can relax this)
         $finalized = strtolower($current->status) === 'finalized';
 
         $set = [];
@@ -151,15 +151,15 @@ class Payroll
 
         if (empty($set)) return true;
 
-        // Validación de rango si se cambian fechas:
+        // Range validation if dates are changed:
         if (!$finalized && isset($set['start_date']) && isset($set['end_date']) && $set['end_date'] < $set['start_date']) {
-            return new WP_Error('invalid_range', 'end_date no puede ser menor que start_date.');
+            return new WP_Error('invalid_range', 'end_date cannot be less than start_date.');
         }
 
         $set['updated_at'] = self::now(); $fmt[] = '%s';
 
         $ok = $wpdb->update($t, $set, ['id'=>$id], $fmt, ['%d']);
-        if ($ok === false) return new WP_Error('db_update_failed', 'No se pudo actualizar el payroll.');
+        if ($ok === false) return new WP_Error('db_update_failed', 'Payroll update failed.');
         return true;
     }
 
@@ -169,23 +169,23 @@ class Payroll
         $id = absint($id);
 
         $current = self::findById($id);
-        if (!$current) return new WP_Error('not_found', 'Payroll no encontrado.');
+        if (!$current) return new WP_Error('not_found', 'Payroll not found.');
         if (strtolower($current->status) === 'finalized') {
-            return new WP_Error('locked', 'No se puede eliminar un payroll finalizado.');
+            return new WP_Error('locked', 'Cannot delete a finalized payroll.');
         }
 
         $ok = $wpdb->delete($t, ['id'=>$id], ['%d']);
-        if ($ok === false) return new WP_Error('db_delete_failed', 'No se pudo eliminar el payroll.');
+    if ($ok === false) return new WP_Error('db_delete_failed', 'Could not delete payroll.');
         return (bool)$ok;
     }
 
-    /* =================== MÉTODOS CLAVE DE NEGOCIO =================== */
+    /* =================== BUSINESS KEY METHODS =================== */
 
-    /** Finaliza el payroll (sella totales; puedes agregar más validaciones si quieres) */
+    /** Finalize the payroll (seal totals; you can add more validations if desired) */
     public static function finalize($id) {
         $id = absint($id);
         $p = self::findById($id);
-        if (!$p) return new WP_Error('not_found', 'Payroll no encontrado.');
+        if (!$p) return new WP_Error('not_found', 'Payroll not found.');
         if (strtolower($p->status) === 'finalized') return true;
 
         // (Opcional) valida límites, que no haya pacientes “pendientes”, etc.
@@ -193,11 +193,11 @@ class Payroll
         return self::update($id, ['status' => 'finalized']);
     }
 
-    /** Reabre un payroll finalizado (si tu negocio lo permite) */
+    /** Reopen a finalized payroll (if your business allows it) */
     public static function reopen($id) {
         $id = absint($id);
         $p = self::findById($id);
-        if (!$p) return new WP_Error('not_found', 'Payroll no encontrado.');
+        if (!$p) return new WP_Error('not_found', 'Payroll not found.');
         if (strtolower($p->status) !== 'finalized') return true;
 
         // Puedes chequear capabilities antes.
@@ -205,7 +205,7 @@ class Payroll
     }
 
     /**
-     * Stats para header de la vista:
+     * Stats for header view:
      * - processed, pending, total (patient_payrolls)
      */
     public static function stats($id): array {
@@ -214,7 +214,7 @@ class Payroll
     }
 
     /**
-     * Totales de dinero:
+     * Money totals:
      * - hours: total_hours, total_amount
      * - extras: total_amount
      * - grand_total
@@ -245,15 +245,15 @@ class Payroll
     }
 
     /**
-     * Payload completo para la pantalla de detalle:
+     * Full payload for the detail screen:
      * - payroll
-     * - stats (procesados/pendientes/total)
+     * - stats (processed/pending/total)
      * - totals (hours, extras, grand_total)
-     * - breakdowns opcionales: por rol, por paciente, por código de extra
+     * - optional breakdowns: by role, by patient, by extra code
      */
     public static function detail($id): array|WP_Error {
         $p = self::findById($id);
-        if (!$p) return new WP_Error('not_found', 'Payroll no encontrado.');
+        if (!$p) return new WP_Error('not_found', 'Payroll not found.');
 
        // $stats  = self::stats($id);
         $totals = self::totals($id);
