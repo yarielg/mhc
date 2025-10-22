@@ -71,6 +71,7 @@ class WorkersController
             'last_name'    => sanitize_text_field(wp_unslash($_POST['last_name'] ?? '')),
             'email'        => sanitize_email(wp_unslash($_POST['email'] ?? '')),
             'company'     => sanitize_text_field(wp_unslash($_POST['company'] ?? '')),
+            'qb_vendor_id' => sanitize_text_field(wp_unslash($_POST['qb_vendor_id'] ?? '')),
             'is_active'    => (int)($_POST['is_active'] ?? 1),
             'worker_roles' => isset($_POST['worker_roles']) ? wp_unslash($_POST['worker_roles']) : '[]',
         ];
@@ -105,6 +106,7 @@ class WorkersController
         if (isset($_POST['last_name']))  $data['last_name']  = sanitize_text_field(wp_unslash($_POST['last_name']));
         if (isset($_POST['email']))      $data['email']      = sanitize_email(wp_unslash($_POST['email']));
         if (isset($_POST['company']))   $data['company']   = sanitize_text_field(wp_unslash($_POST['company']));
+        if (isset($_POST['qb_vendor_id'])) $data['qb_vendor_id'] = sanitize_text_field(wp_unslash($_POST['qb_vendor_id']));
         if (isset($_POST['is_active']))  $data['is_active']  = (int)$_POST['is_active'] ? 1 : 0;
         $data['worker_roles'] = isset($_POST['worker_roles']) ? wp_unslash($_POST['worker_roles']) : '[]';
 

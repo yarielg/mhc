@@ -182,7 +182,7 @@ class Worker {
 
         $fields = [];
         $fmts   = [];
-        foreach (["first_name","last_name","email","company","is_active","start_date","end_date","supervisor_id"] as $field) {
+        foreach (["first_name","last_name","email","company","qb_vendor_id","is_active","start_date","end_date","supervisor_id"] as $field) {
             if (isset($data[$field])) {
                 $fields[$field] = $data[$field];
                 $fmts[] = in_array($field,["is_active","supervisor_id"],true)?'%d':'%s';
@@ -239,7 +239,7 @@ class Worker {
         $fmts   = [];
 
         // fields except supervisor_id first
-        foreach (["first_name","last_name","email","company","is_active","start_date","end_date"] as $field) {
+        foreach (["first_name","last_name","email","company","qb_vendor_id","is_active","start_date","end_date"] as $field) {
             if (array_key_exists($field, $data)) {
                 $fields[$field] = $data[$field];
                 $fmts[] = ($field === "is_active") ? '%d' : '%s';

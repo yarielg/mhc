@@ -37,6 +37,7 @@
       <el-table-column prop="last_name" label="Last Name" width="150" show-overflow-tooltip />
       <el-table-column prop="email" label="Email" width="210" show-overflow-tooltip />
       <el-table-column prop="company" label="Company" width="200" show-overflow-tooltip />
+      <el-table-column prop="qb_vendor_id" label="QB Vendor ID" width="200" show-overflow-tooltip />
 
       <!-- New: Supervisor -->
       <!--<el-table-column label="Supervisor" min-width="210" show-overflow-tooltip class="d-none">
@@ -98,6 +99,11 @@
 
         <el-form-item label="Company" prop="company">
           <el-input v-model="form.company" />
+        </el-form-item>
+
+        <!-- New: QB Vendor ID -->
+        <el-form-item label="QB Vendor ID" prop="qb_vendor_id">
+          <el-input v-model="form.qb_vendor_id" />
         </el-form-item>
 
         <!-- New: Supervisor (remote autocomplete) -->
@@ -206,7 +212,8 @@ const form = reactive({
   first_name: '',
   last_name: '',
   email: '',
-  company: '',               // NEW
+  company: '',
+  qb_vendor_id: '',         // NEW
   is_active: '1',
   supervisor_id: null,        // NEW
   worker_roles: []            // [{ uid, role_id:Number, general_rate:Number }]
@@ -283,6 +290,7 @@ async function searchSupervisors(query) {
     }))
     fd.append('email', form.email)
     fd.append('company', form.company)
+    fd.append('qb_vendor_id', form.qb_vendor_id)
   } catch (e) {
     console.error(e)
     ElMessage.error(e.message || 'Error searching supervisors')
@@ -297,6 +305,7 @@ function mapRowToForm(row) {
   form.last_name = row.last_name || ''
   form.email = row.email || ''
   form.company = row.company || ''
+  form.qb_vendor_id = row.qb_vendor_id || ''
   form.is_active = String(row.is_active ?? '1')
   form.supervisor_id = row.supervisor_id != null ? Number(row.supervisor_id) : null
 
@@ -329,6 +338,7 @@ function resetForm() {
   form.last_name = ''
   form.email = ''
   form.company = ''
+  form.qb_vendor_id = ''
   form.is_active = '1'
   form.supervisor_id = null
   form.worker_roles = []
@@ -406,6 +416,7 @@ async function submit() {
     fd.append('is_active', form.is_active)
     fd.append('email', form.email)
     fd.append('company', form.company)
+    fd.append('qb_vendor_id', form.qb_vendor_id)
 
 
     if (form.supervisor_id != null && form.supervisor_id !== '') {

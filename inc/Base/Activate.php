@@ -17,7 +17,7 @@ class Activate
 
     public static function get_db_version()
     {
-        return '1.4.2'; // increment on DB schema changes
+        return '1.4.4'; // increment on DB schema changes
     }
 
     public static function activate()
@@ -54,6 +54,7 @@ class Activate
             last_name VARCHAR(100) NOT NULL,
             email VARCHAR(190) NOT NULL DEFAULT '',
             company VARCHAR(100) NOT NULL DEFAULT '',
+            qb_vendor_id VARCHAR(100) NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             start_date DATE NULL,
             end_date DATE NULL,
@@ -315,6 +316,11 @@ class Activate
             $columns_he = $wpdb->get_col("SHOW COLUMNS FROM {$pfx}mhc_hours_entries", 0);
             if (!in_array('deleted_at', $columns_he)) {
                 $wpdb->query("ALTER TABLE {$pfx}mhc_hours_entries ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL AFTER updated_at");
+            }
+
+            // 4. Vendor ID for QuickBooks integration
+            if (!in_array('qb_vendor_id', $columns_wpr)) {
+                $wpdb->query("ALTER TABLE {$pfx}mhc_workers ADD COLUMN qb_vendor_id VARCHAR(100) NULL AFTER company");
             }
 
             update_option('mhc_db_version', $current_ver);

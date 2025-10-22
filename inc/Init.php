@@ -21,7 +21,7 @@ final class Init{
             Controllers\PdfController::class,
             Controllers\SeedController::class,
             Controllers\ReportsController::class,
-
+            Controllers\QuickBooksController::class,
             //Base\Ajax::class,
         ];
     }
