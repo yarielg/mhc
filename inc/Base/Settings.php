@@ -246,13 +246,16 @@ class Settings
 
     public function select_base_url($args)
     {
-        $option = get_option('mhc_qb_base_url', 'sandbox');
-    ?>
-        <select name="mhc_qb_base_url" id="mhc_qb_base_url">
-            <option value="https://sandbox-quickbooks.api.intuit.com" <?php selected($option, 'sandbox'); ?>>Sandbox</option>
-            <option value="https://quickbooks.api.intuit.com" <?php selected($option, 'production'); ?>>Production</option>
-        </select>
-    <?php
+        // Use the registered option name so the settings API reads/writes the correct option
+        $option_name = $args['label_for'] ?? 'mhc_qb_base_url';
+        $option = get_option($option_name, 'sandbox');
+        ?>
+            <select name="<?php echo esc_attr($option_name); ?>" id="<?php echo esc_attr($option_name); ?>">
+                <option value="sandbox" <?php selected($option, 'sandbox'); ?>>Sandbox</option>
+                <option value="production" <?php selected($option, 'production'); ?>>Production</option>
+            </select>
+        <?php
+        // No hidden input here — let WP Settings API save the select's value via its name
     }
 
     /* public function render_settings_page()

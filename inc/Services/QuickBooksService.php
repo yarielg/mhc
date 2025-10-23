@@ -19,7 +19,16 @@ class QuickBooksService
         $this->clientId = get_option('mhc_qb_client_id');
         $this->clientSecret = get_option('mhc_qb_client_secret');
         $this->redirectUri = home_url('/qb/callback');
-        $this->baseUrl = get_option('mhc_qb_base_url', 'https://quickbooks.api.intuit.com');
+        // Accept either a short value ('sandbox'|'production') or a full base URL for backward compatibility
+        $raw_base = get_option('mhc_qb_base_url', 'sandbox');
+        if ($raw_base === 'sandbox') {
+            $this->baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+        } elseif ($raw_base === 'production') {
+            $this->baseUrl = 'https://quickbooks.api.intuit.com';
+        } else {
+            // If user previously saved a full URL, use it (trim trailing slash)
+            $this->baseUrl = rtrim($raw_base, '/');
+        }
         $this->accessToken = get_option('mhc_qb_access_token');
         $this->refreshToken = get_option('mhc_qb_refresh_token');
         $this->realmId = get_option('mhc_qb_realm_id');
