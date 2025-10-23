@@ -285,6 +285,26 @@ class Activate
         }
 
         update_option('mhc_db_version', self::get_db_version());
+        // Ensure QbQueue tables exist immediately on activation
+        if (class_exists('\Mhc\Inc\Services\QbQueue')) {
+            \Mhc\Inc\Services\QbQueue::maybe_create_tables();
+        }
+
+        // Register custom cron schedule (in case it's not registered yet) so scheduling works during activation
+        if (!function_exists('wp_get_schedules') || !wp_get_schedules()) {
+            // noop - but keep the normal flow
+        }
+        add_filter('cron_schedules', function($schedules){
+            if (!isset($schedules['five_minutes'])) {
+                $schedules['five_minutes'] = ['interval' => 300, 'display' => 'Every Five Minutes'];
+            }
+            return $schedules;
+        });
+
+        // Schedule queue processor cron if not scheduled
+        if (!wp_next_scheduled('mhc_qb_process_queue_cron')) {
+            wp_schedule_event(time() + 60, 'five_minutes', 'mhc_qb_process_queue_cron');
+        }
     }
 
     public static function check_db_upgrade()
@@ -321,6 +341,11 @@ class Activate
             // 4. Vendor ID for QuickBooks integration
             if (!in_array('qb_vendor_id', $columns_wpr)) {
                 $wpdb->query("ALTER TABLE {$pfx}mhc_workers ADD COLUMN qb_vendor_id VARCHAR(100) NULL AFTER company");
+            }
+
+            // 5. Ensure QbQueue tables are up to date
+            if (class_exists('\Mhc\Inc\Services\QbQueue')) {
+                \Mhc\Inc\Services\QbQueue::maybe_create_tables();
             }
 
             update_option('mhc_db_version', $current_ver);

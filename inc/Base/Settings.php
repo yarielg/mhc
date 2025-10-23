@@ -23,6 +23,9 @@ class Settings
 
         add_action('admin_menu', [$this, 'mhc_add_admin_page']);
         add_action('admin_init', [$this, 'mhc_register_settings']);
+        // AJAX endpoints to generate/clear process key (used by admin UI)
+        add_action('wp_ajax_mhc_generate_process_key', [$this, 'ajax_generate_process_key']);
+        add_action('wp_ajax_mhc_clear_process_key', [$this, 'ajax_clear_process_key']);
     }
 
     /**
@@ -218,6 +221,17 @@ class Settings
             ['label_for' => 'mhc_qb_base_url']
         );
         register_setting('mhc_qb_options', 'mhc_qb_base_url');
+
+        // Process key for external queue processing
+        add_settings_field(
+            'mhc_qb_process_key',
+            __('Queue Process Key', 'mhc'),
+            [$this, 'process_key_field'],
+            'mhc_quickbooks_settings',
+            'mhc_qb_general_section',
+            ['label_for' => 'mhc_qb_process_key']
+        );
+        register_setting('mhc_qb_options', 'mhc_qb_process_key');
     }
 
     public function text_field($args)
@@ -321,6 +335,76 @@ class Settings
             delete_option('mhc_qb_refresh_token');
             add_settings_error('mhc_qb_messages', 'mhc_qb_disconnected', __('Disconnected from QuickBooks.', 'mhc'), 'updated');
         }
+    }
+
+    /** Render process key field (shows key and buttons to generate/clear) */
+    public function process_key_field($args)
+    {
+        if (!current_user_can('manage_options')) return;
+        $key = get_option('mhc_qb_process_key', '');
+        ?>
+        <div>
+            <input type="text" readonly id="mhc_qb_process_key" name="mhc_qb_process_key" value="<?php echo esc_attr($key); ?>" class="regular-text code">
+            <p class="description"><?php _e('This secret key can be used to call the queue processing endpoint from external schedulers. Keep it safe.', 'mhc'); ?></p>
+            <button type="button" class="button" id="mhc-generate-key"><?php _e('Generate new key', 'mhc'); ?></button>
+            <button type="button" class="button button-danger" id="mhc-clear-key"><?php _e('Clear key', 'mhc'); ?></button>
+            <script>
+                (function(){
+                    const gen = document.getElementById('mhc-generate-key');
+                    const clr = document.getElementById('mhc-clear-key');
+                    const field = document.getElementById('mhc_qb_process_key');
+                    const nonce = '<?php echo wp_create_nonce('mhc_qb_admin_ajax'); ?>';
+
+                    gen.addEventListener('click', async (e)=>{
+                        e.preventDefault();
+                        gen.disabled = true;
+                        const body = new URLSearchParams({ action: 'mhc_generate_process_key', _wpnonce: nonce, security: nonce });
+                        const res = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', { method:'POST', body });
+                        const data = await res.json();
+                        gen.disabled = false;
+                        if (data.success && data.data && data.data.key) {
+                            field.value = data.data.key;
+                        } else {
+                            alert('Error generating key');
+                        }
+                    });
+
+                    clr.addEventListener('click', async (e)=>{
+                        e.preventDefault();
+                        if (!confirm('Clear the process key?')) return;
+                        clr.disabled = true;
+                        const body = new URLSearchParams({ action: 'mhc_clear_process_key', _wpnonce: nonce, security: nonce });
+                        const res = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', { method:'POST', body });
+                        const data = await res.json();
+                        clr.disabled = false;
+                        if (data.success) {
+                            field.value = '';
+                        } else {
+                            alert('Error clearing key');
+                        }
+                    });
+                })();
+            </script>
+        </div>
+        <?php
+        // (AJAX handlers are used instead of inline form posts)
+    }
+
+    public function ajax_generate_process_key()
+    {
+        if (!current_user_can('manage_options')) wp_send_json_error(['message' => 'Forbidden'], 403);
+        check_ajax_referer('mhc_qb_admin_ajax', 'security');
+        $new = wp_generate_password(40, false, false);
+        update_option('mhc_qb_process_key', $new);
+        wp_send_json_success(['key' => $new]);
+    }
+
+    public function ajax_clear_process_key()
+    {
+        if (!current_user_can('manage_options')) wp_send_json_error(['message' => 'Forbidden'], 403);
+        check_ajax_referer('mhc_qb_admin_ajax', 'security');
+        delete_option('mhc_qb_process_key');
+        wp_send_json_success(['cleared' => true]);
     }
 
     public function render_vendors_page()
