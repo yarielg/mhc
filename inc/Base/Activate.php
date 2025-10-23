@@ -17,7 +17,7 @@ class Activate
 
     public static function get_db_version()
     {
-        return '1.4.4'; // increment on DB schema changes
+        return '1.4.5'; // increment on DB schema changes
     }
 
     public static function activate()
@@ -339,13 +339,24 @@ class Activate
             }
 
             // 4. Vendor ID for QuickBooks integration
-            if (!in_array('qb_vendor_id', $columns_wpr)) {
+            $columns_w = $wpdb->get_col("SHOW COLUMNS FROM {$pfx}mhc_workers", 0);
+            if (!in_array('qb_vendor_id', $columns_w)) {
                 $wpdb->query("ALTER TABLE {$pfx}mhc_workers ADD COLUMN qb_vendor_id VARCHAR(100) NULL AFTER company");
             }
 
             // 5. Ensure QbQueue tables are up to date
             if (class_exists('\Mhc\Inc\Services\QbQueue')) {
                 \Mhc\Inc\Services\QbQueue::maybe_create_tables();
+            }
+
+            // 6. Add worker_patient_role_id and check_number to wp_mhc_qb_checks (v1.4.5)
+            $qchecks_table = $wpdb->prefix . 'mhc_qb_checks';
+            $cols_checks = $wpdb->get_col("SHOW COLUMNS FROM {$qchecks_table}", 0);
+            if (!in_array('worker_patient_role_id', $cols_checks)) {
+                $wpdb->query("ALTER TABLE {$qchecks_table} ADD COLUMN worker_patient_role_id BIGINT UNSIGNED NULL AFTER payroll_id");
+            }
+            if (!in_array('check_number', $cols_checks)) {
+                $wpdb->query("ALTER TABLE {$qchecks_table} ADD COLUMN check_number VARCHAR(100) NULL AFTER worker_patient_role_id");
             }
 
             update_option('mhc_db_version', $current_ver);

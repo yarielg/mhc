@@ -15,7 +15,7 @@ class QuickBooksController
         add_action('admin_init', [\Mhc\Inc\Services\QbQueue::class, 'maybe_create_tables']);
 
         // Add custom cron schedule (5 minutes)
-        add_filter('cron_schedules', function($schedules){
+        add_filter('cron_schedules', function ($schedules) {
             if (!isset($schedules['five_minutes'])) {
                 $schedules['five_minutes'] = ['interval' => 300, 'display' => __('Every Five Minutes')];
             }
@@ -31,6 +31,9 @@ class QuickBooksController
         add_action('wp_ajax_mhc_qb_enqueue_payroll', [__CLASS__, 'ajax_enqueue_payroll']);
         add_action('wp_ajax_mhc_qb_process_queue', [__CLASS__, 'ajax_process_queue']);
         add_action('wp_ajax_mhc_qb_list_checks', [__CLASS__, 'ajax_list_checks']);
+
+        add_action('wp_ajax_mhc_qb_sync_check_numbers', [__CLASS__, 'ajax_sync_check_numbers']);
+
     }
 
     /**
@@ -111,9 +114,13 @@ class QuickBooksController
     /**
      * 🔹 Lógica central reutilizable: crea un cheque en QuickBooks
      */
-    public function create_check_for_worker($worker_id, $total, $period_start, $period_end)
+    public function create_check_for_worker($worker_id, $wpr_id, $payroll_id, $total, $period_start, $period_end)
     {
         global $wpdb;
+
+        //get checking account and spending account from settings
+        $checking_account_id = get_option('mhc_qb_checking_account_id');
+        $spending_account_id = get_option('mhc_qb_spending_account_id');
 
         $table_workers = $wpdb->prefix . 'mhc_workers';
         $worker = $wpdb->get_row($wpdb->prepare(
@@ -131,7 +138,7 @@ class QuickBooksController
         $body = [
             "PaymentType" => "Check",
             "AccountRef" => [
-                "value" => "35", // Checking account ID (ajusta según tu QuickBooks)
+                "value" => $checking_account_id, // Checking account ID (ajusta según tu QuickBooks)
                 "name" => "Checking Account"
             ],
             "EntityRef" => [
@@ -149,7 +156,7 @@ class QuickBooksController
                     "DetailType" => "AccountBasedExpenseLineDetail",
                     "AccountBasedExpenseLineDetail" => [
                         "AccountRef" => [
-                            "value" => "7",
+                            "value" => $spending_account_id, // Spending account ID (ajusta según tu QuickBooks)
                             "name" => "Contractor Payments"
                         ]
                     ],
@@ -171,11 +178,17 @@ class QuickBooksController
         $check_id = $response['Purchase']['Id'];
 
         // Guardar opcionalmente el último cheque en BD
-        $wpdb->update(
-            $table_workers,
-            ['last_qb_check_id' => $check_id],
-            ['id' => $worker_id]
+        $wpdb->insert(
+            "{$wpdb->prefix}mhc_qb_checks",
+            [
+                'payroll_id' => $payroll_id,
+                'worker_id'  => $worker_id,
+                'worker_patient_role_id' => $wpr_id,
+                'qb_check_id' => $check_id,
+                'amount' => $total,
+            ]
         );
+
 
         return [
             'check_id' => $check_id,
@@ -194,6 +207,8 @@ class QuickBooksController
         }
 
         $worker_id    = intval($_POST['worker_id'] ?? 0);
+        $wpr_id       = intval($_POST['wpr_id'] ?? 0);
+        $payroll_id   = intval($_POST['payroll_id'] ?? 0);
         $total        = floatval($_POST['total'] ?? 0);
         $period_start = sanitize_text_field($_POST['period_start'] ?? '');
         $period_end   = sanitize_text_field($_POST['period_end'] ?? '');
@@ -202,7 +217,7 @@ class QuickBooksController
             wp_send_json_error(['message' => 'Missing parameters'], 400);
         }
 
-        $result = $this->create_check_for_worker($worker_id, $total, $period_start, $period_end);
+        $result = $this->create_check_for_worker($worker_id, $wpr_id, $payroll_id, $total, $period_start, $period_end);
 
         if (is_wp_error($result)) {
             wp_send_json_error(['message' => $result->get_error_message()]);
@@ -233,7 +248,7 @@ class QuickBooksController
         // 1️⃣ Workers con horas
         $res1 = $wpdb->get_results(
             $wpdb->prepare("
-            SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name
+            SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name, wpr.id AS worker_patient_role_id
             FROM {$wpdb->prefix}mhc_hours_entries he
             INNER JOIN {$wpdb->prefix}mhc_worker_patient_roles wpr ON wpr.id = he.worker_patient_role_id
             INNER JOIN {$wpdb->prefix}mhc_workers w ON w.id = wpr.worker_id
@@ -292,7 +307,7 @@ class QuickBooksController
             if ($grand_total <= 0) continue; // omitimos si no tiene pago
 
             // Crear cheque
-            $result = $controller->create_check_for_worker($worker->id, $grand_total, $start, $end);
+            $result = $controller->create_check_for_worker($worker->id, $worker->worker_patient_role_id, $payrollId, $grand_total, $start, $end);
 
             if (is_wp_error($result)) {
                 $errors[] = [
@@ -397,5 +412,39 @@ class QuickBooksController
             return "$sm $sd$dash$em $ed, $sy";
         }
         return "$sm $sd, $sy$dash$em $ed, $ey";
+    }
+
+    public static function ajax_sync_check_numbers()
+    {
+        self::check();
+        global $wpdb;
+
+        $qb = new \Mhc\Inc\Services\QuickBooksService();
+        $endpoint = 'query?query=' . urlencode("select Id, DocNumber from Purchase where PaymentType='Check'") . '&minorversion=75';
+        $response = $qb->request('GET', $endpoint);
+
+        if (is_wp_error($response)) {
+            wp_send_json_error(['message' => $response->get_error_message()]);
+        }
+
+        $purchases = $response['QueryResponse']['Purchase'] ?? [];
+        $updated = 0;
+
+        foreach ($purchases as $p) {
+            $check_id = esc_sql($p['Id']);
+            $check_num = esc_sql($p['DocNumber'] ?? '');
+
+            if (!$check_num) continue;
+
+            $wpdb->update(
+                "{$wpdb->prefix}mhc_qb_checks",
+                ['check_number' => $check_num],
+                ['qb_check_id' => $check_id]
+            );
+
+            $updated++;
+        }
+
+        wp_send_json_success(['message' => "✅ {$updated} checks synchronized successfully.", 'count' => $updated]);
     }
 }

@@ -222,6 +222,27 @@ class Settings
         );
         register_setting('mhc_qb_options', 'mhc_qb_base_url');
 
+        add_settings_field(
+            'mhc_qb_checking_account_id',
+            __('Checking Account ID', 'mhc'),
+            [$this, 'text_field'],
+            'mhc_quickbooks_settings',
+            'mhc_qb_general_section',
+            ['label_for' => 'mhc_qb_checking_account_id']
+        );
+        register_setting('mhc_qb_options', 'mhc_qb_checking_account_id');
+
+        add_settings_field(
+            'mhc_qb_expense_account_id',
+            __('Expense Account ID', 'mhc'),
+            [$this, 'text_field'],
+            'mhc_quickbooks_settings',
+            'mhc_qb_general_section',
+            ['label_for' => 'mhc_qb_expense_account_id']
+        );
+        register_setting('mhc_qb_options', 'mhc_qb_expense_account_id');
+
+
         // Process key for external queue processing
         add_settings_field(
             'mhc_qb_process_key',
@@ -249,12 +270,12 @@ class Settings
         // Use the registered option name so the settings API reads/writes the correct option
         $option_name = $args['label_for'] ?? 'mhc_qb_base_url';
         $option = get_option($option_name, 'sandbox');
-        ?>
-            <select name="<?php echo esc_attr($option_name); ?>" id="<?php echo esc_attr($option_name); ?>">
-                <option value="sandbox" <?php selected($option, 'sandbox'); ?>>Sandbox</option>
-                <option value="production" <?php selected($option, 'production'); ?>>Production</option>
-            </select>
-        <?php
+    ?>
+        <select name="<?php echo esc_attr($option_name); ?>" id="<?php echo esc_attr($option_name); ?>">
+            <option value="sandbox" <?php selected($option, 'sandbox'); ?>>Sandbox</option>
+            <option value="production" <?php selected($option, 'production'); ?>>Production</option>
+        </select>
+    <?php
         // No hidden input here — let WP Settings API save the select's value via its name
     }
 
@@ -330,7 +351,7 @@ class Settings
                 <?php endif; ?>
             <?php endif; ?>
         </div>
-<?php
+        <?php
 
         // Handle manual disconnect
         if (isset($_POST['mhc_qb_disconnect'])) {
@@ -352,17 +373,24 @@ class Settings
             <button type="button" class="button" id="mhc-generate-key"><?php _e('Generate new key', 'mhc'); ?></button>
             <button type="button" class="button button-danger" id="mhc-clear-key"><?php _e('Clear key', 'mhc'); ?></button>
             <script>
-                (function(){
+                (function() {
                     const gen = document.getElementById('mhc-generate-key');
                     const clr = document.getElementById('mhc-clear-key');
                     const field = document.getElementById('mhc_qb_process_key');
                     const nonce = '<?php echo wp_create_nonce('mhc_qb_admin_ajax'); ?>';
 
-                    gen.addEventListener('click', async (e)=>{
+                    gen.addEventListener('click', async (e) => {
                         e.preventDefault();
                         gen.disabled = true;
-                        const body = new URLSearchParams({ action: 'mhc_generate_process_key', _wpnonce: nonce, security: nonce });
-                        const res = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', { method:'POST', body });
+                        const body = new URLSearchParams({
+                            action: 'mhc_generate_process_key',
+                            _wpnonce: nonce,
+                            security: nonce
+                        });
+                        const res = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                            method: 'POST',
+                            body
+                        });
                         const data = await res.json();
                         gen.disabled = false;
                         if (data.success && data.data && data.data.key) {
@@ -372,12 +400,19 @@ class Settings
                         }
                     });
 
-                    clr.addEventListener('click', async (e)=>{
+                    clr.addEventListener('click', async (e) => {
                         e.preventDefault();
                         if (!confirm('Clear the process key?')) return;
                         clr.disabled = true;
-                        const body = new URLSearchParams({ action: 'mhc_clear_process_key', _wpnonce: nonce, security: nonce });
-                        const res = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', { method:'POST', body });
+                        const body = new URLSearchParams({
+                            action: 'mhc_clear_process_key',
+                            _wpnonce: nonce,
+                            security: nonce
+                        });
+                        const res = await fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                            method: 'POST',
+                            body
+                        });
                         const data = await res.json();
                         clr.disabled = false;
                         if (data.success) {
@@ -389,7 +424,7 @@ class Settings
                 })();
             </script>
         </div>
-        <?php
+<?php
         // (AJAX handlers are used instead of inline form posts)
     }
 
@@ -418,17 +453,51 @@ class Settings
 
         echo '<div class="wrap"><h1>QuickBooks Vendors</h1>';
 
-        // Instanciar el servicio
+        // Instanciar el servicio y obtener todos los vendors (paginado)
         $qb = new \Mhc\Inc\Services\QuickBooksService();
-        $response = $qb->request('GET', 'query?query=select%20*%20from%20Vendor&minorversion=75');
 
-        if (is_wp_error($response)) {
-            echo '<div class="notice notice-error"><p><strong>Error:</strong> ' . esc_html($response->get_error_message()) . '</p></div>';
+        $all_vendors = [];
+        $start = 1;
+        $max = 1000; // QBO permite hasta 1000 en una llamada
+        $totalCount = null;
+
+        try {
+            do {
+                $query = sprintf('select * from Vendor STARTPOSITION %d MAXRESULTS %d', $start, $max);
+                $endpoint = 'query?query=' . urlencode($query) . '&minorversion=75';
+                $response = $qb->request('GET', $endpoint);
+
+                if (is_wp_error($response)) {
+                    echo '<div class="notice notice-error"><p><strong>Error:</strong> ' . esc_html($response->get_error_message()) . '</p></div>';
+                    echo '</div>';
+                    return;
+                }
+
+                $vendors = $response['QueryResponse']['Vendor'] ?? [];
+                if (!empty($vendors) && is_array($vendors)) {
+                    $all_vendors = array_merge($all_vendors, $vendors);
+                }
+
+                // Try to read totalCount when provided
+                if ($totalCount === null && isset($response['QueryResponse']['totalCount'])) {
+                    $totalCount = (int)$response['QueryResponse']['totalCount'];
+                }
+
+                $fetched = is_array($vendors) ? count($vendors) : 0;
+                $start += $max;
+
+                // Stop if we've fetched all according to totalCount
+                if ($totalCount !== null && count($all_vendors) >= $totalCount) break;
+
+                // safety: stop if a page returns less than requested
+            } while ($fetched === $max);
+        } catch (\Exception $e) {
+            echo '<div class="notice notice-error"><p><strong>Error:</strong> ' . esc_html($e->getMessage()) . '</p></div>';
             echo '</div>';
             return;
         }
 
-        $vendors = $response['QueryResponse']['Vendor'] ?? [];
+        $vendors = $all_vendors;
 
         if (empty($vendors)) {
             echo '<p>No vendors found in QuickBooks.</p></div>';
