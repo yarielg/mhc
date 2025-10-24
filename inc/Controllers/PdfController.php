@@ -114,12 +114,19 @@ class PdfController
 
     $worker_name  = '';
     $company_name = '';
+    $check_number = '---';
     if (!empty($hours)) {
       $worker_name  = $hours[0]->worker_name ?? '';
       $company_name = $hours[0]->worker_company ?? '';
+      $check_number = $hours[0]->check_number ?? '---';
     }
     if ($worker_name === '') {
       $t = $wpdb->prefix . 'mhc_workers';
+      $check_number = $wpdb->get_var($wpdb->prepare(
+        "SELECT check_number FROM {$wpdb->prefix}mhc_qb_checks WHERE payroll_id = %d AND worker_id = %d",
+        $data['payroll_id'],
+        $data['worker_id']
+      ));
       $row = $wpdb->get_row($wpdb->prepare(
         "SELECT CONCAT(first_name,' ',last_name) AS name, company FROM {$t} WHERE id=%d",
         $data['worker_id']
@@ -144,7 +151,7 @@ class PdfController
     $start = $payroll->start_date ?? date('Y-m-d');
     $end   = $payroll->end_date   ?? date('Y-m-d');
 
-    $html = self::renderWorkerSlipHtml($data, $worker_name, $company_name, $start, $end);
+    $html = self::renderWorkerSlipHtml($data, $worker_name, $company_name, $start, $end, $check_number);
 
     // ====== mPDF ======
     // tempDir: usa una carpeta escribible (ajústala si quieres)
@@ -176,7 +183,7 @@ class PdfController
   /**
    * Renderiza el HTML del slip de trabajador (extraído de generateWorkerSlipPdf)
    */
-  public static function renderWorkerSlipHtml($data, $worker_name, $company_name, $start, $end)
+  public static function renderWorkerSlipHtml($data, $worker_name, $company_name,$start, $end, $check_number = '---')
   {
     $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
     $hours = $data['hours'];
@@ -225,6 +232,7 @@ class PdfController
     <p><strong>Worker:</strong> ' . htmlspecialchars($worker_name) . '</p>
     <p><strong>Company:</strong> ' . htmlspecialchars($company_name ?: "---") . '</p>
     <p><strong>Payroll Period:</strong> ' . self::format_week_range($start, $end) . '</p>
+    <p><strong>Check Number:</strong> ' . htmlspecialchars($check_number) . '</p>
   </div>
 
   <!-- Regular Payments -->
@@ -477,6 +485,7 @@ class PdfController
         'worker_id'     => $wid,
         'worker_name'   => $h['worker_name'] ?? '',
         'company'       => $h['worker_company'] ?? '',
+        'check_number'  => $h['check_number'] ?? '---',
         'hours_hours'   => (float)$h['total_hours'],
         'hours_amount'  => (float)$h['total_amount'],
         'extras_amount' => 0.0,
@@ -488,6 +497,7 @@ class PdfController
         // Try to get name/company from extras row if available
         $worker_name = $e['worker_name'] ?? '';
         $company = $e['worker_company'] ?? '';
+        $check_number = $e['check_number'] ?? '---';
         // If not present, try to fetch from DB
         if ((!$worker_name || !$company) && $wid) {
           global $wpdb;
@@ -497,11 +507,18 @@ class PdfController
             $worker_name = (string)$row->name;
             $company = (string)$row->company;
           }
+          
+          $check_number = $wpdb->get_var($wpdb->prepare(
+            "SELECT check_number FROM {$wpdb->prefix}mhc_qb_checks WHERE payroll_id = %d AND worker_id = %d",
+            $payroll_id,
+            $wid
+          )) ?? '---';
         }
         $map[$wid] = [
           'worker_id'     => $wid,
           'worker_name'   => $worker_name,
           'company'       => $company,
+          'check_number'  => $check_number,
           'hours_hours'   => 0.0,
           'hours_amount'  => 0.0,
           'extras_amount' => 0.0,
@@ -513,6 +530,11 @@ class PdfController
       $r['grand_total'] = round((float)$r['hours_amount'] + (float)$r['extras_amount'], 2);
       return $r;
     }, $map));
+
+    // Sort by worker name
+    usort($items, function ($a, $b) {
+      return strcmp($a['worker_name'], $b['worker_name']);
+    });
     // Totals
     $sum_hours_amount  = array_sum(array_column($items, 'hours_amount'));
     $sum_extras_amount = array_sum(array_column($items, 'extras_amount'));
@@ -549,6 +571,7 @@ class PdfController
       <th>Hours</th>
       <th>Hours $</th>
       <th>Additionals $</th>
+      <th>Check #</th>
       <th>Total $</th>
     </tr></thead><tbody>';
     if (!empty($items)) {
@@ -559,6 +582,7 @@ class PdfController
           <td align="center">' . number_format($i['hours_hours'], 2) . '</td>
           <td align="right">$' . number_format($i['hours_amount'], 2) . '</td>
           <td align="right">$' . number_format($i['extras_amount'], 2) . '</td>
+          <td align="right">' . htmlspecialchars($i['check_number']) . '</td>
           <td align="right"><b>$' . number_format($i['grand_total'], 2) . '</b></td>
         </tr>';
       }
@@ -624,9 +648,10 @@ class PdfController
     // 2. Workers with only extras
     $res2 = $wpdb->get_results(
       $wpdb->prepare("
-        SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name, w.company
+        SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name, w.company, qc.check_number AS check_number
         FROM {$wpdb->prefix}mhc_extra_payments ep
         INNER JOIN {$wpdb->prefix}mhc_workers w ON w.id = ep.worker_id
+        LEFT JOIN {$wpdb->prefix}mhc_qb_checks qc ON qc.payroll_id = ep.payroll_id AND qc.worker_id = ep.worker_id
         WHERE ep.payroll_id = %d
       ", $payrollId)
     );
@@ -664,10 +689,13 @@ class PdfController
         }
         // Prefer company from hours, else from worker row
         $company_name = '';
+        $check_number = '---';
         if (!empty($hours)) {
           $company_name = $hours[0]->worker_company ?? '';
+          $check_number = $hours[0]->check_number ?? '---';
         } elseif (!empty($worker->company)) {
           $company_name = $worker->company;
+          $check_number = $worker->check_number ?? '---';
         }
         $data = [
           'payroll_id' => $payrollId,
@@ -684,7 +712,7 @@ class PdfController
         $payroll = \Mhc\Inc\Models\Payroll::findById($payrollId);
         $start = $payroll->start_date ?? date('Y-m-d');
         $end   = $payroll->end_date   ?? date('Y-m-d');
-        $html = self::renderWorkerSlipHtml($data, $worker->worker_name, $company_name, $start, $end);
+        $html = self::renderWorkerSlipHtml($data, $worker->worker_name, $company_name, $start, $end, $check_number);
         if ($i > 0) {
           $mpdf->AddPage();
         }
