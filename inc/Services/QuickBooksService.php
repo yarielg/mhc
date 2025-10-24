@@ -112,8 +112,7 @@ class QuickBooksService
         }
 
         $url = trailingslashit($this->baseUrl) . "v3/company/{$this->realmId}/" . ltrim($endpoint, '/');
-
-        error_log('Requested path: ' . $url);
+        
         $args = [
             'method'  => strtoupper($method),
             'headers' => [
