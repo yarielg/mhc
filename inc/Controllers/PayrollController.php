@@ -714,10 +714,12 @@ class PayrollController
         $worker_name = '';
         $company = '';
         $check_number = '';
+        $qb_check_id = 0;
         if (!empty($hours)) {
             $worker_name = $hours[0]->worker_name ?? '';
             $company = $hours[0]->worker_company ?? '';
             $check_number = $hours[0]->check_number ?? '';
+            $qb_check_id = $hours[0]->qb_check_id ?? 0;
         }
         if ($worker_name === '') {
             global $wpdb;
@@ -726,6 +728,7 @@ class PayrollController
             $worker_name = (string)$wpdb->get_var($wpdb->prepare("SELECT CONCAT(first_name,' ',last_name) FROM {$t} WHERE id=%d", $worker_id));
             $company = (string)$wpdb->get_var($wpdb->prepare("SELECT company FROM {$t} WHERE id=%d", $worker_id));
             $check_number = (string)$wpdb->get_var($wpdb->prepare("SELECT check_number FROM {$qc} WHERE worker_id=%d AND payroll_id=%d", $worker_id, $payroll_id));
+            $qb_check_id = (int)$wpdb->get_var($wpdb->prepare("SELECT qb_check_id FROM {$qc} WHERE worker_id=%d AND payroll_id=%d", $worker_id, $payroll_id));
         }
 
         wp_send_json_success([
@@ -734,6 +737,7 @@ class PayrollController
                 'worker_name' => $worker_name,
                 'company'     => $company,
                 'check_number' => $check_number,
+                'qb_check_id'  => $qb_check_id,
             ],
             'hours'  => $hours,   // cada item: patient_name, role_code, hours, used_rate, total...
             'extras' => $extras,  // cada item: code, label, unit_rate, amount, notes...

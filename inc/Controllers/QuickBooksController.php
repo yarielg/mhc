@@ -336,9 +336,38 @@ class QuickBooksController
 
             $grand_total = round($ta + $te, 2);
             if ($grand_total <= 0) continue; // omitimos si no tiene pago
+            $wpr_id=isset($worker->worker_patient_role_id) ? $worker->worker_patient_role_id : 0;
 
+
+            // Verificar si ya existe un cheque para este worker y payroll
+            if($wpr_id==0){
+                $existing_check = $wpdb->get_row(
+                    $wpdb->prepare(
+                        "SELECT * FROM {$wpdb->prefix}mhc_qb_checks WHERE worker_id = %d AND payroll_id = %d",
+                        $worker->id,
+                        $payrollId
+                    )
+                );
+            } else {
+                $existing_check = $wpdb->get_row(
+                    $wpdb->prepare(
+                        "SELECT * FROM {$wpdb->prefix}mhc_qb_checks WHERE worker_patient_role_id = %d AND payroll_id = %d",
+                        $wpr_id,
+                        $payrollId
+                    )
+                );
+            }           
             // Crear cheque
-            $result = $controller->create_check_for_worker($worker->id, $worker->worker_patient_role_id, $payrollId, $grand_total, $start, $end);
+            if ($existing_check) {
+                $errors[] = [
+                    'worker' => $worker->worker_name,
+                    'error' => 'Check already exists for this worker and payroll.'
+                ];
+                continue;
+            }else {
+                // No existe, procedemos a crear
+                $result = $controller->create_check_for_worker($worker->id, $wpr_id, $payrollId, $grand_total, $start, $end);
+            }            
 
             if (is_wp_error($result)) {
                 $errors[] = [

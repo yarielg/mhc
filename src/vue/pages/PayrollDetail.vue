@@ -542,6 +542,9 @@
         Additionals: <b>{{ money(modals.slip.totals.extras_amount) }}</b> •
         Grand Total: <b>{{ money(modals.slip.totals.grand_total) }}</b>
       </div>
+      <div class="mt-2 text-sm" v-if="modals.slip.header.qb_check_id !== 0 && modals.slip.header.qb_check_id !== null">
+        <b>Check number:</b> {{ modals.slip.header.check_number || 'N/A' }} (QuickBooks ID: {{ modals.slip.header.qb_check_id || 'N/A' }})
+      </div>
       <template #footer>
         <el-button @click="modals.slip.visible = false">Close</el-button>
       </template>
