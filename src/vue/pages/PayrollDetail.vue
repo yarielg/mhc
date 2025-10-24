@@ -295,9 +295,9 @@
                 
 
                 <el-table :data="summary.items" size="small" border v-loading="loading.summary" empty-text="No data">
-                  <el-table-column prop="worker_name" label="Worker" min-width="180" show-overflow-tooltip />
+                  <el-table-column prop="worker_name" label="Worker" min-width="160" show-overflow-tooltip />
                   <el-table-column prop="company" label="Company" min-width="120" show-overflow-tooltip />
-                  <el-table-column prop="hours_hours" label="Hours" width="90" />
+                  <el-table-column prop="hours_hours" label="Hours" width="80" />
                   <el-table-column prop="hours_amount" label="Regular $" width="120">
                     <template #default="{ row }">{{
                       money(row.hours_amount)
@@ -308,10 +308,10 @@
                       money(row.extras_amount)
                     }}</template>
                   </el-table-column>
-                  <el-table-column prop="grand_total" label="Total $" width="130">
+                  <el-table-column prop="grand_total" label="Total $" width="120">
                     <template #default="{ row }"><b>{{ money(row.grand_total) }}</b></template>
                   </el-table-column>
-                  <el-table-column label="Slip" width="150" fixed="right">
+                  <el-table-column label="Slip" width="200" fixed="right">
                     <template #default="{ row }">
                       <div style="
                           display: flex;
@@ -331,6 +331,12 @@
                         <el-button size="small" @click.stop="downloadWorkerSlip(row)">
                           <el-icon class="">
                             <Download />
+                          </el-icon>
+                        </el-button>
+                        <!-- create worker check -->
+                        <el-button size="small" :loading="creatingCheck[row.worker_id]" @click.stop="createWorkerCheck(row)">
+                          <el-icon class="">
+                            <Money />
                           </el-icon>
                         </el-button>
                       </div>
@@ -523,9 +529,12 @@ import {
   Download,
   Search,
   Printer,
+  Money
 } from "@element-plus/icons-vue";
 
 const sendingSlip = reactive({});
+// Per-row flag used when creating a QuickBooks check for a worker
+const creatingCheck = reactive({});
 
 function downloadSummaryPdf() {
   const payrollId = typeof id !== "undefined" ? id : props?.id || null;
@@ -610,6 +619,44 @@ async function sendAllSlips() {
     ElMessage.error(err.message || 'Error sending slips.');
   } finally {
     sendingAll.value = false;
+  }
+}
+
+/* ====== Create QuickBooks check for a single worker ====== */
+async function createWorkerCheck(row) {
+  const workerId = row?.worker_id || row?.id || 0;
+  const wprId = row?.worker_patient_role_id || row?.wpr_id || 0;
+  const total = Number(row?.grand_total ?? row?.total ?? 0);
+
+  if (!workerId || total <= 0) {
+    ElMessage.error('Missing worker or amount to create check.');
+    return;
+  }
+
+  // payroll id may be in reactive `id` or props
+  const payrollId = id || props.id;
+  const period_start = payroll.start_date || '';
+  const period_end = payroll.end_date || '';
+
+  try {
+    creatingCheck[workerId] = true;
+
+    const data = await ajaxPostForm('mhc_qb_create_check', {
+      worker_id: String(workerId),
+      wpr_id: String(wprId),
+      payroll_id: String(payrollId),
+      total: String(total),
+      period_start,
+      period_end,
+    });
+
+    ElMessage.success(data?.message || 'Check created successfully');
+    // Optionally reload summary / status after creation
+    await loadSummary();
+  } catch (err) {
+    ElMessage.error(err?.message || err?.toString() || 'Failed creating check');
+  } finally {
+    delete creatingCheck[workerId];
   }
 }
 

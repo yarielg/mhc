@@ -118,9 +118,9 @@ class QuickBooksController
     {
         global $wpdb;
 
-        //get checking account and spending account from settings
+        //get checking account and expense account from settings
         $checking_account_id = get_option('mhc_qb_checking_account_id');
-        $spending_account_id = get_option('mhc_qb_spending_account_id');
+        $expense_account_id = get_option('mhc_qb_expense_account_id');
 
         $table_workers = $wpdb->prefix . 'mhc_workers';
         $worker = $wpdb->get_row($wpdb->prepare(
@@ -156,7 +156,7 @@ class QuickBooksController
                     "DetailType" => "AccountBasedExpenseLineDetail",
                     "AccountBasedExpenseLineDetail" => [
                         "AccountRef" => [
-                            "value" => $spending_account_id, // Spending account ID (ajusta según tu QuickBooks)
+                            "value" => $expense_account_id, // Expense account ID (ajusta según tu QuickBooks)
                             "name" => "Contractor Payments"
                         ]
                     ],
@@ -164,8 +164,10 @@ class QuickBooksController
                 ]
             ]
         ];
-
+        error_log("Creating QuickBooks Check for Worker ID {$worker_id} with body: " . print_r($body, true));
         $response = $qb->request('POST', 'purchase?minorversion=75', $body);
+
+        error_log("QuickBooks response: " . print_r($response, true));
 
         if (is_wp_error($response)) {
             return $response;
@@ -217,6 +219,7 @@ class QuickBooksController
             wp_send_json_error(['message' => 'Missing parameters'], 400);
         }
 
+        error_log("Creating check for worker_id: $worker_id, payroll_id: $payroll_id, total: $total");
         $result = $this->create_check_for_worker($worker_id, $wpr_id, $payroll_id, $total, $period_start, $period_end);
 
         if (is_wp_error($result)) {
