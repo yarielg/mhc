@@ -24,6 +24,9 @@ class HoursEntry
     private static function tableRoles(): string {
         global $wpdb; return $wpdb->prefix . 'mhc_roles';
     }
+    private static function tableChecks(): string {
+        global $wpdb; return $wpdb->prefix . 'mhc_qb_checks';
+    }
 
     private static function now(): string { return current_time('mysql'); }
 
@@ -379,6 +382,7 @@ class HoursEntry
         $pt  = self::tablePatients();
         $rl  = self::tableRoles();
         $seg = self::tableSegments();
+        $qc  = self::tableChecks();
 
         // Ahora filtra por payroll_id en la tabla de segmentos
         $where  = ["seg.payroll_id=%d"];
@@ -393,15 +397,17 @@ class HoursEntry
              wpr.worker_id, wpr.patient_id, wpr.role_id,
              CONCAT(w.first_name,' ',w.last_name) AS worker_name, w.company AS worker_company,
              CONCAT(p.first_name,' ',p.last_name) AS patient_name,
+             qc.qb_check_id AS qb_check_id, qc.check_number AS check_number,
              p.record_number AS patient_record_number,
              r.code AS role_code, r.name AS role_name,
              seg.id AS segment_id, seg.segment_start AS segment_start, seg.segment_end AS segment_end
          FROM {$t} he
          JOIN {$wpr} wpr ON wpr.id = he.worker_patient_role_id
-         JOIN {$wk} w ON w.id = wpr.worker_id
+         JOIN {$wk} w ON w.id = wpr.worker_id         
          JOIN {$pt} p ON p.id = wpr.patient_id
          JOIN {$rl} r ON r.id = wpr.role_id
          JOIN {$seg} seg ON seg.id = he.segment_id
+         LEFT JOIN {$qc} qc ON qc.worker_patient_role_id = wpr.id AND qc.payroll_id = seg.payroll_id
          WHERE " . implode(' AND ', $where) . "
          ORDER BY seg.segment_start ASC, seg.segment_end ASC, he.id DESC
      ";
@@ -446,6 +452,7 @@ class HoursEntry
         $wpr = self::tableWPR();
         $wk  = self::tableWorkers();
         $seg = self::tableSegments();
+        $check= self::tableChecks();
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT wpr.worker_id,
@@ -453,11 +460,13 @@ class HoursEntry
                     qb_vendor_id AS qb_vendor_id,
                     wpr.id AS wpr_id,
                     COALESCE(SUM(he.hours),0) AS total_hours,
-                    COALESCE(SUM(he.total),0) AS total_amount
+                    COALESCE(SUM(he.total),0) AS total_amount,
+                    qc.qb_check_id AS qb_check_id, qc.check_number AS check_number
              FROM {$t} he
              JOIN {$wpr} wpr ON wpr.id = he.worker_patient_role_id
              JOIN {$wk} w   ON w.id = wpr.worker_id
              JOIN {$seg} seg ON seg.id = he.segment_id
+             LEFT JOIN {$check} qc ON qc.worker_patient_role_id = wpr.id AND qc.payroll_id = seg.payroll_id
              WHERE seg.payroll_id=%d
              GROUP BY wpr.worker_id, worker_name
              ORDER BY worker_name ASC",
@@ -472,6 +481,8 @@ class HoursEntry
             $r['worker_company'] = (string)$r['worker_company'];
             $r['total_hours']  = (float)$r['total_hours'];
             $r['total_amount'] = (float)$r['total_amount'];
+            $r['qb_check_id'] = (int)$r['qb_check_id'];
+            $r['check_number'] = (string)$r['check_number'];
         }
         return $rows ?: [];
     }

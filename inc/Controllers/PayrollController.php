@@ -594,6 +594,8 @@ class PayrollController
                 'company'       => $h['worker_company'] ?? '',
                 'hours_hours'   => (float)$h['total_hours'],
                 'hours_amount'  => (float)$h['total_amount'],
+                'qb_check_id'   => (int)$h['qb_check_id'],
+                'check_number'  => (string)$h['check_number'],
                 'extras_amount' => 0.0,
                 'extras_items'  => 0,
             ];
@@ -608,6 +610,8 @@ class PayrollController
                     'worker_name'   => '',
                     'hours_hours'   => 0.0,
                     'hours_amount'  => 0.0,
+                    'qb_check_id'   => 0,
+                    'check_number'  => '',
                     'extras_amount' => 0.0,
                     'extras_items'  => 0,
                 ];
@@ -621,17 +625,32 @@ class PayrollController
         if (!empty($missing)) {
             global $wpdb;
             $t = $wpdb->prefix . 'mhc_workers';
+            $qc = $wpdb->prefix . 'mhc_qb_checks';
+
             // ✅ fix: remove stray AND in WHERE
             $ids = implode(',', array_map('intval', $missing));
-            $rows = $wpdb->get_results("SELECT id, CONCAT(first_name,' ',last_name) AS name, company, qb_vendor_id FROM {$t} WHERE id IN ($ids)", ARRAY_A);
-            $names = [];
-            foreach ($rows ?: [] as $r) $names[(int)$r['id']] = (string)$r['name'];
+            $rows = $wpdb->get_results("SELECT w.id, CONCAT(w.first_name,' ',w.last_name) AS worker_name, w.company AS company, w.qb_vendor_id AS qb_vendor_id,
+                                                qc.check_number AS check_number, qc.qb_check_id  AS qb_check_id
+                                        FROM {$t} w
+                                        LEFT JOIN {$qc} qc ON qc.worker_id = w.id
+                                        WHERE w.id IN ($ids)", ARRAY_A);
+
+            // Build a map keyed by worker id so we can safely reference company/qb fields            
+            $rowsById = [];
+            foreach ($rows ?: [] as $r) {
+                $idKey = (int)($r['id'] ?? 0);
+                if ($idKey <= 0) continue;
+                $rowsById[$idKey] = $r;
+            }           
+
             foreach ($missing as $wid) {
-                if (isset($names[$wid])) {
-                    $map[$wid]['worker_name'] = $names[$wid];
-                    $map[$wid]['company'] = $r['company'] ?? '';
-                    $map[$wid]['qb_vendor_id'] = $r['qb_vendor_id'] ?? 0;
-                }
+                if (!isset($rowsById[$wid])) continue;
+                $r = $rowsById[$wid];
+                $map[$wid]['worker_name']   = (string)($r['worker_name'] ?? $map[$wid]['worker_name'] ?? '');
+                $map[$wid]['company']       = (string)($r['company'] ?? $map[$wid]['company'] ?? '');
+                $map[$wid]['qb_vendor_id']  = isset($r['qb_vendor_id']) ? $r['qb_vendor_id'] : ($map[$wid]['qb_vendor_id'] ?? 0);
+                $map[$wid]['qb_check_id']   = (int)($r['qb_check_id'] ?? ($map[$wid]['qb_check_id'] ?? 0));
+                $map[$wid]['check_number']  = (string)($r['check_number'] ?? ($map[$wid]['check_number'] ?? ''));
             }
         }
 
@@ -694,15 +713,19 @@ class PayrollController
         // nombre del worker and company
         $worker_name = '';
         $company = '';
+        $check_number = '';
         if (!empty($hours)) {
             $worker_name = $hours[0]->worker_name ?? '';
             $company = $hours[0]->worker_company ?? '';
+            $check_number = $hours[0]->check_number ?? '';
         }
         if ($worker_name === '') {
             global $wpdb;
             $t = $wpdb->prefix . 'mhc_workers';
+            $qc = $wpdb->prefix . 'mhc_qb_checks';
             $worker_name = (string)$wpdb->get_var($wpdb->prepare("SELECT CONCAT(first_name,' ',last_name) FROM {$t} WHERE id=%d", $worker_id));
             $company = (string)$wpdb->get_var($wpdb->prepare("SELECT company FROM {$t} WHERE id=%d", $worker_id));
+            $check_number = (string)$wpdb->get_var($wpdb->prepare("SELECT check_number FROM {$qc} WHERE worker_id=%d AND payroll_id=%d", $worker_id, $payroll_id));
         }
 
         wp_send_json_success([
@@ -710,6 +733,7 @@ class PayrollController
                 'worker_id'   => $worker_id,
                 'worker_name' => $worker_name,
                 'company'     => $company,
+                'check_number' => $check_number,
             ],
             'hours'  => $hours,   // cada item: patient_name, role_code, hours, used_rate, total...
             'extras' => $extras,  // cada item: code, label, unit_rate, amount, notes...

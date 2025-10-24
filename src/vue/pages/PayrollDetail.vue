@@ -268,20 +268,49 @@
                       </el-icon>
                     </template>
                   </el-input>
-                  <el-button size="small" type="primary" style="float: right; margin-right: 8px;"
+                  <!-- Sync all checks with QuickBooks to add check numbers -->
+                  <el-button
+                    size="small"
+                    type="primary"
+                    title="Sync all checks with QuickBooks to get check numbers"
+                    style="float: right; margin-right: 8px;"
+                    :loading="syncingChecks"
+                    @click="confirmSyncChecks"
+                    >
+                    <el-icon class="">
+                      <Refresh />
+                    </el-icon>
+                  </el-button>
+                  <!-- create all checks -->
+                  <el-button
+                    size="small"
+                    type="primary"
+                    title="Create checks for all workers without checks"
+                    style="float: right; margin-right: 8px;"
+                    :loading="creatingAllChecks"
+                    @click="confirmCreateAllChecks"
+                    >
+                    <el-icon class="">
+                      <Money />
+                    </el-icon>
+                  </el-button>
+                  <el-button size="small" title="Download Sumary PDF" type="primary" style="float: right; margin-right: 8px;"
                     @click="downloadSummaryPdf">
                     <el-icon>
                       <Download />
                     </el-icon>
                   </el-button>
-                  <el-button size="small" type="primary" style="float: right; margin-right: 8px;"
+                  <el-button
+                    title="Download all worker slips as PDF"
+                   size="small" type="primary" style="float: right; margin-right: 8px;"
                     @click="downloadAllSlips">
                     <el-icon>
                       <Printer />
                     </el-icon>
-                  </el-button>
+                  </el-button>                  
                   <el-button
                     type="primary"
+                    title="Send all slips by email to workers"
                     size="small"
                     class="send_all_slip"
                     style="margin-right: 8px;"
@@ -333,9 +362,13 @@
                             <Download />
                           </el-icon>
                         </el-button>
-                        <!-- create worker check -->
-                        <el-button size="small" :loading="creatingCheck[row.worker_id]" @click.stop="createWorkerCheck(row)">
-                          <el-icon class="">
+                        <!-- if(row.qb_check_id > 0) delete check (with row.qb_check_id and confirmation) else create worker check -->
+                        <el-button :class="{ checkBackground: row.qb_check_id > 0, btcheck: Number(row.check_number) === 0 }" size="small" :loading="creatingCheck[row.worker_id]" @click.stop="row.qb_check_id > 0 ? deleteWorkerCheck(row) : createWorkerCheck(row)">
+                          <!-- if(row.check_number > 0) check_number else icon -->
+                          <span v-if="Number(row.check_number) > 0">{{ row.check_number }}</span>
+                          <el-icon v-else class="">
+                            <!-- if(row.qb_check_id > 0) add remove check icon -->
+                            <Delete v-if="row.qb_check_id > 0" />
                             <Money />
                           </el-icon>
                         </el-button>
@@ -529,7 +562,10 @@ import {
   Download,
   Search,
   Printer,
-  Money
+  Money,
+  Check,
+  Document,
+  Refresh
 } from "@element-plus/icons-vue";
 
 const sendingSlip = reactive({});
@@ -584,6 +620,10 @@ const patientSearch = ref("");
 const workerSearch = ref("");
 
 const sendingAll = ref(false);
+// Flag used when syncing check numbers from QuickBooks
+const syncingChecks = ref(false);
+// Flag used when creating all checks for a payroll
+const creatingAllChecks = ref(false);
 
 function getWprId(row) {
   return row.worker_patient_role_id || row.id || row.wpr_id;
@@ -596,6 +636,73 @@ function confirmSendAll() {
       { type: 'warning', confirmButtonText: 'Send', cancelButtonText: 'Cancel' }
   ).then(() => sendAllSlips())
       .catch(() => {});
+}
+
+// Confirm + trigger syncing of check numbers from QuickBooks
+function confirmSyncChecks() {
+  ElMessageBox.confirm(
+    'This will contact QuickBooks and update check numbers for this payroll (if any). Continue?',
+    'Sync checks with QuickBooks',
+    { type: 'warning', confirmButtonText: 'Sync', cancelButtonText: 'Cancel' }
+  )
+    .then(() => syncChecks())
+    .catch(() => {});
+}
+
+// Confirm + trigger creation of checks for all workers in this payroll
+function confirmCreateAllChecks() {
+  ElMessageBox.confirm(
+    'This will create QuickBooks checks for every eligible worker in this payroll. This action cannot be easily undone. Continue?',
+    'Create all checks',
+    { type: 'warning', confirmButtonText: 'Create', cancelButtonText: 'Cancel' }
+  )
+    .then(() => createAllChecks())
+    .catch(() => {});
+}
+
+async function createAllChecks() {
+  const payrollId = typeof id !== 'undefined' ? id : props?.id || null;
+  if (!payrollId) {
+    ElMessage.error('Missing payroll id');
+    return;
+  }
+
+  creatingAllChecks.value = true;
+  try {
+    // The backend handler expects payroll_id on GET for this action, so use ajaxGet
+    const data = await ajaxGet('mhc_qb_create_all_checks', { payroll_id: payrollId });
+
+    ElMessage.success(data?.message || 'Checks created');
+    // Refresh summary to show created checks
+    await loadSummary();
+  } catch (err) {
+    ElMessage.error(err?.message || 'Failed to create checks');
+  } finally {
+    creatingAllChecks.value = false;
+  }
+}
+
+async function syncChecks() {
+  const payrollId = typeof id !== 'undefined' ? id : props?.id || null;
+  if (!payrollId) {
+    ElMessage.error('Missing payroll id');
+    return;
+  }
+
+  syncingChecks.value = true;
+  try {
+    const data = await ajaxPostForm('mhc_qb_sync_check_numbers', {
+      payroll_id: String(payrollId),
+    });
+
+    ElMessage.success(data?.message || 'Checks synced successfully');
+    // Refresh UI to show updated check numbers
+    await loadSummary();
+  } catch (err) {
+    ElMessage.error(err?.message || 'Failed to sync checks');
+  } finally {
+    syncingChecks.value = false;
+  }
 }
 
 async function sendAllSlips() {
@@ -655,6 +762,47 @@ async function createWorkerCheck(row) {
     await loadSummary();
   } catch (err) {
     ElMessage.error(err?.message || err?.toString() || 'Failed creating check');
+  } finally {
+    delete creatingCheck[workerId];
+  }
+}
+
+/* ====== Delete QuickBooks check for a single worker (with confirmation) ====== */
+async function deleteWorkerCheck(row) {
+  const workerId = row?.worker_id || row?.id || 0;
+  const qbCheckId = row?.qb_check_id || row?.check_id || null;
+  const payrollId = id || props.id;
+
+  if (!qbCheckId) {
+    ElMessage.error('No check id found for this worker.');
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete QuickBooks check ${qbCheckId} for ${row.worker_name || ''}?`,
+      'Delete check',
+      { type: 'warning', confirmButtonText: 'Delete', cancelButtonText: 'Cancel' }
+    );
+
+    creatingCheck[workerId] = true;
+
+    const data = await ajaxPostForm('mhc_qb_delete_check', {
+      qb_check_id: String(qbCheckId),
+      payroll_id: String(payrollId),
+      worker_id: String(workerId),
+    });
+
+    ElMessage.success(data?.message || 'Check deleted locally');
+    // Refresh UI
+    await loadSummary();
+  } catch (err) {
+    // If user cancelled, err === 'cancel' or an Error
+    if (err === 'cancel' || (err && err.message && err.message.indexOf('cancel') !== -1)) {
+      // user cancelled
+    } else {
+      ElMessage.error(err?.message || 'Failed to delete check');
+    }
   } finally {
     delete creatingCheck[workerId];
   }
@@ -1756,7 +1904,25 @@ function downloadWorkerSlip(row) {
 .h-full {
   height: 100%;
 }
-
+.checkBackground {
+  /* Match Element Plus plain success button appearance */
+  color: var(--el-color-success, #67c23a) !important;
+  background-color: transparent !important;
+  border-color: var(--el-color-success, #67c23a) !important;
+}
+.checkBackground:hover {
+  /* On hover show danger (like el-button--danger is-plain) */
+  color: var(--el-color-danger, #f56c6c) !important;
+  background-color: transparent !important;
+  border-color: var(--el-color-danger, #f56c6c) !important;
+}
+.btcheck {
+  padding: 0%;
+}
+.btcheck i {
+  width: 2rem;
+  height: 2rem;
+}
 .ml-2 {
   margin-left: 0.5rem;
 }

@@ -33,6 +33,7 @@ class QuickBooksController
         add_action('wp_ajax_mhc_qb_list_checks', [__CLASS__, 'ajax_list_checks']);
 
         add_action('wp_ajax_mhc_qb_sync_check_numbers', [__CLASS__, 'ajax_sync_check_numbers']);
+        add_action('wp_ajax_mhc_qb_delete_check', [$this, 'ajax_delete_check_for_worker']);
 
     }
 
@@ -48,6 +49,34 @@ class QuickBooksController
             require_once dirname(__DIR__, 2) . '/util/helpers.php';
         }
         mhc_check_ajax_access();
+    }
+
+    /**
+     * AJAX: delete a locally recorded QuickBooks check (optionally attempts no remote action).
+     * POST: qb_check_id, payroll_id (optional), worker_id (optional)
+     */
+    public function ajax_delete_check_for_worker()
+    {
+        self::check();
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Unauthorized'], 403);
+        }
+
+        $qb_check_id = isset($_POST['qb_check_id']) ? sanitize_text_field(wp_unslash($_POST['qb_check_id'])) : '';
+        if (empty($qb_check_id)) wp_send_json_error(['message' => 'qb_check_id required'], 400);
+
+        global $wpdb;
+        $pfx = $wpdb->prefix;
+
+        // Remove local record(s)
+        $deleted = $wpdb->delete("{$pfx}mhc_qb_checks", ['qb_check_id' => $qb_check_id]);
+        
+        if ($deleted !== false) {                      
+            wp_send_json_success(['message' => 'Check removed locally', 'deleted' => (int)$deleted]);
+        }
+
+        wp_send_json_error(['message' => 'Could not delete local check'], 500);
     }
 
     public function mhc_register_callback_route()
@@ -202,6 +231,8 @@ class QuickBooksController
      */
     public function ajax_create_check_for_worker()
     {
+        self::check();
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error(['message' => 'Unauthorized'], 403);
         }
@@ -344,7 +375,7 @@ class QuickBooksController
         $res = \Mhc\Inc\Services\QbQueue::enqueuePayroll($payroll_id);
         wp_send_json_success($res);
     }
-
+    
     /**
      * AJAX: process queue (limited number)
      * POST: limit (optional)
@@ -419,32 +450,115 @@ class QuickBooksController
         self::check();
         global $wpdb;
 
+        // Expect payroll_id so we only sync relevant local checks
+        $payroll_id = isset($_REQUEST['payroll_id']) ? (int) $_REQUEST['payroll_id'] : 0;
+        if ($payroll_id <= 0) {
+            wp_send_json_error(['message' => 'payroll_id required'], 400);
+        }
+
+        $pfx = $wpdb->prefix;
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT qb_check_id FROM {$pfx}mhc_qb_checks WHERE payroll_id = %d AND check_number is null AND qb_check_id <> ''", $payroll_id));
+
+        if (empty($rows)) {
+            wp_send_json_success(['message' => 'No local checks found for this payroll', 'total_local' => 0, 'updated' => 0]);
+        }
+
+        $ids = array_values(array_filter(array_map(function ($r) {
+            return is_object($r) ? trim((string) $r->qb_check_id) : trim((string) $r);
+        }, $rows)));
+
+        $ids = array_values(array_unique($ids));
+        $total_local = count($ids);
+
         $qb = new \Mhc\Inc\Services\QuickBooksService();
-        $endpoint = 'query?query=' . urlencode("select Id, DocNumber from Purchase where PaymentType='Check'") . '&minorversion=75';
-        $response = $qb->request('GET', $endpoint);
-
-        if (is_wp_error($response)) {
-            wp_send_json_error(['message' => $response->get_error_message()]);
-        }
-
-        $purchases = $response['QueryResponse']['Purchase'] ?? [];
         $updated = 0;
+        $not_found = [];
 
-        foreach ($purchases as $p) {
-            $check_id = esc_sql($p['Id']);
-            $check_num = esc_sql($p['DocNumber'] ?? '');
+        // QuickBooks query can accept multiple Ids with IN, but chunk to be safe
+        $chunk_size = 30;
+        $chunks = array_chunk($ids, $chunk_size);
 
-            if (!$check_num) continue;
+        foreach ($chunks as $chunk) {
+            // Build IN list, escaping IDs
+            $in = implode(',', array_map(function ($id) {
+                return "'" . esc_sql($id) . "'";
+            }, $chunk));
 
-            $wpdb->update(
-                "{$wpdb->prefix}mhc_qb_checks",
-                ['check_number' => $check_num],
-                ['qb_check_id' => $check_id]
-            );
+            $query = "select Id, DocNumber from Purchase where Id IN ({$in})";
+            $endpoint = 'query?query=' . urlencode($query) . '&minorversion=75';
 
-            $updated++;
+            $response = $qb->request('GET', $endpoint);
+            if (is_wp_error($response)) {
+                wp_send_json_error(['message' => $response->get_error_message()]);
+            }
+
+            $purchases = $response['QueryResponse']['Purchase'] ?? [];
+
+            // Normalize to array of purchases
+            if ($purchases && isset($purchases['Id'])) {
+                // single object
+                $purchases = [$purchases];
+            }
+
+            $found_ids = [];
+            foreach ($purchases as $p) {
+                $check_id = isset($p['Id']) ? (string) $p['Id'] : '';
+                $check_num = isset($p['DocNumber']) ? (string) $p['DocNumber'] : '';
+                if (!$check_id) continue;
+                $found_ids[] = $check_id;
+
+                // Only update if we have a document number
+                if ($check_num !== '') {
+                    $wpdb->update("{$pfx}mhc_qb_checks", ['check_number' => esc_sql($check_num)], ['qb_check_id' => esc_sql($check_id)]);
+                    $updated++;
+                }
+            }
+
+            // track not found ids in this chunk
+            foreach ($chunk as $cid) {
+                if (!in_array($cid, $found_ids, true)) $not_found[] = $cid;
+            }
         }
 
-        wp_send_json_success(['message' => "✅ {$updated} checks synchronized successfully.", 'count' => $updated]);
+        wp_send_json_success([
+            'message' => "✅ {$updated} checks synchronized successfully.",
+            'total_local' => $total_local,
+            'updated' => $updated,
+            'not_found' => array_values(array_unique($not_found)),
+        ]);
+    }
+
+    //validate that the wpr_id for this payroll_id and the amount is not already created in the checks table
+    public static function validate_check_exists($payroll_id, $worker_patient_role_id, $amount)
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'mhc_qb_checks';
+
+        $existing = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE payroll_id = %d AND worker_patient_role_id = %d AND amount = %f",
+            $payroll_id,
+            $worker_patient_role_id,
+            $amount
+        ));
+
+        return $existing > 0;
+    }
+
+    //remove check by payroll_id and worker_patient_role_id and amount
+    public static function remove_check($payroll_id, $worker_patient_role_id, $amount)
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'mhc_qb_checks';
+
+        $deleted = $wpdb->delete(
+            $table,
+            [
+                'payroll_id' => $payroll_id,
+                'worker_patient_role_id' => $worker_patient_role_id,
+                'amount' => $amount
+            ]
+        );
+
+        return $deleted !== false;
     }
 }
