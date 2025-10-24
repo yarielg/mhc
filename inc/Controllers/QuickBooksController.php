@@ -164,10 +164,8 @@ class QuickBooksController
                 ]
             ]
         ];
-        error_log("Creating QuickBooks Check for Worker ID {$worker_id} with body: " . print_r($body, true));
-        $response = $qb->request('POST', 'purchase?minorversion=75', $body);
-
-        error_log("QuickBooks response: " . print_r($response, true));
+        
+        $response = $qb->request('POST', 'purchase?minorversion=75', $body);       
 
         if (is_wp_error($response)) {
             return $response;
@@ -218,8 +216,7 @@ class QuickBooksController
         if (!$worker_id || !$total) {
             wp_send_json_error(['message' => 'Missing parameters'], 400);
         }
-
-        error_log("Creating check for worker_id: $worker_id, payroll_id: $payroll_id, total: $total");
+        
         $result = $this->create_check_for_worker($worker_id, $wpr_id, $payroll_id, $total, $period_start, $period_end);
 
         if (is_wp_error($result)) {
