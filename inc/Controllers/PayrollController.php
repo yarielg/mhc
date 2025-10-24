@@ -585,8 +585,11 @@ class PayrollController
         $map = [];
         foreach ($hours as $h) {
             $wid = (int)$h['worker_id'];
+            $wpr_id = (int)$h['wpr_id'] ?? 0;
             $map[$wid] = [
                 'worker_id'     => $wid,
+                'wpr_id'        => $wpr_id,
+                'qb_vendor_id'  => $h['qb_vendor_id'] ?? 0,
                 'worker_name'   => $h['worker_name'] ?? '',
                 'company'       => $h['worker_company'] ?? '',
                 'hours_hours'   => (float)$h['total_hours'],
@@ -600,6 +603,8 @@ class PayrollController
             if (!isset($map[$wid])) {
                 $map[$wid] = [
                     'worker_id'     => $wid,
+                    'wpr_id'        => 0,
+                    'qb_vendor_id'  => 0,
                     'worker_name'   => '',
                     'hours_hours'   => 0.0,
                     'hours_amount'  => 0.0,
@@ -618,13 +623,14 @@ class PayrollController
             $t = $wpdb->prefix . 'mhc_workers';
             // ✅ fix: remove stray AND in WHERE
             $ids = implode(',', array_map('intval', $missing));
-            $rows = $wpdb->get_results("SELECT id, CONCAT(first_name,' ',last_name) AS name, company FROM {$t} WHERE id IN ($ids)", ARRAY_A);
+            $rows = $wpdb->get_results("SELECT id, CONCAT(first_name,' ',last_name) AS name, company, qb_vendor_id FROM {$t} WHERE id IN ($ids)", ARRAY_A);
             $names = [];
             foreach ($rows ?: [] as $r) $names[(int)$r['id']] = (string)$r['name'];
             foreach ($missing as $wid) {
                 if (isset($names[$wid])) {
                     $map[$wid]['worker_name'] = $names[$wid];
                     $map[$wid]['company'] = $r['company'] ?? '';
+                    $map[$wid]['qb_vendor_id'] = $r['qb_vendor_id'] ?? 0;
                 }
             }
         }

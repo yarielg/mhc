@@ -450,6 +450,8 @@ class HoursEntry
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT wpr.worker_id,
                     CONCAT(w.first_name,' ',w.last_name) AS worker_name, w.company AS worker_company,
+                    qb_vendor_id AS qb_vendor_id,
+                    wpr.id AS wpr_id,
                     COALESCE(SUM(he.hours),0) AS total_hours,
                     COALESCE(SUM(he.total),0) AS total_amount
              FROM {$t} he
@@ -464,6 +466,8 @@ class HoursEntry
 
         foreach ($rows ?: [] as &$r) {
             $r['worker_id']    = (int)$r['worker_id'];
+            $r['qb_vendor_id'] = (int)$r['qb_vendor_id'];
+            $r['wpr_id']       = (int)$r['wpr_id'];
             $r['worker_name']  = (string)$r['worker_name'];
             $r['worker_company'] = (string)$r['worker_company'];
             $r['total_hours']  = (float)$r['total_hours'];
