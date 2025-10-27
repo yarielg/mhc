@@ -17,7 +17,7 @@ class Activate
 
     public static function get_db_version()
     {
-        return '1.4.5'; // increment on DB schema changes
+        return '1.4.6'; // increment on DB schema changes
     }
 
     public static function activate()
@@ -357,6 +357,13 @@ class Activate
             }
             if (!in_array('check_number', $cols_checks)) {
                 $wpdb->query("ALTER TABLE {$qchecks_table} ADD COLUMN check_number VARCHAR(100) NULL AFTER worker_patient_role_id");
+            }
+
+            //7. add payroll_print_date to wp_mhc_payrolls (v1.4.6)
+            $payrolls_table = $wpdb->prefix . 'mhc_payrolls';
+            $cols_payrolls = $wpdb->get_col("SHOW COLUMNS FROM {$payrolls_table}", 0);
+            if (!in_array('payroll_print_date', $cols_payrolls)) {
+                $wpdb->query("ALTER TABLE {$payrolls_table} ADD COLUMN payroll_print_date DATETIME NULL AFTER end_date");
             }
 
             update_option('mhc_db_version', $current_ver);

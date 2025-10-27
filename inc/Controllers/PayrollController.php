@@ -156,6 +156,7 @@ class PayrollController
         $payload = [
             'start_date' => isset($data['start_date']) ? self::sanitize_date($data['start_date']) : '',
             'end_date'   => isset($data['end_date'])   ? self::sanitize_date($data['end_date'])   : '',
+            'payroll_print_date' => isset($data['payroll_print_date']) ? self::sanitize_date($data['payroll_print_date']) : null,
             'status'     => isset($data['status']) ? sanitize_text_field($data['status']) : 'draft',
             'notes'      => isset($data['notes'])  ? sanitize_text_field($data['notes'])  : '',
         ];
@@ -284,6 +285,7 @@ class PayrollController
         $upd = [];
         if (isset($data['start_date'])) $upd['start_date'] = self::sanitize_date($data['start_date']);
         if (isset($data['end_date']))   $upd['end_date']   = self::sanitize_date($data['end_date']);
+        if (isset($data['payroll_print_date']))   $upd['payroll_print_date']   = self::sanitize_date($data['payroll_print_date']);
         if (isset($data['status']))     $upd['status']     = sanitize_text_field($data['status']);
         if (isset($data['notes']))      $upd['notes']      = sanitize_text_field($data['notes']);
 

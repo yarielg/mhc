@@ -53,6 +53,13 @@
           </template>
         </el-table-column>
 
+        <!--Payroll print date-->
+        <el-table-column label="Print Date" min-width="160">
+          <template #default="{ row }">
+            <span>{{ fmtDate(row.payroll_print_date) }}</span>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="notes" label="Notes" min-width="260" show-overflow-tooltip />
 
         <el-table-column label="Status" width="130">
@@ -147,6 +154,18 @@
           />
         </el-form-item>
 
+        <!--Payroll print date-->
+        <el-form-item label="Print date" prop="print_date">
+          <el-date-picker
+              v-model="modals.new.form.print_date"
+              type="date"
+              placeholder="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              format="YYYY-MM-DD"
+              style="width: 100%"
+          />
+        </el-form-item>
+
         <el-form-item label="Notes" prop="notes">
           <el-input
               v-model="modals.new.form.notes"
@@ -184,6 +203,19 @@
           :rules="editRules"
           label-width="110px"
       >
+
+        <!--Payroll print date-->
+        <el-form-item label="Print date" prop="print_date">
+          <el-date-picker
+              v-model="modals.edit.form.print_date"
+              type="date"
+              placeholder="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              format="YYYY-MM-DD"
+              style="width: 100%"
+          />
+        </el-form-item>
+
         <el-form-item label="Notes" prop="notes">
           <el-input
               v-model="modals.edit.form.notes"
@@ -289,6 +321,7 @@ const modals = reactive({
     form: {
       start_date: '',
       end_date: '',
+      print_date: '',
       notes: '',
     },
   },
@@ -296,6 +329,7 @@ const modals = reactive({
     visible: false,
     form: {
       id: null,
+      print_date: '',
       notes: '',
     },
   },
@@ -340,11 +374,13 @@ function openNewModal() {
   modals.new.form.start_date = ''
   modals.new.form.end_date = ''
   modals.new.form.notes = ''
+  modals.new.form.print_date = ''
   modals.new.visible = true
 }
 
 function openEdit(row) {
   modals.edit.form.id = row.id
+  modals.edit.form.print_date = row.payroll_print_date || ''
   modals.edit.form.notes = row.notes || ''
   modals.edit.visible = true
 }
@@ -359,6 +395,7 @@ async function submitEdit() {
   try {
     const payload = {
       id: modals.edit.form.id,
+      payroll_print_date: modals.edit.form.print_date || '',
       notes: modals.edit.form.notes?.trim() || '',
     }
     // Use form-data (asJson=false) so backend can read via $_REQUEST as well
@@ -387,6 +424,7 @@ async function submitNew() {
     const payload = {
       start_date: modals.new.form.start_date,
       end_date: modals.new.form.end_date,
+      payroll_print_date: modals.new.form.print_date,
       notes: modals.new.form.notes?.trim() || '',
     }
     // Overlap check before creating
@@ -424,6 +462,7 @@ async function submitNew() {
       id: data.id,
       start_date: payload.start_date,
       end_date: payload.end_date,
+      payroll_print_date: payload.payroll_print_date || now.toISOString().slice(0, 10),
       status: 'draft',
       notes: payload.notes,
       created_at: now.toISOString().slice(0, 19).replace('T', ' '),
