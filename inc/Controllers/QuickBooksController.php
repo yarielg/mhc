@@ -143,13 +143,17 @@ class QuickBooksController
     /**
      * 🔹 Lógica central reutilizable: crea un cheque en QuickBooks
      */
-    public function create_check_for_worker($worker_id, $wpr_id, $payroll_id, $total, $period_start, $period_end)
+    public function create_check_for_worker($worker_id, $wpr_id, $payroll_id, $total, $period_start, $period_end, $payroll_print_date = null)
     {
         global $wpdb;
 
         //get checking account and expense account from settings
         $checking_account_id = get_option('mhc_qb_checking_account_id');
         $expense_account_id = get_option('mhc_qb_expense_account_id');
+
+        if(is_null($payroll_print_date) || empty($payroll_print_date)){
+            $payroll_print_date = date('Y-m-d');
+        }
 
         $table_workers = $wpdb->prefix . 'mhc_workers';
         $worker = $wpdb->get_row($wpdb->prepare(
@@ -176,7 +180,7 @@ class QuickBooksController
                 "name"  => $worker->company
             ],
             "TotalAmt" => round($total, 2),
-            "TxnDate"  => date('Y-m-d'),
+            "TxnDate"  => $payroll_print_date,
             "PrintStatus" => "NeedToPrint",
             "PrivateNote" => "Payroll period {$date}",
             "Line" => [
@@ -243,12 +247,13 @@ class QuickBooksController
         $total        = floatval($_POST['total'] ?? 0);
         $period_start = sanitize_text_field($_POST['period_start'] ?? '');
         $period_end   = sanitize_text_field($_POST['period_end'] ?? '');
+        $payroll_print_date = sanitize_text_field($_POST['payroll_print_date'] ?? '');
 
         if (!$worker_id || !$total) {
             wp_send_json_error(['message' => 'Missing parameters'], 400);
         }
         
-        $result = $this->create_check_for_worker($worker_id, $wpr_id, $payroll_id, $total, $period_start, $period_end);
+        $result = $this->create_check_for_worker($worker_id, $wpr_id, $payroll_id, $total, $period_start, $period_end, $payroll_print_date);
 
         if (is_wp_error($result)) {
             wp_send_json_error(['message' => $result->get_error_message()]);
@@ -316,6 +321,7 @@ class QuickBooksController
         $payroll = \Mhc\Inc\Models\Payroll::findById($payrollId);
         $start = $payroll->start_date ?? date('Y-m-d');
         $end   = $payroll->end_date ?? date('Y-m-d');
+        $print_date = $payroll->payroll_print_date ?? date('Y-m-d');
 
         // === Instanciar el servicio QuickBooks ===
         $qb = new \Mhc\Inc\Services\QuickBooksService();
@@ -366,7 +372,7 @@ class QuickBooksController
                 continue;
             }else {
                 // No existe, procedemos a crear
-                $result = $controller->create_check_for_worker($worker->id, $wpr_id, $payrollId, $grand_total, $start, $end);
+                $result = $controller->create_check_for_worker($worker->id, $wpr_id, $payrollId, $grand_total, $start, $end, $print_date);
             }            
 
             if (is_wp_error($result)) {

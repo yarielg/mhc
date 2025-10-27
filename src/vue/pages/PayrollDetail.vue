@@ -747,6 +747,7 @@ async function createWorkerCheck(row) {
   const payrollId = id || props.id;
   const period_start = payroll.start_date || '';
   const period_end = payroll.end_date || '';
+  const payroll_print_date = payroll.payroll_print_date || '';
 
   try {
     creatingCheck[workerId] = true;
@@ -758,6 +759,7 @@ async function createWorkerCheck(row) {
       total: String(total),
       period_start,
       period_end,
+      payroll_print_date,
     });
 
     ElMessage.success(data?.message || 'Check created successfully');
@@ -939,6 +941,7 @@ const payroll = reactive({
   id,
   start_date: "",
   end_date: "",
+  payroll_print_date: "",
   status: "",
   notes: "",
 });
