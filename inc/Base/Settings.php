@@ -149,6 +149,14 @@ class Settings
             'mhc_quickbooks_vendors',
             [$this, 'render_vendors_page']
         );
+        add_submenu_page(
+            'mhc_main_menu',
+            __('Accounts from QuickBooks', 'mhc'),
+            __('Accounts', 'mhc'),
+            'manage_options',
+            'mhc_quickbooks_accounts',
+            [$this, 'render_accounts_page']
+        );
     }
 
     /**
@@ -514,6 +522,75 @@ class Settings
             $active = !empty($v['Active']) && $v['Active'] ? '✅' : '❌';
 
             echo "<tr><td>{$id}</td><td>{$name}</td><td>{$email}</td><td>{$active}</td></tr>";
+        }
+
+        echo '</tbody></table></div>';
+    }
+
+    public function render_accounts_page()
+    {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        echo '<div class="wrap"><h1>QuickBooks Accounts</h1>';
+
+        $qb = new \Mhc\Inc\Services\QuickBooksService();
+
+        $all_accounts = [];
+        $start = 1;
+        $max = 1000; // máximo permitido por QBO
+        $totalCount = null;
+
+        try {
+            do {
+                $query = sprintf('select Id, Name, AccountType, AccountSubType, Active from Account STARTPOSITION %d MAXRESULTS %d', $start, $max);
+                $endpoint = 'query?query=' . urlencode($query) . '&minorversion=75';
+                $response = $qb->request('GET', $endpoint);
+
+                if (is_wp_error($response)) {
+                    echo '<div class="notice notice-error"><p><strong>Error:</strong> ' . esc_html($response->get_error_message()) . '</p></div>';
+                    echo '</div>';
+                    return;
+                }
+
+                $accounts = $response['QueryResponse']['Account'] ?? [];
+                if (!empty($accounts) && is_array($accounts)) {
+                    $all_accounts = array_merge($all_accounts, $accounts);
+                }
+
+                if ($totalCount === null && isset($response['QueryResponse']['totalCount'])) {
+                    $totalCount = (int)$response['QueryResponse']['totalCount'];
+                }
+
+                $fetched = is_array($accounts) ? count($accounts) : 0;
+                $start += $max;
+
+                if ($totalCount !== null && count($all_accounts) >= $totalCount) break;
+            } while ($fetched === $max);
+        } catch (\Exception $e) {
+            echo '<div class="notice notice-error"><p><strong>Error:</strong> ' . esc_html($e->getMessage()) . '</p></div>';
+            echo '</div>';
+            return;
+        }
+
+        $accounts = $all_accounts;
+
+        if (empty($accounts)) {
+            echo '<p>No accounts found in QuickBooks.</p></div>';
+            return;
+        }
+
+        echo '<table class="widefat striped">';
+        echo '<thead><tr><th>ID</th><th>Name</th><th>Type</th><th>SubType</th><th>Active</th></tr></thead><tbody>';
+
+        foreach ($accounts as $a) {
+            $id       = esc_html($a['Id'] ?? '');
+            $name     = esc_html($a['Name'] ?? '');
+            $type     = esc_html($a['AccountType'] ?? '');
+            $subtype  = esc_html($a['AccountSubType'] ?? '');
+            $active   = !empty($a['Active']) && $a['Active'] ? '✅' : '❌';
+            echo "<tr><td>{$id}</td><td>{$name}</td><td>{$type}</td><td>{$subtype}</td><td>{$active}</td></tr>";
         }
 
         echo '</tbody></table></div>';
