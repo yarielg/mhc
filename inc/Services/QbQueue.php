@@ -50,16 +50,49 @@ class QbQueue
         dbDelta($sql);
         dbDelta($sql2);
 
-        // Ensure checks table has qb_vendor_id column and unique index for payroll+vendor
+        // Ensure checks table has qb_vendor_id column
         $cols_ctable = $wpdb->get_col("SHOW COLUMNS FROM {$ctable}", 0);
         if (!in_array('qb_vendor_id', $cols_ctable)) {
             $wpdb->query("ALTER TABLE {$ctable} ADD COLUMN qb_vendor_id VARCHAR(191) DEFAULT NULL AFTER worker_id");
         }
 
-        $indexes = $wpdb->get_results("SHOW INDEX FROM {$ctable} WHERE Key_name = 'uniq_payroll_vendor'");
-        if (empty($indexes)) {
-            // Add unique index to prevent multiple checks for same payroll+vendor
-            $wpdb->query("ALTER TABLE {$ctable} ADD UNIQUE KEY uniq_payroll_vendor (payroll_id, qb_vendor_id)");
+        // Ensure there is a UNIQUE index on (payroll_id, qb_vendor_id, worker_id).
+        $raw_indexes = $wpdb->get_results("SHOW INDEX FROM {$ctable}");
+        $indexes = [];
+        if (!empty($raw_indexes)) {
+            foreach ($raw_indexes as $idx) {
+                $indexes[$idx->Key_name][(int)$idx->Seq_in_index] = $idx->Column_name;
+            }
+            foreach ($indexes as $k => $cols) {
+                ksort($cols);
+                $indexes[$k] = array_values($cols);
+            }
+        }
+
+        $has_desired = false;
+        foreach ($indexes as $name => $cols) {
+            if ($cols === ['payroll_id', 'qb_vendor_id', 'worker_id']) {
+                $has_desired = true;
+                break;
+            }
+        }
+
+        if (!$has_desired) {
+            // Drop any index que sea exactamente (payroll_id, qb_vendor_id)
+            // o empiece con esas dos columnas
+            foreach ($indexes as $name => $cols) {
+                if ($name === 'PRIMARY') continue;
+                if (
+                    $cols === ['payroll_id', 'qb_vendor_id'] ||
+                    (count($cols) >= 2 && $cols[0] === 'payroll_id' && $cols[1] === 'qb_vendor_id')
+                ) {
+                    $wpdb->query("ALTER TABLE {$ctable} DROP INDEX `{$name}`");
+                }
+            }
+
+            // ✅ Create the unique index con nombre nuevo
+            $wpdb->query("ALTER TABLE {$ctable}
+        ADD UNIQUE KEY uniq_payroll_vendor_worker (payroll_id, qb_vendor_id, worker_id)");
         }
         // Ensure queue table has available_at column for scheduling retries
         $cols = $wpdb->get_col("SHOW COLUMNS FROM {$qtable}", 0);
@@ -116,7 +149,10 @@ class QbQueue
 
         $worker_ids = [];
         $workers = [];
-        foreach ($res1 as $w) { $worker_ids[$w->id] = true; $workers[$w->id] = $w; }
+        foreach ($res1 as $w) {
+            $worker_ids[$w->id] = true;
+            $workers[$w->id] = $w;
+        }
 
         // 2) workers with extras
         $res2 = $wpdb->get_results($wpdb->prepare("SELECT DISTINCT w.id
@@ -124,7 +160,12 @@ class QbQueue
             INNER JOIN {$pfx}mhc_workers w ON w.id = ep.worker_id
             WHERE ep.payroll_id = %d
         ", $payroll_id));
-        foreach ($res2 as $w) { if (!isset($worker_ids[$w->id])) { $worker_ids[$w->id] = true; $workers[$w->id] = $w; } }
+        foreach ($res2 as $w) {
+            if (!isset($worker_ids[$w->id])) {
+                $worker_ids[$w->id] = true;
+                $workers[$w->id] = $w;
+            }
+        }
 
         if (empty($workers)) return ['queued' => 0, 'skipped' => 0];
 
@@ -138,7 +179,10 @@ class QbQueue
             // compute totals per worker similar to ajax_all_checks_qb
             $hours = \Mhc\Inc\Models\HoursEntry::listDetailedForPayroll($payroll_id, ['worker_id' => $wid]);
             $extras = \Mhc\Inc\Models\ExtraPayment::listDetailedForPayroll($payroll_id, ['worker_id' => $wid]);
-            $ta = 0.0; $te = 0.0; foreach ($hours as $h) $ta += (float)$h->total; foreach ($extras as $e) $te += (float)$e->amount;
+            $ta = 0.0;
+            $te = 0.0;
+            foreach ($hours as $h) $ta += (float)$h->total;
+            foreach ($extras as $e) $te += (float)$e->amount;
             $grand_total = round($ta + $te, 2);
             if ($grand_total <= 0) continue;
             if (self::enqueueWorker($payroll_id, $wid, $grand_total, $start, $end)) $queued++;

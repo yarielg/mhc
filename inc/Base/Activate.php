@@ -17,7 +17,7 @@ class Activate
 
     public static function get_db_version()
     {
-        return '1.4.6'; // increment on DB schema changes
+        return '1.4.8'; // increment on DB schema changes
     }
 
     public static function activate()
@@ -294,7 +294,7 @@ class Activate
         if (!function_exists('wp_get_schedules') || !wp_get_schedules()) {
             // noop - but keep the normal flow
         }
-        add_filter('cron_schedules', function($schedules){
+        add_filter('cron_schedules', function ($schedules) {
             if (!isset($schedules['five_minutes'])) {
                 $schedules['five_minutes'] = ['interval' => 300, 'display' => 'Every Five Minutes'];
             }
@@ -365,6 +365,58 @@ class Activate
             if (!in_array('payroll_print_date', $cols_payrolls)) {
                 $wpdb->query("ALTER TABLE {$payrolls_table} ADD COLUMN payroll_print_date DATETIME NULL AFTER end_date");
             }
+
+            // 8. fix índice único en mhc_qb_checks para permitir varios workers por payroll+vendor (v1.4.8)
+           
+
+            // Asegura columnas requeridas (si ya existen, no pasa nada)
+            $cols_qc = $wpdb->get_col("SHOW COLUMNS FROM {$qchecks_table}", 0);
+            if (!in_array('worker_id', $cols_qc)) {
+                $wpdb->query("ALTER TABLE {$qchecks_table} ADD COLUMN worker_id BIGINT UNSIGNED NULL AFTER payroll_id");
+            }
+            if (!in_array('qb_vendor_id', $cols_qc)) {
+                $wpdb->query("ALTER TABLE {$qchecks_table} ADD COLUMN qb_vendor_id VARCHAR(191) NULL AFTER worker_id");
+            }
+
+            // Normaliza NULLs antes de modificar
+            $wpdb->query("UPDATE {$qchecks_table} SET qb_vendor_id = '' WHERE qb_vendor_id IS NULL");
+            $wpdb->query("UPDATE {$qchecks_table} SET worker_id = 0 WHERE worker_id IS NULL");
+
+            $wpdb->query("ALTER TABLE {$qchecks_table} MODIFY qb_vendor_id VARCHAR(191) NOT NULL");
+            $wpdb->query("ALTER TABLE {$qchecks_table} MODIFY worker_id BIGINT UNSIGNED NOT NULL");
+
+            // === LIMPIEZA DE ÍNDICES VIEJOS ===
+            $raw_indexes = $wpdb->get_results("SHOW INDEX FROM {$qchecks_table}");
+            if (!empty($raw_indexes)) {
+                $indexes = [];
+                foreach ($raw_indexes as $idx) {
+                    $indexes[$idx->Key_name][(int)$idx->Seq_in_index] = $idx->Column_name;
+                }
+                foreach ($indexes as $name => $cols) {
+                    ksort($cols);
+                    $cols = array_values($cols);
+                    // Si es exactamente (payroll_id,qb_vendor_id) o empieza con esos dos, lo borramos
+                    if ($name !== 'PRIMARY' && (implode(',', $cols) === 'payroll_id,qb_vendor_id' ||
+                        (count($cols) >= 2 && $cols[0] === 'payroll_id' && $cols[1] === 'qb_vendor_id'))) {
+                        $wpdb->query("ALTER TABLE {$qchecks_table} DROP INDEX `{$name}`");
+                    }
+                }
+            }
+
+            // === CREA EL NUEVO ÍNDICE ÚNICO CORRECTO ===
+            $exists = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(1)
+            FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = %s
+            AND INDEX_NAME = 'uniq_payroll_vendor_worker'
+        ", $qchecks_table));
+            if (!$exists) {
+                $wpdb->query("ALTER TABLE {$qchecks_table}
+                ADD UNIQUE KEY uniq_payroll_vendor_worker (payroll_id, qb_vendor_id, worker_id)");
+            }
+
+
 
             update_option('mhc_db_version', $current_ver);
         }
