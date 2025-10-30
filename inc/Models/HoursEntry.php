@@ -407,7 +407,7 @@ class HoursEntry
          JOIN {$pt} p ON p.id = wpr.patient_id
          JOIN {$rl} r ON r.id = wpr.role_id
          JOIN {$seg} seg ON seg.id = he.segment_id
-         LEFT JOIN {$qc} qc ON qc.worker_patient_role_id = wpr.id AND qc.payroll_id = seg.payroll_id
+         LEFT JOIN {$qc} qc ON qc.qb_vendor_id = w.qb_vendor_id AND qc.payroll_id = seg.payroll_id AND qc.worker_id=w.id
          WHERE " . implode(' AND ', $where) . "
          ORDER BY seg.segment_start ASC, seg.segment_end ASC, he.id DESC
      ";

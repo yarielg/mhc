@@ -176,7 +176,7 @@ class QuickBooksController
 
         // Acquire lock (timeout 5s). Use vendor-based lock when available and vendor id present.
         if ($has_vendor_col && $vendor_id !== '') {
-            $lock_name = 'mhc_qb_create_check_vendor_' . md5($payroll_id . '_' . $vendor_id);
+            $lock_name = 'mhc_qb_create_check_vendor_' . md5($payroll_id . '_' . $vendor_id.''.$worker_id);
         } else {
             $lock_name = 'mhc_qb_create_check_' . intval($payroll_id) . '_' . intval($worker_id);
         }
@@ -192,9 +192,9 @@ class QuickBooksController
             $exists = false;
             if ($has_vendor_col && $vendor_id !== '') {
                 $exists = (bool) $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$checks_table} WHERE payroll_id = %d AND qb_vendor_id = %s",
-                    $payroll_id,
-                    $vendor_id
+                    "SELECT COUNT(*) FROM {$checks_table}
+                    WHERE payroll_id = %d AND qb_vendor_id = %s AND worker_id = %d",
+                    $payroll_id, $vendor_id, $worker_id
                 ));
             } else {
                 //if not have vendor then return error because we cannot sent to QB without vendor
@@ -600,6 +600,8 @@ class QuickBooksController
 
             $response = $qb->request('GET', $endpoint);
             if (is_wp_error($response)) {
+                //log error
+                \Mhc\Inc\Services\QbLogger::error('qb_request_failed_sync_checks', ['payroll_id' => $payroll_id, 'error' => $response->get_error_message()]);
                 wp_send_json_error(['message' => $response->get_error_message()]);
             }
 
