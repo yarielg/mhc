@@ -466,7 +466,7 @@ class HoursEntry
              JOIN {$wpr} wpr ON wpr.id = he.worker_patient_role_id
              JOIN {$wk} w   ON w.id = wpr.worker_id
              JOIN {$seg} seg ON seg.id = he.segment_id
-             LEFT JOIN {$check} qc ON qc.worker_patient_role_id = wpr.id AND qc.payroll_id = seg.payroll_id
+             LEFT JOIN {$check} qc ON qc.qb_vendor_id = wpr.qb_vendor_id AND qc.payroll_id = seg.payroll_id and qc.worker_id=w.id
              WHERE seg.payroll_id=%d
              GROUP BY wpr.worker_id, worker_name
              ORDER BY worker_name ASC",
