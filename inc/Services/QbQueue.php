@@ -37,6 +37,7 @@ class QbQueue
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             payroll_id BIGINT UNSIGNED NOT NULL,
             worker_id BIGINT UNSIGNED NOT NULL,
+            qb_vendor_id VARCHAR(191) DEFAULT NULL,
             qb_check_id VARCHAR(191) NOT NULL,
             amount DECIMAL(12,2) NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -49,6 +50,17 @@ class QbQueue
         dbDelta($sql);
         dbDelta($sql2);
 
+        // Ensure checks table has qb_vendor_id column and unique index for payroll+vendor
+        $cols_ctable = $wpdb->get_col("SHOW COLUMNS FROM {$ctable}", 0);
+        if (!in_array('qb_vendor_id', $cols_ctable)) {
+            $wpdb->query("ALTER TABLE {$ctable} ADD COLUMN qb_vendor_id VARCHAR(191) DEFAULT NULL AFTER worker_id");
+        }
+
+        $indexes = $wpdb->get_results("SHOW INDEX FROM {$ctable} WHERE Key_name = 'uniq_payroll_vendor'");
+        if (empty($indexes)) {
+            // Add unique index to prevent multiple checks for same payroll+vendor
+            $wpdb->query("ALTER TABLE {$ctable} ADD UNIQUE KEY uniq_payroll_vendor (payroll_id, qb_vendor_id)");
+        }
         // Ensure queue table has available_at column for scheduling retries
         $cols = $wpdb->get_col("SHOW COLUMNS FROM {$qtable}", 0);
         if (!in_array('available_at', $cols)) {

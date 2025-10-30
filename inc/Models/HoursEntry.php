@@ -457,7 +457,7 @@ class HoursEntry
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT wpr.worker_id,
                     CONCAT(w.first_name,' ',w.last_name) AS worker_name, w.company AS worker_company,
-                    qb_vendor_id AS qb_vendor_id,
+                    w.qb_vendor_id AS qb_vendor_id,
                     wpr.id AS wpr_id,
                     COALESCE(SUM(he.hours),0) AS total_hours,
                     COALESCE(SUM(he.total),0) AS total_amount,

@@ -34,7 +34,6 @@ class QuickBooksController
 
         add_action('wp_ajax_mhc_qb_sync_check_numbers', [__CLASS__, 'ajax_sync_check_numbers']);
         add_action('wp_ajax_mhc_qb_delete_check', [$this, 'ajax_delete_check_for_worker']);
-
     }
 
     /**
@@ -71,8 +70,8 @@ class QuickBooksController
 
         // Remove local record(s)
         $deleted = $wpdb->delete("{$pfx}mhc_qb_checks", ['qb_check_id' => $qb_check_id]);
-        
-        if ($deleted !== false) {                      
+
+        if ($deleted !== false) {
             wp_send_json_success(['message' => 'Check removed locally', 'deleted' => (int)$deleted]);
         }
 
@@ -151,7 +150,7 @@ class QuickBooksController
         $checking_account_id = get_option('mhc_qb_checking_account_id');
         $expense_account_id = get_option('mhc_qb_expense_account_id');
 
-        if(is_null($payroll_print_date) || empty($payroll_print_date)){
+        if (is_null($payroll_print_date) || empty($payroll_print_date)) {
             $payroll_print_date = date('Y-m-d');
         }
 
@@ -167,67 +166,139 @@ class QuickBooksController
 
         $date = self::format_week_range($period_start, $period_end);
         $qb = new \Mhc\Inc\Services\QuickBooksService();
+        // To avoid creating duplicate checks in QuickBooks when multiple concurrent
+        // requests run, decide whether to perform vendor-based deduplication (if
+        // the local table contains a qb_vendor_id column). We'll acquire an
+        // advisory lock per payroll+vendor (preferred) or payroll+worker.
+        $checks_table = $wpdb->prefix . 'mhc_qb_checks';
+        $has_vendor_col = !empty($wpdb->get_results("SHOW COLUMNS FROM {$checks_table} LIKE 'qb_vendor_id'"));
+        $vendor_id = isset($worker->qb_vendor_id) ? trim((string)$worker->qb_vendor_id) : '';
 
-        $body = [
-            "PaymentType" => "Check",
-            "AccountRef" => [
-                "value" => $checking_account_id, // Checking account ID (ajusta según tu QuickBooks)
-                "name" => "Checking Account"
-            ],
-            "EntityRef" => [
-                "type"  => "Vendor",
-                "value" => $worker->qb_vendor_id,
-                "name"  => $worker->company
-            ],
-            "TotalAmt" => round($total, 2),
-            "TxnDate"  => $payroll_print_date,
-            "PrintStatus" => "NeedToPrint",
-            "PrivateNote" => "Payroll period {$date}",
-            "Line" => [
-                [
-                    "Amount" => round($total, 2),
-                    "DetailType" => "AccountBasedExpenseLineDetail",
-                    "AccountBasedExpenseLineDetail" => [
-                        "AccountRef" => [
-                            "value" => $expense_account_id, // Expense account ID (ajusta según tu QuickBooks)
-                            "name" => "Contractor Payments"
-                        ]
-                    ],
-                    "Description" => "Payroll period {$date}"
+        // Acquire lock (timeout 5s). Use vendor-based lock when available and vendor id present.
+        if ($has_vendor_col && $vendor_id !== '') {
+            $lock_name = 'mhc_qb_create_check_vendor_' . md5($payroll_id . '_' . $vendor_id);
+        } else {
+            $lock_name = 'mhc_qb_create_check_' . intval($payroll_id) . '_' . intval($worker_id);
+        }
+        $got_lock = $wpdb->get_var($wpdb->prepare("SELECT GET_LOCK(%s, %d)", $lock_name, 5));
+        if (!$got_lock) {
+            \Mhc\Inc\Services\QbLogger::error('lock_failed_acquire', ['payroll_id' => $payroll_id, 'worker_id' => $worker_id, 'wpr_id' => $wpr_id, 'vendor_id' => $vendor_id, 'lock' => $lock_name]);
+            return new \WP_Error('lock_failed', 'Could not acquire lock to create check. Try again shortly.');
+        }
+
+        try {
+            // Re-check local existence. If vendor-based dedupe is available and vendor id is present,
+            // check by payroll+vendor. Otherwise fall back to worker/wpr checks (including amount where used).
+            $exists = false;
+            if ($has_vendor_col && $vendor_id !== '') {
+                $exists = (bool) $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$checks_table} WHERE payroll_id = %d AND qb_vendor_id = %s",
+                    $payroll_id,
+                    $vendor_id
+                ));
+            } else {
+                //if not have vendor then return error because we cannot sent to QB without vendor
+                \Mhc\Inc\Services\QbLogger::error('no_vendor', ['payroll_id' => $payroll_id, 'worker_id' => $worker_id, 'wpr_id' => $wpr_id]);
+                return new \WP_Error('no_vendor', "Worker {$worker_id} is not linked to a QuickBooks Vendor.");
+            }
+
+            if ($exists) {
+                \Mhc\Inc\Services\QbLogger::info('exists_local', ['payroll_id' => $payroll_id, 'worker_id' => $worker_id, 'wpr_id' => $wpr_id, 'vendor_id' => $vendor_id]);
+                return new \WP_Error('exists', 'A check for this payroll/worker/vendor already exists locally.');
+            }
+
+            $body = [
+                "PaymentType" => "Check",
+                "AccountRef" => [
+                    "value" => $checking_account_id, // Checking account ID (ajusta según tu QuickBooks)
+                    "name" => "Checking Account"
+                ],
+                "EntityRef" => [
+                    "type"  => "Vendor",
+                    "value" => $worker->qb_vendor_id,
+                    "name"  => $worker->company
+                ],
+                "TotalAmt" => round($total, 2),
+                "TxnDate"  => $payroll_print_date,
+                "PrintStatus" => "NeedToPrint",
+                "PrivateNote" => "Payroll period {$date}",
+                "Line" => [
+                    [
+                        "Amount" => round($total, 2),
+                        "DetailType" => "AccountBasedExpenseLineDetail",
+                        "AccountBasedExpenseLineDetail" => [
+                            "AccountRef" => [
+                                "value" => $expense_account_id, // Expense account ID (ajusta según tu QuickBooks)
+                                "name" => "Contractor Payments"
+                            ]
+                        ],
+                        "Description" => "Payroll period {$date}"
+                    ]
                 ]
-            ]
-        ];
-        
-        $response = $qb->request('POST', 'purchase?minorversion=75', $body);       
+            ];
 
-        if (is_wp_error($response)) {
-            return $response;
-        }
+            $response = $qb->request('POST', 'purchase?minorversion=75', $body);
 
-        if (empty($response['Purchase']['Id'])) {
-            return new \WP_Error('creation_failed', 'QuickBooks did not return a valid Check ID.');
-        }
+            if (is_wp_error($response)) {
+                // Log remote creation error
+                \Mhc\Inc\Services\QbLogger::error('qb_request_failed', ['payroll_id' => $payroll_id, 'worker_id' => $worker_id, 'vendor_id' => $vendor_id, 'error' => $response->get_error_message()]);
+                // release lock before returning
+                $wpdb->get_var($wpdb->prepare("SELECT RELEASE_LOCK(%s)", $lock_name));
+                return $response;
+            }
 
-        $check_id = $response['Purchase']['Id'];
+            if (empty($response['Purchase']['Id'])) {
+                \Mhc\Inc\Services\QbLogger::error('qb_no_id', ['payroll_id' => $payroll_id, 'worker_id' => $worker_id, 'vendor_id' => $vendor_id, 'response' => $response]);
+                // release lock before returning
+                $wpdb->get_var($wpdb->prepare("SELECT RELEASE_LOCK(%s)", $lock_name));
+                return new \WP_Error('creation_failed', 'QuickBooks did not return a valid Check ID.');
+            }
 
-        // Guardar opcionalmente el último cheque en BD
-        $wpdb->insert(
-            "{$wpdb->prefix}mhc_qb_checks",
-            [
+            $check_id = $response['Purchase']['Id'];
+
+            // Guardar opcionalmente el último cheque en BD
+            $row = [
                 'payroll_id' => $payroll_id,
                 'worker_id'  => $worker_id,
                 'worker_patient_role_id' => $wpr_id,
                 'qb_check_id' => $check_id,
                 'amount' => $total,
-            ]
-        );
+            ];
 
+            if (!empty($has_vendor_col) && $vendor_id !== '') {
+                $row['qb_vendor_id'] = $vendor_id;
+            }
 
-        return [
-            'check_id' => $check_id,
-            'vendor_name' => $worker->company,
-            'total' => $total
-        ];
+            $inserted = $wpdb->insert("{$wpdb->prefix}mhc_qb_checks", $row);
+
+            if ($inserted === false) {
+                // The remote check was created but we failed to persist locally. That's
+                // a bad state; return an informative error. We intentionally do not
+                // attempt to delete the remote check here to avoid accidental data loss.
+                \Mhc\Inc\Services\QbLogger::error('db_insert_failed', ['payroll_id' => $payroll_id, 'worker_id' => $worker_id, 'wpr_id' => $wpr_id, 'vendor_id' => $vendor_id, 'qb_check_id' => $check_id, 'amount' => $total]);
+                return new \WP_Error('db_insert_failed', 'Check created in QuickBooks but failed to record locally.');
+            }
+
+            // Successful creation: log and return
+            \Mhc\Inc\Services\QbLogger::logCheckCreated([
+                'payroll_id' => $payroll_id,
+                'worker_id' => $worker_id,
+                'wpr_id' => $wpr_id,
+                'vendor_id' => $vendor_id,
+                'qb_check_id' => $check_id,
+                'amount' => $total,
+                'lock' => $lock_name,
+            ]);
+
+            return [
+                'check_id' => $check_id,
+                'vendor_name' => $worker->company,
+                'total' => $total
+            ];
+        } finally {
+            // Always release the lock
+            $wpdb->get_var($wpdb->prepare("SELECT RELEASE_LOCK(%s)", $lock_name));
+        }
     }
 
     /**
@@ -252,7 +323,7 @@ class QuickBooksController
         if (!$worker_id || !$total) {
             wp_send_json_error(['message' => 'Missing parameters'], 400);
         }
-        
+
         $result = $this->create_check_for_worker($worker_id, $wpr_id, $payroll_id, $total, $period_start, $period_end, $payroll_print_date);
 
         if (is_wp_error($result)) {
@@ -283,14 +354,15 @@ class QuickBooksController
 
         // 1️⃣ Workers con horas
         $res1 = $wpdb->get_results(
-            $wpdb->prepare("
-            SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name, wpr.id AS worker_patient_role_id
+            $wpdb->prepare(
+                "SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name, wpr.id AS worker_patient_role_id, w.qb_vendor_id AS qb_vendor_id
             FROM {$wpdb->prefix}mhc_hours_entries he
             INNER JOIN {$wpdb->prefix}mhc_worker_patient_roles wpr ON wpr.id = he.worker_patient_role_id
             INNER JOIN {$wpdb->prefix}mhc_workers w ON w.id = wpr.worker_id
             INNER JOIN {$wpdb->prefix}mhc_payroll_segments seg ON seg.id = he.segment_id
-            WHERE seg.payroll_id = %d
-        ", $payrollId)
+            WHERE seg.payroll_id = %d",
+                $payrollId
+            )
         );
         foreach ($res1 as $w) {
             $workers[] = $w;
@@ -299,12 +371,13 @@ class QuickBooksController
 
         // 2️⃣ Workers con extras
         $res2 = $wpdb->get_results(
-            $wpdb->prepare("
-            SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name
+            $wpdb->prepare(
+                "SELECT DISTINCT w.id, CONCAT(w.first_name, ' ', w.last_name) AS worker_name, w.qb_vendor_id AS qb_vendor_id
             FROM {$wpdb->prefix}mhc_extra_payments ep
             INNER JOIN {$wpdb->prefix}mhc_workers w ON w.id = ep.worker_id
-            WHERE ep.payroll_id = %d
-        ", $payrollId)
+            WHERE ep.payroll_id = %d",
+                $payrollId
+            )
         );
         foreach ($res2 as $w) {
             if (!isset($worker_ids[$w->id])) {
@@ -322,6 +395,12 @@ class QuickBooksController
         $start = $payroll->start_date ?? date('Y-m-d');
         $end   = $payroll->end_date ?? date('Y-m-d');
         $print_date = $payroll->payroll_print_date ?? date('Y-m-d');
+
+        // Check whether local checks table contains a qb_vendor_id column. If so,
+        // we'll use vendor-based deduplication and locking to avoid multiple
+        // checks for the same QuickBooks vendor for a payroll.
+        $checks_table = $wpdb->prefix . 'mhc_qb_checks';
+        $has_vendor_col = !empty($wpdb->get_results("SHOW COLUMNS FROM {$checks_table} LIKE 'qb_vendor_id'"));
 
         // === Instanciar el servicio QuickBooks ===
         $qb = new \Mhc\Inc\Services\QuickBooksService();
@@ -342,27 +421,24 @@ class QuickBooksController
 
             $grand_total = round($ta + $te, 2);
             if ($grand_total <= 0) continue; // omitimos si no tiene pago
-            $wpr_id=isset($worker->worker_patient_role_id) ? $worker->worker_patient_role_id : 0;
+            $wpr_id = isset($worker->worker_patient_role_id) ? $worker->worker_patient_role_id : 0;
+            $worker_qb_vendor = isset($worker->qb_vendor_id) ? trim((string)$worker->qb_vendor_id) : '';
 
-
-            // Verificar si ya existe un cheque para este worker y payroll
-            if($wpr_id==0){
+            // Verificar si ya existe un cheque para este worker/payroll o por vendor (si la columna existe)
+            if ($has_vendor_col && $worker_qb_vendor !== '') {
+                // Prefer vendor-based dedupe to avoid multiple checks for same vendor
                 $existing_check = $wpdb->get_row(
                     $wpdb->prepare(
-                        "SELECT * FROM {$wpdb->prefix}mhc_qb_checks WHERE worker_id = %d AND payroll_id = %d",
-                        $worker->id,
-                        $payrollId
+                        "SELECT * FROM {$checks_table} WHERE payroll_id = %d AND qb_vendor_id = %s",
+                        $payrollId,
+                        $worker_qb_vendor
                     )
                 );
             } else {
-                $existing_check = $wpdb->get_row(
-                    $wpdb->prepare(
-                        "SELECT * FROM {$wpdb->prefix}mhc_qb_checks WHERE worker_patient_role_id = %d AND payroll_id = %d",
-                        $wpr_id,
-                        $payrollId
-                    )
-                );
-            }           
+                // We no longer perform worker-based deduplication when qb_vendor_id
+                // deduplication is enabled — the caller will validate by vendor_id.
+                $existing_check = null;
+            }
             // Crear cheque
             if ($existing_check) {
                 $errors[] = [
@@ -370,10 +446,10 @@ class QuickBooksController
                     'error' => 'Check already exists for this worker and payroll.'
                 ];
                 continue;
-            }else {
+            } else {
                 // No existe, procedemos a crear
                 $result = $controller->create_check_for_worker($worker->id, $wpr_id, $payrollId, $grand_total, $start, $end, $print_date);
-            }            
+            }
 
             if (is_wp_error($result)) {
                 $errors[] = [
@@ -410,7 +486,7 @@ class QuickBooksController
         $res = \Mhc\Inc\Services\QbQueue::enqueuePayroll($payroll_id);
         wp_send_json_success($res);
     }
-    
+
     /**
      * AJAX: process queue (limited number)
      * POST: limit (optional)
