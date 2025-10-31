@@ -17,7 +17,7 @@ class Activate
 
     public static function get_db_version()
     {
-        return '1.4.8'; // increment on DB schema changes
+        return '1.4.10'; // increment on DB schema changes
     }
 
     public static function activate()
@@ -316,6 +316,7 @@ class Activate
 
         if ($installed_ver !== $current_ver) {
             $pfx = $wpdb->prefix;
+            $charset_collate = $wpdb->get_charset_collate();
             // Agregar columnas solo si no existen
             // 1. Extra payments: hours y hours_rate
             $columns = $wpdb->get_col("SHOW COLUMNS FROM {$pfx}mhc_extra_payments", 0);
@@ -416,8 +417,39 @@ class Activate
                 ADD UNIQUE KEY uniq_payroll_vendor_worker (payroll_id, qb_vendor_id, worker_id)");
             }
 
+                // create insurers table if not exists (v1.4.10) with unique index on (name)
+                $insurers_table = $wpdb->prefix . 'mhc_insurers';
+                $table_exists = $wpdb->get_var($wpdb->prepare("
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = %s
+            ", $insurers_table));
+                if (!$table_exists) {
+                    $wpdb->query("CREATE TABLE {$insurers_table} (
+                        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                        name VARCHAR(191) NOT NULL,
+                        is_active TINYINT(1) NOT NULL DEFAULT 1,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                        PRIMARY KEY  (id),
+                        UNIQUE KEY uniq_name (name),
+                        KEY idx_active (is_active)
+                    ) {$charset_collate};");
+                }
+                // Add insurer_id and insurer_number to mhc_patients if not exists
+                $columns_patients = $wpdb->get_col("SHOW COLUMNS FROM {$pfx}mhc_patients", 0);
+                if (!in_array('insurer_id', $columns_patients)) {
+                    $wpdb->query("ALTER TABLE {$pfx}mhc_patients ADD COLUMN insurer_id BIGINT UNSIGNED NULL AFTER record_number");
+                    // refresh columns list after making schema change
+                    $columns_patients = $wpdb->get_col("SHOW COLUMNS FROM {$pfx}mhc_patients", 0);
+                }
+                // add insurer_number to mhc_patients
+                if (!in_array('insurer_number', $columns_patients)) {
+                    $wpdb->query("ALTER TABLE {$pfx}mhc_patients ADD COLUMN insurer_number VARCHAR(100) NULL AFTER insurer_id");
+                }
 
-
+            // Finally, update the stored DB version
             update_option('mhc_db_version', $current_ver);
         }
     }

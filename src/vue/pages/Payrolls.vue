@@ -10,7 +10,7 @@
             size="small"
             clearable
             @clear="fetchList()"
-            @keyup.enter.native="fetchList()"
+        @keyup.enter="fetchList()"
             style="width: 220px"
         />
         <el-select

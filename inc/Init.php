@@ -22,6 +22,7 @@ final class Init{
             Controllers\SeedController::class,
             Controllers\ReportsController::class,
             Controllers\QuickBooksController::class,
+            Controllers\InsurersController::class,
             //Base\Ajax::class,
         ];
     }

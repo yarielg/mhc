@@ -69,6 +69,7 @@
               </template>
               <el-menu-item index="/settings">Settings</el-menu-item>
               <el-menu-item index="/roles">Roles</el-menu-item>
+              <el-menu-item index="/insurers">Insurers</el-menu-item>
               <el-menu-item index="/special-rates">Special Rates</el-menu-item>
             </el-sub-menu>
           </el-menu>

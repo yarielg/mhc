@@ -17,6 +17,7 @@ const routes = [
     { path: '/patients', component: Patients, meta: { title: 'Patients' } },
     { path: '/payrolls', component: Payrolls, meta: { title: 'Payrolls' } },
     { path: '/roles', component: Roles, meta: { title: 'Roles' } },
+    {path: '/insurers', component: () => import('./pages/Insurers.vue'), meta: { title: 'Insurers' } },
     { path: '/special-rates', component: SpecialRates, meta: { title: 'Special Rates' } },
     { path: '/settings', component: Settings, meta: { title: 'Settings' } },
     { path: '/reports', component: Reports, meta: { title: 'Reports' } },

@@ -12,7 +12,7 @@
         <el-col :span="8">
           <div class="mb-3">
             <el-input v-model="state.search" placeholder="Search by name/code..." clearable @clear="fetchData(1)"
-              @keyup.enter.native="fetchData(1)">
+              @keyup.enter="fetchData(1)">
               <template #append>
                 <el-button @click="fetchData(1)">Search</el-button>
               </template>

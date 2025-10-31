@@ -1,18 +1,18 @@
 <template>
   <div class="wp-wrap">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-semibold">Special Rates</h2>
+      <h2 class="text-xl font-semibold">Insurers</h2>
     </div>
 
     <div class="mb-20">
       <el-row :gutter="20">
         <el-col :span="16">
-          <el-button type="primary" @click="openCreate">Add Special Rate</el-button>
+          <el-button type="primary" @click="openCreate">Add Insurer</el-button>
         </el-col>
         <el-col :span="8">
           <div class="mb-3">
-              <el-input v-model="state.search" placeholder="Search by code, label, or CPT code..." clearable
-                @clear="fetchData(1)" @keyup.enter="fetchData(1)">
+            <el-input v-model="state.search" placeholder="Search by name..." clearable @clear="fetchData(1)"
+              @keyup.enter="fetchData(1)">
               <template #append>
                 <el-button @click="fetchData(1)">Search</el-button>
               </template>
@@ -23,12 +23,9 @@
     </div>
 
     <el-table :data="state.items" v-loading="state.loading" border style="width:100%" size="small"
-      empty-text="No special rates found">
+      empty-text="No insurers found">
       <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="code" label="Code" width="120" />
-      <el-table-column prop="label" label="Label" width="180" />
-      <el-table-column prop="cpt_code" label="CPT Code" width="120" />
-      <el-table-column prop="unit_rate" label="Unit Rate" width="120" />
+      <el-table-column prop="name" label="Name" />
       <el-table-column prop="is_active" label="Active" width="110">
         <template #default="{ row }">
           <el-tag :type="String(row.is_active) === '1' ? 'success' : 'info'">
@@ -48,21 +45,12 @@
         :page-size="state.per_page" :current-page="state.page" @current-change="fetchData" />
     </div>
 
-    <!-- Dialog: Add/Edit Special Rate -->
-    <el-dialog :title="state.editing ? 'Edit Special Rate' : 'Add Special Rate'" v-model="state.showDialog"
-      width="700px" :close-on-click-modal="false">
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="140px">
-        <el-form-item label="Code" prop="code">
-          <el-input v-model="form.code" />
-        </el-form-item>
-        <el-form-item label="Label" prop="label">
-          <el-input v-model="form.label" />
-        </el-form-item>
-        <el-form-item label="CPT Code" prop="cpt_code">
-          <el-input v-model="form.cpt_code" />
-        </el-form-item>
-        <el-form-item label="Unit Rate" prop="unit_rate">
-          <el-input-number v-model="form.unit_rate" :min="0" :step="0.5" :precision="2" style="width:100%;" />
+    <!-- Dialog: Add/Edit Insurer -->
+    <el-dialog :title="state.editing ? 'Edit Insurer' : 'Add Insurer'" v-model="state.showDialog" width="600px"
+      :close-on-click-modal="false">
+      <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
+        <el-form-item label="Name" prop="name">
+          <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item label="Is Active?">
           <el-select v-model="form.is_active">
@@ -99,24 +87,16 @@ const state = reactive({
 
 const formRef = ref(null)
 const form = reactive({
-  code: '',
-  label: '',
-  cpt_code: '',
-  unit_rate: null,
+  name: '',
   is_active: '1',
 })
 
 const rules = {
-  code: [{ required: true, message: 'Code is required', trigger: 'blur' }],
-  label: [{ required: true, message: 'Label is required', trigger: 'blur' }],
-  unit_rate: [{ required: true, message: 'Unit Rate is required', trigger: 'blur' }],
+  name: [{ required: true, message: 'Name is required', trigger: 'blur' }],
 }
 
 function resetForm() {
-  form.code = ''
-  form.label = ''
-  form.cpt_code = ''
-  form.unit_rate = null
+  form.name = ''
   form.is_active = '1'
   state.currentId = null
   state.editing = false
@@ -130,10 +110,7 @@ function openCreate() {
 function openEdit(row) {
   state.editing = true
   state.currentId = row.id
-  form.code = row.code || ''
-  form.label = row.label || ''
-  form.cpt_code = row.cpt_code || ''
-  form.unit_rate = row.unit_rate != null ? Number(row.unit_rate) : null
+  form.name = row.name || ''
   form.is_active = String(row.is_active ?? '1')
   state.showDialog = true
 }
@@ -143,7 +120,7 @@ async function fetchData(page = state.page) {
     state.loading = true
     state.page = page
     const fd = new FormData()
-    fd.append('action', 'mhc_special_rates_list')
+    fd.append('action', 'mhc_insurers_list')
     fd.append('nonce', parameters.nonce)
     fd.append('page', state.page)
     fd.append('per_page', state.per_page)
@@ -155,12 +132,11 @@ async function fetchData(page = state.page) {
     state.total = Number(data.data.total || 0)
   } catch (e) {
     console.error(e)
-    ElMessage.error(e.message || 'Error loading special rates')
+    ElMessage.error(e.message || 'Error loading insurers')
   } finally {
     state.loading = false
   }
 }
-
 
 async function submit() {
   try {
@@ -175,16 +151,13 @@ async function submit() {
     fd.append('nonce', parameters.nonce)
 
     if (state.editing) {
-      fd.append('action', 'mhc_special_rates_update')
+      fd.append('action', 'mhc_insurers_update')
       fd.append('id', state.currentId)
     } else {
-      fd.append('action', 'mhc_special_rates_create')
+      fd.append('action', 'mhc_insurers_create')
     }
 
-    fd.append('code', form.code)
-    fd.append('label', form.label)
-    fd.append('cpt_code', form.cpt_code)
-    fd.append('unit_rate', form.unit_rate)
+    fd.append('name', form.name)
     fd.append('is_active', form.is_active)
 
     const { data } = await axios.post(parameters.ajax_url, fd)
@@ -212,7 +185,7 @@ async function submit() {
 async function remove(row) {
   try {
     const fd = new FormData()
-    fd.append('action', 'mhc_special_rates_delete')
+    fd.append('action', 'mhc_insurers_delete')
     fd.append('nonce', parameters.nonce)
     fd.append('id', row.id)
 
@@ -245,4 +218,5 @@ onMounted(() => {
 h2 {
   color: var(--el-text-color-primary);
 }
+
 </style>
