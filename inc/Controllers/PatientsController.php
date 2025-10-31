@@ -55,6 +55,8 @@ class PatientsController{
             'first_name' => sanitize_text_field(wp_unslash($_POST['first_name'] ?? '')),
             'last_name'  => sanitize_text_field(wp_unslash($_POST['last_name'] ?? '')),
             'record_number' => sanitize_text_field(wp_unslash($_POST['record_number'] ?? '')),
+            'insurer_id' => intval($_POST['insurer_id'] ?? 0),
+            'insurer_number' => sanitize_text_field(wp_unslash($_POST['insurer_number'] ?? '')),
             'is_active'  => intval($_POST['is_active'] ?? 1),
         ];
         if ($data['first_name'] === '' || $data['last_name'] === '') {
@@ -96,6 +98,12 @@ class PatientsController{
         if (isset($_POST['first_name'])) $data['first_name'] = sanitize_text_field(wp_unslash($_POST['first_name']));
         if (isset($_POST['last_name']))  $data['last_name']  = sanitize_text_field(wp_unslash($_POST['last_name']));
         if (isset($_POST['record_number']))  $data['record_number']  = sanitize_text_field(wp_unslash($_POST['record_number']));
+        if (isset($_POST['insurer_id'])) {
+            $data['insurer_id'] = intval($_POST['insurer_id']);
+        }
+        if (isset($_POST['insurer_number'])) {
+            $data['insurer_number'] = sanitize_text_field(wp_unslash($_POST['insurer_number']));
+        }
         if (isset($_POST['is_active'])) {
             $st = intval($_POST['is_active']);
             if (!in_array($st, [1,0], true)) $st = 1;

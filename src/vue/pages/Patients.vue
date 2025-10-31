@@ -41,13 +41,15 @@
       <el-table-column prop="first_name" label="First Name" />
       <el-table-column prop="last_name" label="Last Name" />
       <el-table-column prop="record_number" label="Record Number" />
-      <el-table-column prop="is_active" label="Is Active?" width="110">
-        <template #default="{ row }">
-          <el-tag :type="row.is_active == 1 ? 'success' : 'info'">
-            {{ row.is_active == 1 ? 'Active' : 'Inactive' }}
-          </el-tag>
-        </template>
-      </el-table-column>
+  <el-table-column prop="insurer_name" label="Insurer"/> 
+      <el-table-column prop="insurer_number" label="Policy Number" />
+     <el-table-column prop="is_active" label="Is Active?" width="110">
+       <template #default="{ row }">
+         <el-tag :type="row.is_active == 1 ? 'success' : 'info'">
+           {{ row.is_active == 1 ? 'Active' : 'Inactive' }}
+         </el-tag>
+       </template>
+     </el-table-column>
       <el-table-column label="Actions" width="180" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openEdit(row)">Edit</el-button>          
@@ -73,6 +75,16 @@
 
         <el-form-item label="Record Number" prop="record_number">
           <el-input v-model="form.record_number" />
+        </el-form-item>
+
+        <el-form-item label="Insurer">
+          <el-select v-model="form.insurer_id" placeholder="Select insurer" clearable style="width: 100%">
+            <el-option v-for="ins in insurersOptions" :key="ins.id" :label="ins.name" :value="ins.id" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Policy Number">
+          <el-input v-model="form.insurer_number" />
         </el-form-item>
 
         <el-form-item label="Is Active?">
@@ -165,6 +177,8 @@ const loading = reactive({
   workers: false,
 });
 
+const insurersOptions = ref([]); // [{id, name}]
+
 const NONCE = parameters.nonce || ""; // your controller uses NONCE_ACTION 'mhc_ajax'
 const AJAX_URL = parameters.ajax_url || "/wp-admin/admin-ajax.php";
 
@@ -177,6 +191,8 @@ const form = reactive({
   is_active: '1',
   // NEW
   assignments: [], // [{ worker_id, role_id, rate, _workerOptions, _rolesForWorker, _lastRoleDefault }]
+  insurer_id: null,
+  insurer_number: '',
 })
 
 const filters = reactive({
@@ -209,6 +225,8 @@ function resetForm() {
   form.record_number = ''
   form.is_active = '1'
   form.assignments = []
+  form.insurer_id = null
+  form.insurer_number = ''
   state.currentId = null
   state.editing = false
 }
@@ -221,9 +239,36 @@ function openCreate() {
 async function openEdit(row) {
   state.editing = true
   state.currentId = row.id
+  // Ensure insurers options are loaded so the select shows the label (name) instead of raw id
+  await loadInsurers()
+  // If this patient's insurer_id is not present in the loaded options (e.g. large dataset),
+  // fetch that single insurer and add it so the select can render the name.
+  if (row.insurer_id) {
+    const insId = Number(row.insurer_id)
+    const found = insurersOptions.value.find(i => Number(i.id) === insId)
+    if (!found) {
+      try {
+        const fd = new FormData()
+        fd.append('action', 'mhc_insurers_get')
+        fd.append('nonce', parameters.nonce)
+        fd.append('id', insId)
+        const { data } = await axios.post(parameters.ajax_url, fd)
+        if (data && data.success && data.data && data.data.item) {
+          const it = data.data.item
+          // Keep id type consistent with loadInsurers (Number)
+          insurersOptions.value.push({ id: Number(it.id), name: it.name })
+        }
+      } catch (e) {
+        // ignore - select will fallback to showing raw value
+        console.error('fetch insurer by id failed', e)
+      }
+    }
+  }
   form.first_name = row.first_name
   form.last_name = row.last_name
   form.record_number = row.record_number || ''
+  form.insurer_id = row.insurer_id ? Number(row.insurer_id) : null
+  form.insurer_number = row.insurer_number || ''
   form.is_active = String(row.is_active ?? '1')
   form.assignments = (row.assignments || []).map(a => ({
     worker_id: a.worker_id,
@@ -313,6 +358,22 @@ async function fetchData(page = state.page) {
     ElMessage.error(e.message || 'Error loading clients')
   } finally {
     state.loading = false
+  }
+}
+
+async function loadInsurers() {
+  try {
+    const fd = new FormData()
+    fd.append('action', 'mhc_insurers_list')
+    fd.append('nonce', parameters.nonce)
+    fd.append('page', 1)
+    fd.append('per_page', 200)
+    const { data } = await axios.post(parameters.ajax_url, fd)
+    if (!data.success) throw new Error(data.data?.message || 'Failed to load insurers')
+    // Normalize ids to Number so v-model (Number) matches option values and the select can show the label
+    insurersOptions.value = (data.data.items || []).map(i => ({ id: Number(i.id), name: i.name }))
+  } catch (e) {
+    console.error('loadInsurers', e)
   }
 }
 
@@ -451,6 +512,8 @@ async function submit() {
     fd.append('first_name', form.first_name)
     fd.append('last_name', form.last_name)
     fd.append('record_number', form.record_number)
+    fd.append('insurer_id', form.insurer_id ?? 0)
+    fd.append('insurer_number', form.insurer_number ?? '')
     fd.append('is_active', form.is_active)
 
     // Prepare assignments payload (new patients only for now)
@@ -522,8 +585,20 @@ async function endAssignment(row) {
   }
 }
 
+async function getInsurerName(row) {
+  // If backend provides insurer_name, prefer it
+  if (row.insurer_name) return row.insurer_name
+  const id = row.insurer_id != null ? Number(row.insurer_id) : null
+  if (!id) return ''
+  const found = insurersOptions.value.find(i => Number(i.id) === id)
+  if (found) return found.name
+  // fallback to numeric id
+  return String(row.insurer_id)
+}
+
 onMounted(() => {
   fetchData(1)
+  loadInsurers()
 })
 </script>
 

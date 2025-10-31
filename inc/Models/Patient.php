@@ -9,9 +9,14 @@ class Patient {
         $pfx = $wpdb->prefix;
         $table = "{$pfx}mhc_patients";
         $wpr = "{$pfx}mhc_worker_patient_roles";
+        $ins = "{$pfx}mhc_insurers";
         $id = intval($id);
         if ($id <= 0) return null;
-        $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id=%d", $id), ARRAY_A);
+        // include insurer name if present
+        $row = $wpdb->get_row($wpdb->prepare(
+            "SELECT p.*, ins.name AS insurer_name FROM {$table} p LEFT JOIN {$ins} ins ON p.insurer_id = ins.id WHERE p.id=%d",
+            $id
+        ), ARRAY_A);
         if (!$row) return null;
         // Attach all only assignments without end_date if $ended is false
         // If $ended is true, attach all assignments including those with end_date
@@ -34,7 +39,8 @@ class Patient {
         global $wpdb;
         $pfx   = $wpdb->prefix;
         $table = "{$pfx}mhc_patients";
-        $wpr   = "{$pfx}mhc_worker_patient_roles";
+    $wpr   = "{$pfx}mhc_worker_patient_roles";
+    $ins   = "{$pfx}mhc_insurers";
 
         $offset = max(0, ($page - 1) * $per_page);
 
@@ -44,11 +50,14 @@ class Patient {
         // Search (first/last/full name, record number)
         if ($search !== '') {
             $like = '%' . $wpdb->esc_like($search) . '%';
-            $where[] = "(p.first_name LIKE %s OR p.last_name LIKE %s OR CONCAT(p.first_name,' ',p.last_name) LIKE %s OR p.record_number LIKE %s)";
+            // include insurer name in the searchable fields
+            $where[] = "(p.first_name LIKE %s OR p.last_name LIKE %s OR CONCAT(p.first_name,' ',p.last_name) LIKE %s OR p.record_number LIKE %s OR p.insurer_number LIKE %s OR ins.name LIKE %s)";
             $params[] = $like; // first_name
             $params[] = $like; // last_name
             $params[] = $like; // full name
             $params[] = $like; // record_number
+            $params[] = $like; // insurer_number
+            $params[] = $like; // insurer name
         }
 
         // Filtro por estado activo/inactivo
@@ -69,14 +78,16 @@ class Patient {
             $params[] = (int)$worker_id;
         }
 
+        // join insurers so we can return insurer name and search by it
+        $join_sql = " LEFT JOIN {$ins} ins ON p.insurer_id = ins.id";
         $where_sql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
-        // Total count
-        $total_sql = "SELECT COUNT(*) FROM {$table} p {$where_sql}";
+        // Total count (include join to keep WHERE references valid)
+        $total_sql = "SELECT COUNT(*) FROM {$table} p {$join_sql} {$where_sql}";
         $total = (int) $wpdb->get_var($wpdb->prepare($total_sql, $params));
 
-        // Rows (page)
-        $rows_sql = "SELECT p.* FROM {$table} p {$where_sql} ORDER BY p.id DESC LIMIT %d OFFSET %d";
+        // Rows (page) - include insurer name
+        $rows_sql = "SELECT p.*, ins.name AS insurer_name FROM {$table} p {$join_sql} {$where_sql} ORDER BY p.id DESC LIMIT %d OFFSET %d";
         $rows = $wpdb->get_results(
             $wpdb->prepare($rows_sql, array_merge($params, [(int)$per_page, (int)$offset])),
             ARRAY_A
@@ -133,7 +144,7 @@ class Patient {
         $table = "{$pfx}mhc_patients";
         $fields = [];
         $fmts = [];
-        foreach (["first_name","last_name","record_number","is_active","start_date","end_date"] as $field) {
+        foreach (["first_name","last_name","insurer_id","insurer_number","record_number","is_active","start_date","end_date"] as $field) {
             if (isset($data[$field])) {
                 $fields[$field] = $data[$field];
                 $fmts[] = $field === "is_active" ? '%d' : '%s';
@@ -158,7 +169,7 @@ class Patient {
         $wpr = "{$pfx}mhc_worker_patient_roles";
         $fields = [];
         $fmts = [];
-        foreach (["first_name","last_name","record_number","is_active","start_date","end_date"] as $field) {
+        foreach (["first_name","last_name","insurer_id","insurer_number","record_number","is_active","start_date","end_date"] as $field) {
             if (isset($data[$field])) {
                 $fields[$field] = $data[$field];
                 $fmts[] = $field === "is_active" ? '%d' : '%s';
