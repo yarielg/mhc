@@ -573,6 +573,7 @@ class PayrollController
         self::check();
         $payroll_id = (int)($_POST['payroll_id'] ?? 0);
         $search     = sanitize_text_field($_POST['search'] ?? ''); // ✅ capture correctly
+        $orderby    = isset($_POST['orderby']) ? sanitize_text_field($_POST['orderby']) : 'name';
         if ($payroll_id <= 0) wp_send_json_error(['message' => 'payroll_id required'], 400);
 
         // Totales por trabajador (horas)
@@ -670,13 +671,29 @@ class PayrollController
             }));
         }
 
-        // Ordenar por nombre
-        usort($items, fn($a, $b) => strcasecmp($a['worker_name'], $b['worker_name']));
+        // Ordenar según preferencia: por company o por worker_name
+        if ($orderby === 'company') {
+            usort($items, function($a, $b) {
+                $ca = isset($a['company']) ? $a['company'] : '';
+                $cb = isset($b['company']) ? $b['company'] : '';
+                $cmp = strcasecmp($ca, $cb);
+                if ($cmp !== 0) return $cmp;
+                return strcasecmp($a['worker_name'] ?? '', $b['worker_name'] ?? '');
+            });
+        } else {
+            usort($items, fn($a, $b) => strcasecmp($a['worker_name'] ?? '', $b['worker_name'] ?? ''));
+        }
 
         // Totales globales del payroll (de la lista ya filtrada)
         $sum_hours_amount  = array_sum(array_column($items, 'hours_amount'));
         $sum_extras_amount = array_sum(array_column($items, 'extras_amount'));
         $sum_grand_total   = $sum_hours_amount + $sum_extras_amount;
+
+        //add totals of workers, total of workers with checks, total of workers without checks, total of workers without check_number
+        $total_workers = count($items);
+        $total_with_checks = count(array_filter($items, fn($r) => (int)$r['qb_check_id'] > 0));
+        $total_without_checks = $total_workers - $total_with_checks;
+        $total_without_checks_number = count(array_filter($items, fn($r) => trim($r['check_number']) === ''));
 
         wp_send_json_success([
             'items' => $items,
@@ -684,6 +701,10 @@ class PayrollController
                 'hours_amount'  => round($sum_hours_amount, 2),
                 'extras_amount' => round($sum_extras_amount, 2),
                 'grand_total'   => round($sum_grand_total, 2),
+                'total_workers' => $total_workers,
+                'total_with_checks' => $total_with_checks,
+                'total_without_checks' => $total_without_checks,
+                'total_without_checks_number' => $total_without_checks_number,
             ],
         ]);
     }

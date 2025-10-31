@@ -1,8 +1,11 @@
 <?php
+
 namespace Mhc\Inc\Models;
 
-class PatientPayroll {
-    public static function findById($id) {
+class PatientPayroll
+{
+    public static function findById($id)
+    {
         global $wpdb;
         $pfx = $wpdb->prefix;
         return $wpdb->get_row(
@@ -12,7 +15,8 @@ class PatientPayroll {
     }
 
     // Lista de pacientes por payroll, con join a pacientes y filtro opcional de is_processed
-    public static function findByPayroll($payroll_id, $args = [], $search = '') {
+    public static function findByPayroll($payroll_id, $args = [], $search = '')
+    {
         global $wpdb;
         $pfx = $wpdb->prefix;
 
@@ -48,29 +52,35 @@ class PatientPayroll {
                       ON wpr.patient_id = pp.patient_id";
         }
 
+        // include insurer info (number + name) by left joining insurers
         $sql = "
-        SELECT DISTINCT
-            pp.id,
-            pp.payroll_id,
-            pp.patient_id,
-            pp.is_processed,
-            p.first_name,
-            p.last_name
-        FROM {$pfx}mhc_patient_payrolls pp
-        INNER JOIN {$pfx}mhc_payrolls pr
-                ON pr.id = pp.payroll_id
-        INNER JOIN {$pfx}mhc_patients p
-                ON p.id = pp.patient_id
-        {$joinWpr}
-        WHERE " . implode(' AND ', $where) . "
-        ORDER BY p.last_name ASC, p.first_name ASC
+    SELECT DISTINCT
+        pp.id,
+        pp.payroll_id,
+        pp.patient_id,
+        pp.is_processed,
+        p.first_name,
+        p.last_name,
+        p.insurer_number,
+        ins.name AS insurer_name
+    FROM {$pfx}mhc_patient_payrolls pp
+    INNER JOIN {$pfx}mhc_payrolls pr
+        ON pr.id = pp.payroll_id
+    INNER JOIN {$pfx}mhc_patients p
+        ON p.id = pp.patient_id
+    LEFT JOIN {$pfx}mhc_insurers ins
+        ON ins.id = p.insurer_id
+    {$joinWpr}
+    WHERE " . implode(' AND ', $where) . "
+    ORDER BY p.last_name ASC, p.first_name ASC
     ";
 
         return $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
     }
 
     // Crear una fila (uso interno)
-    public static function create($data) {
+    public static function create($data)
+    {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $wpdb->insert("{$pfx}mhc_patient_payrolls", [
@@ -78,12 +88,13 @@ class PatientPayroll {
             'payroll_id' => (int)$data['payroll_id'],
             'is_processed' => isset($data['is_processed']) ? (int)$data['is_processed'] : 0,
             'created_at' => current_time('mysql')
-        ], ['%d','%d','%d','%s']);
+        ], ['%d', '%d', '%d', '%s']);
         return (int)$wpdb->insert_id;
     }
 
     // Actualizar (uso interno)
-    public static function update($id, $data) {
+    public static function update($id, $data)
+    {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $fields = [];
@@ -91,7 +102,10 @@ class PatientPayroll {
         $where = ['id' => (int)$id];
         $where_format = ['%d'];
 
-        if (isset($data['is_processed'])) { $fields['is_processed'] = (int)$data['is_processed']; $formats[] = '%d'; }
+        if (isset($data['is_processed'])) {
+            $fields['is_processed'] = (int)$data['is_processed'];
+            $formats[] = '%d';
+        }
         if (!empty($fields)) {
             $fields['updated_at'] = current_time('mysql');
             $formats[] = '%s';
@@ -100,14 +114,16 @@ class PatientPayroll {
         return false;
     }
 
-    public static function delete($id) {
+    public static function delete($id)
+    {
         global $wpdb;
         $pfx = $wpdb->prefix;
         return (bool)$wpdb->delete("{$pfx}mhc_patient_payrolls", ['id' => (int)$id], ['%d']);
     }
 
     // Marcar procesado / no procesado para un patient en un payroll
-    public static function setProcessed($payroll_id, $patient_id, $flag) {
+    public static function setProcessed($payroll_id, $patient_id, $flag)
+    {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $row_id = $wpdb->get_var($wpdb->prepare("
@@ -123,7 +139,8 @@ class PatientPayroll {
     }
 
     // Sembrar todos los pacientes activos en un payroll (evita duplicar si ya existe)
-    public static function seedForPayroll($payroll_id) {
+    public static function seedForPayroll($payroll_id)
+    {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $payroll_id = (int)$payroll_id;
@@ -152,7 +169,8 @@ class PatientPayroll {
     }
 
     // Contadores útiles para el frontend
-    public static function countsByStatus($payroll_id) {
+    public static function countsByStatus($payroll_id)
+    {
         global $wpdb;
         $pfx = $wpdb->prefix;
         $total = (int)$wpdb->get_var($wpdb->prepare("
@@ -168,11 +186,12 @@ class PatientPayroll {
         ];
     }
 
-        /**
+    /**
      * Stats para header de la vista de payroll
      * - processed, pending, total
      */
-    public static function stats($payroll_id) {
+    public static function stats($payroll_id)
+    {
         return self::countsByStatus($payroll_id);
     }
 }

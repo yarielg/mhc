@@ -93,8 +93,7 @@
                 <template v-else>
                   <div class="flex items-center justify-between mb-2">
                     <div class="font-semibold">
-                      {{ selectedPatient.patient_name
-                        || (selectedPatient.first_name + ' ' + selectedPatient.last_name) }}
+                      {{ patientDisplayName(selectedPatient) }}
                       <el-tag class="ml-2" :type="is_processed(selectedPatient.is_processed)
                         ? 'success'
                         : 'info'
@@ -260,6 +259,10 @@
 
 
 
+                  <el-select v-model="summaryOrder" size="small" style="width:140px; float: right; margin-left:8px; margin-right:4px;" @change="loadSummary">
+                    <el-option label="Order: Name" value="name" />
+                    <el-option label="Order: Company" value="company" />
+                  </el-select>
                   <el-input v-model="workerSearch" placeholder="Search worker..." clearable size="small"
                     @input="loadSummary" style="width: 200px; float: right">
                     <template #prefix>
@@ -379,9 +382,20 @@
 
                 <div class="mt-2 text-sm">
                   <b>Payroll totals:</b>
-                  Regular {{ money(summary.totals?.hours_amount || 0) }} •
-                  Addtionals {{ money(summary.totals?.extras_amount || 0) }} •
-                  Grand <b>{{ money(summary.totals?.grand_total || 0) }}</b>
+                    <div>
+                      Regular {{ money(summary.totals?.hours_amount || 0) }} •
+                      Addtionals {{ money(summary.totals?.extras_amount || 0) }} •
+                      Grand <b>{{ money(summary.totals?.grand_total || 0) }}</b>
+                    </div>
+                    <div>
+                    <!--Add new totals-->
+                    Total workers: <b>{{ summary.totals?.total_workers || 0 }}</b>
+                    • With checks: <b>{{ summary.totals?.total_with_checks || 0 }}</b>
+                    • Without checks: <b>{{ summary.totals?.total_without_checks || 0 }}</b>
+                    • Without check numbers: <b>{{ summary.totals?.total_without_checks_number || 0 }}</b>
+                    </div>
+                  
+                  
                 </div>
               </el-tab-pane>
             </el-tabs>
@@ -621,6 +635,7 @@ const debouncers = {};
 
 const patientSearch = ref("");
 const workerSearch = ref("");
+const summaryOrder = ref('name'); // 'name' or 'company'
 
 const sendingAll = ref(false);
 // Flag used when syncing check numbers from QuickBooks
@@ -630,6 +645,18 @@ const creatingAllChecks = ref(false);
 
 function getWprId(row) {
   return row.worker_patient_role_id || row.id || row.wpr_id;
+}
+
+/**
+ * Friendly label for a patient including insurer info when present.
+ * Example: "Hassie Lesch — Medicaid (0001234)"
+ */
+function patientDisplayName(p) {
+  if (!p) return '';
+  const name = p.patient_name || (p.first_name ? p.first_name + (p.last_name ? ' ' + p.last_name : '') : '');
+  if (!p.insurer_name) return name;
+  const num = p.insurer_number ? ' (' + p.insurer_number + ')' : '';
+  return name + ' — ' + p.insurer_name + num;
 }
 
 function confirmSendAll() {
@@ -1115,7 +1142,7 @@ function onExtraHoursOrRateChange() {
   // Only auto-calculate for pending_pos_hourly or pending_neg_hourly
   const r = selectedRate.value;
   if (!r) return;
-  // Accept both possible typos in code (pending_pos_hourly, pending_pos_hours, etc)
+  // Accept both possible typos in code (pending_pos_hourly, pending_neg_hourly, etc)
   const code = r.code || '';
   if (code === 'pending_pos_hourly' || code === 'pending_neg_hourly' || code === 'pending_pos_hours' || code === 'pending_neg_hourlys') {
     const f = modals.extra.form;
@@ -1124,7 +1151,6 @@ function onExtraHoursOrRateChange() {
     f.amount = +(hrs * rate).toFixed(2);
   }
 }
-// ...existing code...
 
 /* ======= Loaders ======= */
 async function loadHeader() {
@@ -1725,6 +1751,7 @@ async function loadSummary() {
     const res = await ajaxPostForm("mhc_payroll_workers", {
       payroll_id: id,
       search: workerSearch.value,
+      orderby: summaryOrder.value,
     });
     summary.items = res?.items || [];
     summary.totals = res?.totals || null;
