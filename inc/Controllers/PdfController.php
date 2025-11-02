@@ -183,7 +183,7 @@ class PdfController
   /**
    * Renderiza el HTML del slip de trabajador (extraído de generateWorkerSlipPdf)
    */
-  public static function renderWorkerSlipHtml($data, $worker_name, $company_name,$start, $end, $check_number = '---')
+  public static function renderWorkerSlipHtml($data, $worker_name, $company_name, $start, $end, $check_number = '---')
   {
     $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
     $hours = $data['hours'];
@@ -443,12 +443,13 @@ class PdfController
   {
     self::check();
     $payroll_id = (int)($_GET['payroll_id'] ?? 0);
+    $orderby = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'name';
     if ($payroll_id <= 0) {
       status_header(400);
       echo 'Missing payroll_id';
       exit;
     }
-    $pdfPath = self::generatePayrollSummaryPdf($payroll_id);
+    $pdfPath = self::generatePayrollSummaryPdf($payroll_id, $orderby);
     if (!file_exists($pdfPath)) {
       status_header(500);
       echo 'Error generating PDF';
@@ -467,7 +468,7 @@ class PdfController
    * @param int $payroll_id
    * @return string Path to the generated PDF file
    */
-  public static function generatePayrollSummaryPdf($payroll_id)
+  public static function generatePayrollSummaryPdf($payroll_id, $orderby = 'name')
   {
     global $wpdb;
     // Get payroll info
@@ -507,7 +508,7 @@ class PdfController
             $worker_name = (string)$row->name;
             $company = (string)$row->company;
           }
-          
+
           $check_number = $wpdb->get_var($wpdb->prepare(
             "SELECT check_number FROM {$wpdb->prefix}mhc_qb_checks WHERE payroll_id = %d AND worker_id = %d",
             $payroll_id,
@@ -531,10 +532,18 @@ class PdfController
       return $r;
     }, $map));
 
-    // Sort by worker name
-    usort($items, function ($a, $b) {
-      return strcmp($a['worker_name'], $b['worker_name']);
-    });
+    // Sort according to requested order: by company (then worker_name) or by worker_name
+    if ($orderby === 'company') {
+      usort($items, function ($a, $b) {
+        $ca = isset($a['company']) ? $a['company'] : '';
+        $cb = isset($b['company']) ? $b['company'] : '';
+        $cmp = strcasecmp($ca, $cb);
+        if ($cmp !== 0) return $cmp;
+        return strcasecmp($a['worker_name'] ?? '', $b['worker_name'] ?? '');
+      });
+    } else {
+      usort($items, fn($a, $b) => strcasecmp($a['worker_name'] ?? '', $b['worker_name'] ?? ''));
+    }
     // Totals
     $sum_hours_amount  = array_sum(array_column($items, 'hours_amount'));
     $sum_extras_amount = array_sum(array_column($items, 'extras_amount'));
@@ -625,6 +634,8 @@ class PdfController
     if (!$payrollId) {
       wp_send_json_error(['message' => 'Missing payroll_id']);
     }
+    //get orderby param
+    $orderby = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'name';
 
 
     // Buscar todos los trabajadores con horas o extras en este payroll
@@ -665,10 +676,18 @@ class PdfController
       wp_send_json_error(['message' => 'No workers found for this payroll']);
     }
 
-    //ORDER workers by name
-    usort($workers, function ($a, $b) {
-      return strcmp($a->worker_name, $b->worker_name);
-    });
+    // ORDER workers according to requested order: by company (then worker_name) or by worker_name
+    if ($orderby === 'company') {
+      usort($workers, function ($a, $b) {
+        $ca = isset($a->company) ? $a->company : '';
+        $cb = isset($b->company) ? $b->company : '';
+        $cmp = strcasecmp($ca, $cb);
+        if ($cmp !== 0) return $cmp;
+        return strcasecmp($a->worker_name ?? '', $b->worker_name ?? '');
+      });
+    } else {
+      usort($workers, fn($a, $b) => strcasecmp($a->worker_name ?? '', $b->worker_name ?? ''));
+    }
 
     try {
       $mpdf = new \Mpdf\Mpdf();

@@ -1069,15 +1069,15 @@ class PayrollController
         INNER JOIN {$pfx}mhc_payroll_segments s  ON s.id = he.segment_id
         INNER JOIN {$pfx}mhc_worker_patient_roles wpr ON wpr.id = he.worker_patient_role_id
         WHERE s.payroll_id = %d
-    ", $payroll_id));
+        ", $payroll_id));
 
-        // 2) Workers with EXTRA PAYMENTS in this payroll
-        $workers_from_extras = $wpdb->get_col($wpdb->prepare("
-        SELECT DISTINCT ep.worker_id
-        FROM {$pfx}mhc_extra_payments ep
-        WHERE ep.payroll_id = %d
-          AND ep.amount <> 0
-    ", $payroll_id));
+            // 2) Workers with EXTRA PAYMENTS in this payroll
+            $workers_from_extras = $wpdb->get_col($wpdb->prepare("
+            SELECT DISTINCT ep.worker_id
+            FROM {$pfx}mhc_extra_payments ep
+            WHERE ep.payroll_id = %d
+            AND ep.amount <> 0
+        ", $payroll_id));
 
         // Merge unique, keep integers
         $eligible_worker_ids = array_values(array_unique(array_map('intval', array_merge(

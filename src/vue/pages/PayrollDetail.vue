@@ -598,6 +598,10 @@ function downloadSummaryPdf() {
   const url = new URL(ajaxUrl, window.location.origin);
   url.searchParams.set("action", "mhc_payroll_summary_pdf");
   url.searchParams.set("payroll_id", payrollId);
+  // pass selected ordering (name|company) so server can sort PDF accordingly
+  if (typeof summaryOrder !== "undefined") {
+    url.searchParams.set("orderby", summaryOrder.value || 'name');
+  }
   if (typeof parameters !== "undefined" && parameters?.nonce) {
     url.searchParams.set("nonce", parameters.nonce);
   }
@@ -612,6 +616,10 @@ function downloadAllSlips() {
   const url = new URL(ajaxUrl, window.location.origin);
   url.searchParams.set("action", "mhc_all_slips_pdf");
   url.searchParams.set("payroll_id", payrollId);
+  // pass selected ordering (name|company) so server can sort PDF accordingly
+  if (typeof summaryOrder !== "undefined") {
+    url.searchParams.set("orderby", summaryOrder.value || 'name');
+  }
   if (typeof parameters !== "undefined" && parameters?.nonce) {
     url.searchParams.set("nonce", parameters.nonce);
   }
