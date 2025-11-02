@@ -536,14 +536,14 @@ class QuickBooksController
         if (!$start || !$end) return '—';
         $s = date_create($start);
         $e = date_create($end);
-        if (!$s || !$e) return $start . ' – ' . $end;
+        if (!$s || !$e) return $start . ' to ' . $end;
         $sm = date_format($s, 'M');
         $em = date_format($e, 'M');
         $sy = date_format($s, 'Y');
         $ey = date_format($e, 'Y');
         $sd = date_format($s, 'j');
         $ed = date_format($e, 'j');
-        $dash = '–';
+        $dash = ' to ';
         if ($s == $e) {
             return "$sm $sd, $sy";
         }
