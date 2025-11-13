@@ -630,13 +630,16 @@ class PayrollController
             $t = $wpdb->prefix . 'mhc_workers';
             $qc = $wpdb->prefix . 'mhc_qb_checks';
 
-            // ✅ fix: remove stray AND in WHERE
-            $ids = implode(',', array_map('intval', $missing));
-            $rows = $wpdb->get_results("SELECT w.id, CONCAT(w.first_name,' ',w.last_name) AS worker_name, w.company AS company, w.qb_vendor_id AS qb_vendor_id,
-                                                qc.check_number AS check_number, qc.qb_check_id  AS qb_check_id
-                                        FROM {$t} w
-                                        LEFT JOIN {$qc} qc ON qc.worker_id = w.id
-                                        WHERE w.id IN ($ids)", ARRAY_A);
+        // ✅ fix: use prepared statement and limit qc to this payroll (so check_number/qb_check_id are for this payroll)
+        $ids_arr = array_map('intval', $missing);
+        $placeholders = implode(',', array_fill(0, count($ids_arr), '%d'));
+        $sql = "SELECT w.id, CONCAT(w.first_name,' ',w.last_name) AS worker_name, w.company AS company, w.qb_vendor_id AS qb_vendor_id,
+                        qc.check_number AS check_number, qc.qb_check_id  AS qb_check_id
+                    FROM {$t} w
+                    LEFT JOIN {$qc} qc ON qc.worker_id = w.id AND qc.payroll_id = %d
+                    WHERE w.id IN ($placeholders)";
+        $params = array_merge([$payroll_id], $ids_arr);
+        $rows = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
 
             // Build a map keyed by worker id so we can safely reference company/qb fields            
             $rowsById = [];
