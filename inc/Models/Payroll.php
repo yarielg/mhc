@@ -42,6 +42,51 @@ class Payroll
     }
 
 
+    /** countAll: count total records matching filters (without LIMIT/OFFSET)
+     *  Same filters as findAll but returns only the count
+     */
+    public static function countAll($args = [])
+    {
+        global $wpdb;
+        $t = self::table();
+        $where  = [];
+        $params = [];
+
+        if (!empty($args['status']) && $args['status'] !== 'all') {
+            $where[] = "status=%s";
+            $params[] = (string)$args['status'];
+        }
+
+        // Rango que se solapa con otro rango
+        if (!empty($args['date_overlaps']['start']) && !empty($args['date_overlaps']['end'])) {
+            $s = $args['date_overlaps']['start'];
+            $e = $args['date_overlaps']['end'];
+            $where[] = "(start_date <= %s AND end_date >= %s)";
+            $params[] = $e;
+            $params[] = $s;
+        } else {
+            if (!empty($args['start_date_from'])) {
+                $where[] = "start_date >= %s";
+                $params[] = (string)$args['start_date_from'];
+            }
+            if (!empty($args['start_date_to'])) {
+                $where[] = "start_date <= %s";
+                $params[] = (string)$args['start_date_to'];
+            }
+        }
+
+        if (!empty($args['search'])) {
+            $where[] = "notes LIKE %s";
+            $params[] = '%' . $wpdb->esc_like($args['search']) . '%';
+        }
+
+        $sql = "SELECT COUNT(*) FROM {$t}";
+        if ($where) $sql .= " WHERE " . implode(' AND ', $where);
+
+        if ($params) $sql = $wpdb->prepare($sql, ...$params);
+        return (int)$wpdb->get_var($sql);
+    }
+
     /** findAll with filters:
      *  - status: 'draft' | 'finalized' | 'locked' (or your values)
      *  - date_overlaps: ['start'=>'YYYY-MM-DD','end'=>'YYYY-MM-DD'] (overlapping periods)

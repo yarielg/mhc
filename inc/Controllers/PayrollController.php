@@ -110,8 +110,16 @@ class PayrollController
         if (isset($_GET['limit']))  $args['limit']  = max(1, (int)$_GET['limit']);
         if (isset($_GET['offset'])) $args['offset'] = max(0, (int)$_GET['offset']);
 
+        // Get total count (without LIMIT/OFFSET for pagination)
+        $total = Payroll::countAll($args);
+        
+        // Get paginated items
         $rows = Payroll::findAll($args);
-        wp_send_json_success(['items' => $rows]);
+        
+        wp_send_json_success([
+            'items' => $rows,
+            'total' => $total
+        ]);
     }
 
     // GET: un payroll (sólo el registro)

@@ -105,8 +105,22 @@
       </el-table>
 
       <div class="flex items-center justify-between mt-3">
-        <div class="text-xs text-gray-500">
-          Showing {{ items.length }} item(s)
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-500">Items per page:</span>
+          <el-select
+              v-model="q.limit"
+              size="small"
+              style="width: 80px"
+              @change="onSizeChange"
+          >
+            <el-option :value="10" label="10" />
+            <el-option :value="25" label="25" />
+            <el-option :value="50" label="50" />
+            <el-option :value="100" label="100" />
+          </el-select>
+          <span class="text-xs text-gray-500">
+            Showing {{ items.length }} of {{ total }} item(s)
+          </span>
         </div>
         <el-pagination
             background
@@ -496,7 +510,8 @@ async function fetchList() {
     items.value = Array.isArray(data.items) ? data.items : []
     // Sort client-side as a guard (id DESC)
     items.value.sort((a, b) => Number(b.id) - Number(a.id))
-    total.value = Math.max(total.value, items.value.length) // adjust if you add a count API later
+    // Get total from backend response, fallback to items length
+    total.value = data.total !== undefined ? Number(data.total) : items.value.length
   } catch (e) {
     ElMessage.error(e.message || 'Failed to load payrolls')
   } finally {
@@ -506,6 +521,11 @@ async function fetchList() {
 
 function onPage(p) {
   q.page = p
+  fetchList()
+}
+
+function onSizeChange() {
+  q.page = 1 // Reset to first page when changing page size
   fetchList()
 }
 
