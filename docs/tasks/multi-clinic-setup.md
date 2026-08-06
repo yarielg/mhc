@@ -72,40 +72,43 @@ mhc_qb_checks           id, payroll_id, worker_patient_role_id BIGINT UNSIGNED N
 
 ## Work breakdown
 
-### Phase 0 — Code fixes and parameterization (local)
+### Phase 0 — Code fixes and parameterization (local) — DONE (commit `0706bcb`)
 
-- [ ] **T1 — Fresh-install schema.** Bring `Activate::activate()` to the 1.4.10 shape so a
+- [x] **T1 — Fresh-install schema.** Bring `Activate::activate()` to the 1.4.10 shape so a
       clean activation produces the schema above. Keep `check_db_upgrade()` intact for the
       existing production install.
-- [ ] **T2 — Catalog seed.** Seed 5 roles (RBT, BCaBA, BCBA, LMHC, Other) and the 7 special
+- [x] **T2 — Catalog seed.** Seed 5 roles (RBT, BCaBA, BCBA, LMHC, Other) and the 7 special
       rates with current amounts. Leave insurers empty (D3).
-- [ ] **T3 — Security.** `Ajax::ajax_delete_plugin_tables` drops 11 tables with a capability
+- [x] **T3 — Security.** `Ajax::ajax_delete_plugin_tables` drops 11 tables with a capability
       check but no nonce, reachable by GET on `admin-ajax.php` (CSRF → total payroll loss).
       `SeedController::ajax_seed_fake_data` inserts fake records, also without a nonce.
       Remove both from the production code path.
-- [ ] **T4 — Branding options.** New settings section: company name + logo (media uploader).
+- [x] **T4 — Branding options.** New settings section: company name + logo (media uploader).
       Defaults reproduce today's values so production behavior is unchanged (D2).
-- [ ] **T5 — Replace hardcoded branding** at 11 sites:
+- [x] **T5 — Replace hardcoded branding** at 11 sites:
       `PdfController.php` (4 name + 4 logo), `PayrollController.php` (3 logo),
       `email-template.html:44` (absolute URL to the production logo — must become a
       placeholder), `email-template.html:172` (copyright), `App.vue:9`, `TopMenu.vue:12`.
-- [ ] **T6 — `uninstall.php`.** Currently misses `mhc_patients`, `mhc_insurers`,
+- [x] **T6 — `uninstall.php`.** Currently misses `mhc_patients`, `mhc_insurers`,
       `mhc_qb_checks`, `mhc_qb_queue` and every option, including the QuickBooks OAuth tokens.
-- [ ] **T7 — README.** Documents `[mhc]` / `[mhc__login]`; the real shortcodes are
+- [x] **T7 — README.** Documents `[mhc]` / `[mhc__login]`; the real shortcodes are
       `[mhc_app]` / `[mhc_app_login]`. Whoever builds the new site from the README gets
       blank pages.
-- [ ] **T8 — Rebuild** `assets/dist` (`npm run build`) after the Vue changes.
+- [x] **T8 — Rebuild** `assets/dist` (`npm run build`) after the Vue changes.
 
 ### Phase 1 — Local validation (the gate that de-risks the whole operation)
 
-- [ ] **V1 — Clean-install test.** Deactivate → drop all `mhc_*` tables and `mhc_*` options →
+V1, V2 and V4 executed against a scratch database (`mhc_fresh_test`, since dropped);
+the local dev data was never modified. V3 is the only outstanding item.
+
+- [x] **V1 — Clean-install test.** Deactivate → drop all `mhc_*` tables and `mhc_*` options →
       reactivate → diff resulting schema against the reference above. Must match exactly.
-- [ ] **V2 — Upgrade-path test.** Restore a 1.4.9-shaped DB → load a page → confirm
+- [x] **V2 — Upgrade-path test.** Restore a 1.4.9-shaped DB → load a page → confirm
       `check_db_upgrade()` still migrates correctly (protects production).
 - [ ] **V3 — Regression on existing data.** With the current local dataset, exercise
       payroll detail, PDF slip, PDF summary, email send, insurers CRUD, QuickBooks check
       listing. `WP_DEBUG_LOG` must stay clean.
-- [ ] **V4 — Branding test.** Change name and logo in settings, confirm the new values reach
+- [x] **V4 — Branding test.** Change name and logo in settings, confirm the new values reach
       PDFs, emails and the Vue header; confirm defaults reproduce current output.
 
 ### Phase 2 — New site infrastructure (after local sign-off)
