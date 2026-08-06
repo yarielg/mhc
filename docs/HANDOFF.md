@@ -11,7 +11,23 @@ across all 42 deployed files, so local is a trustworthy base. The environment in
 the root cause of the fresh-install schema gap, and the full branding-hardcode inventory
 are recorded in the task file.
 
-Phase 0 (code fixes and parameterization) is starting. Nothing has been deployed anywhere.
+Phase 0 (code fixes and parameterization) is complete and committed. Phase 1 validation
+(V1 clean install, V2 upgrade path, V3 functional regression, V4 branding) all pass.
+Nothing has been deployed anywhere.
+
+A dedicated local site exists for MHC work and should be used instead of the shared
+sandbox at `D:/xampp/htdocs/wordpress` (which hangs on load and would be broken by the
+plugin's global anonymous redirect):
+
+    URL   http://localhost/mhc-local/
+    admin http://localhost/mhc-local/wp-admin/  (mhcadmin / mhc-local-dev-password)
+    DB    mhc_local
+    plugin  wp-content/plugins/mhc is an NTFS junction to the real working tree, so
+            edits are picked up with no copy step
+
+It was provisioned by the same sequence Phase 2 will follow on the subdomain: install WP,
+activate the plugin, create Home (`[mhc_app]`) and Login (slug `app-login`,
+`[mhc_app_login]`), write `.htaccess`, create `uploads/mpdf`.
 
 ## Ground rules for this task
 
@@ -37,16 +53,15 @@ Phase 0 (code fixes and parameterization) is starting. Nothing has been deployed
 
 ## Next actions
 
-1. T1–T2: fresh-install schema and catalog seed in `inc/Base/Activate.php`
-2. T3: remove the two unprotected AJAX endpoints
-3. T4–T5: branding settings + replace the 11 hardcoded sites
-4. T6–T7: `uninstall.php` and README
-5. T8 + V1–V4: rebuild assets, then run the local validation gate
+1. Decide what to do about P1/P2/P3 (see the task file) — in particular, confirm whether
+   production has the duplicate `mhc_qb_checks` rows that P1 found in the dev data
+2. Merge `feature/multi-clinic-setup` into `master`
+3. Phase 2: provision the subdomain, following the same sequence used for `mhc-local`
 
 ## Blocked on the user
 
-Only Phase 2 items: the exact subdomain, the QuickBooks app strategy, and which WP admin
-users the new site needs. Phase 0 and Phase 1 can complete without these answers.
+The exact subdomain, the QuickBooks app strategy, and which WP admin users the new site
+needs — all Phase 2. Plus a decision on P1/P2/P3.
 
 ## Knowledge base
 

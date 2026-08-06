@@ -99,15 +99,21 @@ mhc_qb_checks           id, payroll_id, worker_patient_role_id BIGINT UNSIGNED N
 ### Phase 1 — Local validation (the gate that de-risks the whole operation)
 
 V1, V2 and V4 executed against a scratch database (`mhc_fresh_test`, since dropped);
-the local dev data was never modified. V3 is the only outstanding item.
+V3 against a dedicated local site. The shared dev sandbox data was never modified.
+Phase 1 is complete.
 
 - [x] **V1 — Clean-install test.** Deactivate → drop all `mhc_*` tables and `mhc_*` options →
       reactivate → diff resulting schema against the reference above. Must match exactly.
 - [x] **V2 — Upgrade-path test.** Restore a 1.4.9-shaped DB → load a page → confirm
       `check_db_upgrade()` still migrates correctly (protects production).
-- [ ] **V3 — Regression on existing data.** With the current local dataset, exercise
-      payroll detail, PDF slip, PDF summary, email send, insurers CRUD, QuickBooks check
-      listing. `WP_DEBUG_LOG` must stay clean.
+- [x] **V3 — Regression on existing data.** Ran against a dedicated local site
+      (`D:/xampp/htdocs/mhc-local`, DB `mhc_local`, plugin junctioned to the working tree)
+      loaded with the dev dataset: 124 workers, 113 patients, 11 payrolls, 459 hour rows,
+      21 extras, 24 checks. 32 checks pass: every list/detail AJAX endpoint, insurers CRUD,
+      reports, and four mPDF outputs (worker slip 56 KB, summary by name 79 KB, summary by
+      company 79 KB, all slips 326 KB). Both destructive endpoints return WP's `0`
+      (unregistered). No new errors in `WP_DEBUG_LOG`; two pre-existing defects surfaced,
+      see below.
 - [x] **V4 — Branding test.** Change name and logo in settings, confirm the new values reach
       PDFs, emails and the Vue header; confirm defaults reproduce current output.
 
@@ -122,6 +128,17 @@ the local dev data was never modified. V3 is the only outstanding item.
 - [ ] Writable `wp-content/uploads/mpdf`
 - [ ] Configure branding, QuickBooks (new realm, new redirect URI, new account IDs),
       `mhc_week_start_day`; verify the `mhc_qb_process_queue_cron` schedule
+
+## Pre-existing defects surfaced by V3 (not introduced here, not yet fixed)
+
+| # | Defect | Impact |
+|---|---|---|
+| P1 | Duplicate rows in `mhc_qb_checks` in the dev dataset: payroll 1 has worker 109 with **five** distinct QuickBooks check ids for the same $2,340.00, plus two workers duplicated twice. 28 of 30 rows have `qb_vendor_id` NULL, and MySQL does not enforce uniqueness across NULLs, so `uniq_payroll_vendor_worker` never fired. Same root cause as the fresh-install bug: that DB was created at 1.4.10, so the `MODIFY ... NOT NULL` in `check_db_upgrade()` never ran. | Needs verifying against production before it is dismissed. Production was upgraded incrementally so the MODIFY should have run there, but that is an assumption until checked. |
+| P2 | `PdfController.php:313` passes NULL to `htmlspecialchars()` (`cpt_code` and `notes` are NULL for supervision/pending extras). 20 deprecations logged per summary PDF on PHP 8.3. | Log noise now; fatal on PHP 9. |
+| P3 | `wpdb::prepare($sql, $params)` called with empty `$params` and no placeholder in `Role.php:39`, `SpecialRate.php:32`, `Worker.php:42`, `Insurer.php:39`, `WorkerPatientRole.php:126`. One notice per list request. | Log noise. |
+
+Left untouched on purpose: under D2 any change here eventually ships to production too, so
+they are the user's call rather than a silent side effect of this task.
 
 ## Open questions
 
