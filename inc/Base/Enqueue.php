@@ -34,7 +34,16 @@ class Enqueue{
         // wp_enqueue_style('vue-custom-icon', 'https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css');
         // wp_enqueue_style('main_css', CBF_PLUGIN_URL . '/assets/css/main.css');
 
-        wp_enqueue_script('vue-custom-js', MHC_PLUGIN_URL . 'assets/dist/app.js' ,array('jquery'),'1.0', true);
+        // Version by build mtime. Both handles used to ship a constant ('1.0' for the
+        // script, and no version at all for the style, which falls back to the
+        // WordPress version), so every deploy served the previous bundle from cache
+        // until users hard-refreshed.
+        $js_path  = MHC_PLUGIN_PATH . 'assets/dist/app.js';
+        $css_path = MHC_PLUGIN_PATH . 'assets/dist/app.css';
+        $js_ver   = file_exists($js_path)  ? filemtime($js_path)  : MHC_PLUGIN_VERSION;
+        $css_ver  = file_exists($css_path) ? filemtime($css_path) : MHC_PLUGIN_VERSION;
+
+        wp_enqueue_script('vue-custom-js', MHC_PLUGIN_URL . 'assets/dist/app.js' ,array('jquery'), $js_ver, true);
 
         wp_localize_script( 'vue-custom-js', 'parameters', [
             'site_url' => site_url(),
@@ -47,7 +56,7 @@ class Enqueue{
             'company_logo' => mhc_company_logo_url(),
         ]);
 
-        wp_enqueue_style( 'main_css', MHC_PLUGIN_URL . '/assets/dist/app.css'  );
+        wp_enqueue_style( 'main_css', MHC_PLUGIN_URL . 'assets/dist/app.css', array(), $css_ver );
     }
 
 }

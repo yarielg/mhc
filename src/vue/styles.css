@@ -22,3 +22,15 @@ body{
 .mb-20 {
     margin-bottom: 20px;
 }
+
+/* Clinic logo in the app header. Configurable per site, so it must survive any
+   aspect ratio: constrain both axes and letterbox rather than fixing the width.
+   The bundled 254x154 logo used to render 61px tall inside a 60px header. */
+.mhc-brand-logo {
+    max-height: 44px;
+    max-width: 120px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+}

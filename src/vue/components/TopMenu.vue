@@ -8,7 +8,7 @@
   >
     <el-menu-item index="0">
     <img
-              style="width: 100px"
+              class="mhc-brand-logo"
               :src="company_logo"
               :alt="company_name"
             />

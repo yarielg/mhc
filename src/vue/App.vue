@@ -6,7 +6,10 @@
       <el-header class="mhc-header">
         <div class="mhc-left">
           <el-button link class="mhc-hamburger" @click="toggleAside" :icon="Menu" />
-          <img style="width: 100px" :src="company_logo" :alt="company_name" />
+          <!-- Height-constrained: the logo is configurable now, so it has to fit the
+               60px header at any aspect ratio. A fixed width overflowed as soon as
+               someone uploaded a portrait logo. -->
+          <img class="mhc-brand-logo" :src="company_logo" :alt="company_name" />
         </div>
 
         <div class="mhc-right">
