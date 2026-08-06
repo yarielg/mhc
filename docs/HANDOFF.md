@@ -53,15 +53,14 @@ activate the plugin, create Home (`[mhc_app]`) and Login (slug `app-login`,
 
 ## Next actions
 
-1. Decide what to do about P2/P3 (see the task file). P1 is closed: production was
-   checked read-only and has no duplicate or NULL-vendor check rows
-2. Merge `feature/multi-clinic-setup` into `master`
-3. Phase 2: provision the subdomain, following the same sequence used for `mhc-local`
+1. Merge `feature/multi-clinic-setup` into `master`. Phase 0 and Phase 1 are complete and
+   P1/P2/P3 are all closed
+2. Phase 2: provision the subdomain, following the same sequence used for `mhc-local`
 
 ## Blocked on the user
 
 The exact subdomain, the QuickBooks app strategy, and which WP admin users the new site
-needs — all Phase 2. Plus a decision on P2/P3.
+needs — all Phase 2.
 
 ## Knowledge base
 

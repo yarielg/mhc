@@ -129,16 +129,17 @@ Phase 1 is complete.
 - [ ] Configure branding, QuickBooks (new realm, new redirect URI, new account IDs),
       `mhc_week_start_day`; verify the `mhc_qb_process_queue_cron` schedule
 
-## Pre-existing defects surfaced by V3 (not introduced here, not yet fixed)
+## Pre-existing defects surfaced by V3
 
 | # | Defect | Impact |
 |---|---|---|
 | P1 | Duplicate rows in `mhc_qb_checks` in the dev dataset: payroll 1 has worker 109 with **five** distinct QuickBooks check ids for the same $2,340.00, plus two workers duplicated twice. 28 of 30 rows have `qb_vendor_id` NULL, and MySQL does not enforce uniqueness across NULLs, so `uniq_payroll_vendor_worker` never fired. Same root cause as the fresh-install bug: that DB was created at 1.4.10, so the `MODIFY ... NOT NULL` in `check_db_upgrade()` never ran. | **Production verified clean** (read-only, 2026-08-05): 42 payrolls, 1,820 check rows, 0 with NULL/empty `qb_vendor_id`, 0 duplicate groups. Production was upgraded incrementally so the MODIFY did run and the unique index has been enforcing correctly. The defect is confined to the local dev sandbox, which was created fresh at 1.4.10. No production remediation needed. |
-| P2 | `PdfController.php:313` passes NULL to `htmlspecialchars()` (`cpt_code` and `notes` are NULL for supervision/pending extras). 20 deprecations logged per summary PDF on PHP 8.3. | Log noise now; fatal on PHP 9. |
-| P3 | `wpdb::prepare($sql, $params)` called with empty `$params` and no placeholder in `Role.php:39`, `SpecialRate.php:32`, `Worker.php:42`, `Insurer.php:39`, `WorkerPatientRole.php:126`. One notice per list request. | Log noise. |
+| P2 | `PdfController` passed NULL to `htmlspecialchars()` for nullable columns. 20 deprecations per summary PDF on PHP 8.3, fatal on PHP 9. | **Fixed**: `self::esc()` casts first; all 16 call sites routed through it. PDF output byte-identical. |
+| P3 | `wpdb::prepare()` called with a placeholder-free query and empty params on unfiltered listings. One notice per request. | **Fixed** in `Role`, `SpecialRate`, `Insurer` (count + rows), `Worker` (count), `Patient` (count). `Worker::search` and `WorkerPatientRole` were false positives. |
 
-Left untouched on purpose: under D2 any change here eventually ships to production too, so
-they are the user's call rather than a silent side effect of this task.
+P2 and P3 fixed on request. `WP_DEBUG_LOG` is now empty across the whole V3 suite, down
+from 20 deprecations and 5 notices. Both fixes are behavior-preserving, verified by
+byte-identical PDF output and a full V1/V2/V3/V4 re-run.
 
 ## Open questions
 
