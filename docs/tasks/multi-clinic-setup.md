@@ -36,6 +36,7 @@ production site at `app.agencyofmentalhealth.com`.
 | D4 | Separate WordPress installation for the new clinic (not multisite, not multi-tenant) | PHI isolation, separate QuickBooks realm, independent backups |
 | D5 | Work on `feature/multi-clinic-setup`, merge to `master` after local validation | Production only changes on an explicit SFTP deploy, which is out of scope |
 | D6 | Both clinics share one Intuit app; separation is by realm, not by credentials | One app, one client_id/secret, a redirect URI per site. Each site stores its own realm_id and tokens. See P4 for the security consequence |
+| D7 | A dedicated **classic** theme (`mhc-app`, repo `D:/Projects/mhc-theme`) replaces the database template override | Templates become files: versioned, reviewable, deployed with the code, and correct on a fresh install. Classic rather than block because block templates can still be overridden from the Site Editor into the database, reintroducing the same failure |
 
 ## Root cause: incomplete fresh-install schema
 
@@ -178,28 +179,25 @@ file-level comparison that found local and production byte-identical covered onl
 plugin, so it could never have surfaced this. Production also carries a custom `footer`
 template part, unused by the app template but part of the same class of DB-only state.
 
-Recipe for a new site:
+Recipe for a new site (superseded by D7 - kept for reference, since this is what the
+frozen production site does):
 
 1. Leave `show_on_front = posts` (the WordPress default - do not create a front page)
 2. Appearance -> Editor -> Templates -> Home, replace the entire content with a single
    Shortcode block containing `[mhc_app]`
 3. Create one page only: Login, slug exactly `app-login`, content `[mhc_app_login]`
 
-Equivalent programmatic form, used by `scratchpad/fix_frontpage.php`:
+### With the `mhc-app` theme (D7, what the new site will do)
 
-```php
-update_option('show_on_front', 'posts');
-$id = wp_insert_post([
-    'post_type'    => 'wp_template',
-    'post_name'    => 'home',
-    'post_title'   => 'Blog Home',
-    'post_content' => "<!-- wp:shortcode -->
-[mhc_app]
-<!-- /wp:shortcode -->",
-    'post_status'  => 'publish',
-]);
-wp_set_object_terms($id, 'twentytwentyfive', 'wp_theme');
-```
+Steps 1 and 2 disappear - `index.php` in the theme is the app shell, and
+`page-app-login.php` is the login screen:
+
+1. `git clone <theme-repo> wp-content/themes/mhc-app`, activate it
+2. Leave `show_on_front = posts`
+3. Create one page: Login, slug exactly `app-login`, content `[mhc_app_login]`
+
+Nothing in the Site Editor, and no `wp_template` rows in the database. The theme also
+brands `wp-login.php`, which password resets go through.
 
 ## Open questions
 
