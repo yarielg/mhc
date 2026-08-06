@@ -185,11 +185,12 @@ class PdfController
    */
   public static function renderWorkerSlipHtml($data, $worker_name, $company_name, $start, $end, $check_number = '---')
   {
-    $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
     $hours = $data['hours'];
     $extras = $data['extras'];
-    // Logo (ruta absoluta de archivo para mPDF)
-    $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
+    // Logo (ruta absoluta de archivo para mPDF). $company_name es la empresa del worker,
+    // no la clínica, así que la marca va en $clinic_name.
+    $logo_path = mhc_company_logo_path();
+    $clinic_name = mhc_company_name();
 
     // ==== HTML (tu versión ajustada para diseño suave) ====
     // NOTA: mantenemos nombres/estructura de columnas y datos como pediste.
@@ -221,7 +222,7 @@ class PdfController
         </td>
         <td style="width:30%; text-align:right; border:none;">
           <h2>Worker Payroll Slip</h2>
-          <div style="font-size:10px; margin-top: 1rem;">Agency of Mental Health Services</div>
+          <div style="font-size:10px; margin-top: 1rem;">' . htmlspecialchars($clinic_name, ENT_QUOTES, 'UTF-8') . '</div>
         </td>
       </tr>
     </table>
@@ -348,7 +349,7 @@ class PdfController
 
   <!-- Footer -->
   <div class="footer">
-    Slip generated automatically - Agency of Mental Health Services © ' . date("Y") . '
+    Slip generated automatically - ' . htmlspecialchars($clinic_name, ENT_QUOTES, 'UTF-8') . ' © ' . date("Y") . '
   </div>
 </div>';
     return $html;
@@ -387,7 +388,7 @@ class PdfController
    */
   public static function generateSlimPdf($data = [])
   {
-    $logo = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
+    $logo = mhc_company_logo_path();
     $pdf = new \TCPDF();
     $pdf->SetCreator('MHC Payroll');
     $pdf->SetAuthor('MHC');
@@ -549,7 +550,8 @@ class PdfController
     $sum_extras_amount = array_sum(array_column($items, 'extras_amount'));
     $sum_grand_total   = $sum_hours_amount + $sum_extras_amount;
     // PDF HTML
-    $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
+    $logo_path = mhc_company_logo_path();
+    $clinic_name = mhc_company_name();
     $html = '<style>
       body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 11px; color:#333; }
       .header { border-bottom: 2px solid #006699; padding-bottom: 10px; margin-bottom: 20px; }
@@ -568,7 +570,7 @@ class PdfController
         <td style="width:70%; border:none;">' . (file_exists($logo_path) ? '<img src="' . $logo_path . '" width="100" />' : '') . '</td>
         <td style="width:30%; text-align:right; border:none;">
           <h2>Payroll Workers Summary</h2>
-          <div style="font-size:10px; margin-top: 1rem;">Agency of Mental Health Services</div>
+          <div style="font-size:10px; margin-top: 1rem;">' . htmlspecialchars($clinic_name, ENT_QUOTES, 'UTF-8') . '</div>
         </td>
       </tr></table>
       <div style="margin-top:8px; font-size:12px;">Period: <b>' . self::format_week_range($start, $end) . '</b> &nbsp;|&nbsp; Status: <b>' . htmlspecialchars($status) . '</b></div>
@@ -605,7 +607,7 @@ class PdfController
     $html .= '<tr class="totals"><td>Additionals</td><td colspan="5" align="right">$' . number_format($sum_extras_amount, 2) . '</td></tr>';
     $html .= '<tr class="totals"><td>Grand Total</td><td colspan="5" align="right"><b>$' . number_format($sum_grand_total, 2) . '</b></td></tr>';
     $html .= '</tbody></table>';
-    $html .= '<div class="footer">Summary generated automatically - Agency of Mental Health Services © ' . date('Y') . '</div>';
+    $html .= '<div class="footer">Summary generated automatically - ' . htmlspecialchars($clinic_name, ENT_QUOTES, 'UTF-8') . ' © ' . date('Y') . '</div>';
     // mPDF
     $mpdf = new Mpdf([
       'mode' => 'utf-8',

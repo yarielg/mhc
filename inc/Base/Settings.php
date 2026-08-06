@@ -131,6 +131,16 @@ class Settings
             2
         );
 
+        // Company branding submenu
+        add_submenu_page(
+            'mhc_main_menu',
+            __('Company Settings', 'mhc'),
+            __('Company', 'mhc'),
+            'manage_options',
+            'mhc_company_settings',
+            [$this, 'render_company_page']
+        );
+
         // QuickBooks settings submenu
         add_submenu_page(
             'mhc_main_menu', // parent slug for the plugin
@@ -178,6 +188,44 @@ class Settings
 
     public function mhc_register_settings()
     {
+        // === Marca de la clínica (usada en PDFs, emails y la cabecera de la app) ===
+        add_settings_section(
+            'mhc_company_section',
+            __('Clinic Identity', 'mhc'),
+            function () {
+                echo '<p>' . esc_html__('Name and logo used on payroll slips, summary PDFs, outgoing emails and the app header. Leave empty to keep the bundled defaults.', 'mhc') . '</p>';
+            },
+            'mhc_company_settings'
+        );
+
+        add_settings_field(
+            'mhc_company_name',
+            __('Clinic Name', 'mhc'),
+            [$this, 'company_name_field'],
+            'mhc_company_settings',
+            'mhc_company_section',
+            ['label_for' => 'mhc_company_name']
+        );
+        register_setting('mhc_company_options', 'mhc_company_name', [
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default'           => '',
+        ]);
+
+        add_settings_field(
+            'mhc_company_logo_id',
+            __('Clinic Logo', 'mhc'),
+            [$this, 'company_logo_field'],
+            'mhc_company_settings',
+            'mhc_company_section',
+            ['label_for' => 'mhc_company_logo_id']
+        );
+        register_setting('mhc_company_options', 'mhc_company_logo_id', [
+            'type'              => 'integer',
+            'sanitize_callback' => 'absint',
+            'default'           => 0,
+        ]);
+
         // === Sección general ===
         add_settings_section(
             'mhc_qb_general_section',
@@ -261,6 +309,90 @@ class Settings
             ['label_for' => 'mhc_qb_process_key']
         );
         register_setting('mhc_qb_options', 'mhc_qb_process_key');
+    }
+
+    public function render_company_page()
+    {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        wp_enqueue_media(); // needed by the logo picker below
+    ?>
+        <div class="wrap">
+            <h1><?php _e('Company Settings', 'mhc'); ?></h1>
+            <form method="post" action="options.php">
+                <?php
+                settings_fields('mhc_company_options');
+                do_settings_sections('mhc_company_settings');
+                submit_button(__('Save Settings', 'mhc'));
+                ?>
+            </form>
+        </div>
+    <?php
+    }
+
+    public function company_name_field($args)
+    {
+        $option = get_option($args['label_for'], '');
+        printf(
+            '<input type="text" id="%1$s" name="%1$s" value="%2$s" class="regular-text" placeholder="%3$s">',
+            esc_attr($args['label_for']),
+            esc_attr($option),
+            esc_attr(mhc_company_name())
+        );
+        echo '<p class="description">' . esc_html__('Appears on PDF headers/footers and in the email footer.', 'mhc') . '</p>';
+    }
+
+    public function company_logo_field($args)
+    {
+        $id  = (int) get_option($args['label_for'], 0);
+        $url = mhc_company_logo_url();
+    ?>
+        <div id="mhc-logo-wrap">
+            <p>
+                <img id="mhc-logo-preview" src="<?php echo esc_url($url); ?>" alt=""
+                     style="max-width:220px;height:auto;display:block;border:1px solid #ccd0d4;padding:6px;background:#fff;">
+            </p>
+            <input type="hidden" id="<?php echo esc_attr($args['label_for']); ?>"
+                   name="<?php echo esc_attr($args['label_for']); ?>" value="<?php echo esc_attr($id); ?>">
+            <button type="button" class="button" id="mhc-logo-select"><?php _e('Select logo', 'mhc'); ?></button>
+            <button type="button" class="button" id="mhc-logo-clear"><?php _e('Use default', 'mhc'); ?></button>
+            <p class="description">
+                <?php _e('PNG or JPG. Used at 100px wide in PDFs and 220px in emails, so upload at least 440px wide.', 'mhc'); ?>
+            </p>
+            <script>
+                (function() {
+                    const field   = document.getElementById('<?php echo esc_js($args['label_for']); ?>');
+                    const preview = document.getElementById('mhc-logo-preview');
+                    const fallback = <?php echo wp_json_encode(MHC_PLUGIN_URL . 'assets/img/mentalhelt.png'); ?>;
+                    let frame;
+
+                    document.getElementById('mhc-logo-select').addEventListener('click', function(e) {
+                        e.preventDefault();
+                        if (frame) { frame.open(); return; }
+                        frame = wp.media({
+                            title: <?php echo wp_json_encode(__('Select clinic logo', 'mhc')); ?>,
+                            button: { text: <?php echo wp_json_encode(__('Use this logo', 'mhc')); ?> },
+                            library: { type: 'image' },
+                            multiple: false
+                        });
+                        frame.on('select', function() {
+                            const att = frame.state().get('selection').first().toJSON();
+                            field.value = att.id;
+                            preview.src = att.url;
+                        });
+                        frame.open();
+                    });
+
+                    document.getElementById('mhc-logo-clear').addEventListener('click', function(e) {
+                        e.preventDefault();
+                        field.value = 0;
+                        preview.src = fallback;
+                    });
+                })();
+            </script>
+        </div>
+    <?php
     }
 
     public function text_field($args)

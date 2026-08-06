@@ -965,7 +965,10 @@ class PayrollController
             ]);
             if (!file_exists($pdfPath)) continue;
 
-            $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
+            // El logo del email lo resuelve la plantilla via {{logo_url}}. Esta ruta CID apuntaba
+            // fuera del plugin (plugins/assets/img/...), nunca existio y el adjunto se omitia
+            // en silencio; se deja en null para no alterar el email que se envia hoy.
+            $logo_path = null;
             $result = mhc_send_email(
                 $email,
                 'Hello ' . esc_html($name),
@@ -1005,7 +1008,10 @@ class PayrollController
         ]);
         if (!file_exists($pdfPath)) wp_send_json_error(['message' => 'PDF generation failed'], 500);
 
-        $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
+        // El logo del email lo resuelve la plantilla via {{logo_url}}. Esta ruta CID apuntaba
+            // fuera del plugin (plugins/assets/img/...), nunca existio y el adjunto se omitia
+            // en silencio; se deja en null para no alterar el email que se envia hoy.
+            $logo_path = null;
         $result = mhc_send_email(
             $email,
             'Hello ' . esc_html($name),
@@ -1041,7 +1047,10 @@ class PayrollController
 
         if (!file_exists($pdfPath)) wp_send_json_error(['message' => 'PDF generation failed'], 500);
 
-        $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
+        // El logo del email lo resuelve la plantilla via {{logo_url}}. Esta ruta CID apuntaba
+            // fuera del plugin (plugins/assets/img/...), nunca existio y el adjunto se omitia
+            // en silencio; se deja en null para no alterar el email que se envia hoy.
+            $logo_path = null;
         $result = mhc_send_email(
             $email,
             'Hello ' . esc_html($name),

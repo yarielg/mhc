@@ -67,10 +67,12 @@ class Activate
 
         // 3) Patients
         $sql[] = "CREATE TABLE {$pfx}mhc_patients (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,            
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             first_name VARCHAR(100) NOT NULL,
             last_name VARCHAR(100) NOT NULL,
             record_number VARCHAR(80) NOT NULL DEFAULT '',
+            insurer_id BIGINT UNSIGNED NULL,
+            insurer_number VARCHAR(100) NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             start_date DATE NULL,
             end_date DATE NULL,
@@ -120,6 +122,7 @@ class Activate
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             start_date DATE NOT NULL,
             end_date DATE NOT NULL,
+            payroll_print_date DATETIME NULL,
             status VARCHAR(50) NOT NULL DEFAULT 'draft',
             notes VARCHAR(255) NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -151,6 +154,7 @@ class Activate
             total DECIMAL(12,2) NOT NULL DEFAULT 0.00,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            deleted_at DATETIME NULL DEFAULT NULL,
             PRIMARY KEY  (id),
             KEY idx_segment (segment_id),
             KEY idx_wpr (worker_patient_role_id)
@@ -205,6 +209,18 @@ class Activate
             KEY idx_payroll (payroll_id)
         ) {$charset_collate};";
 
+        // 11) Insurers (lookup referenced by mhc_patients.insurer_id)
+        $sql[] = "CREATE TABLE {$pfx}mhc_insurers (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            name VARCHAR(191) NOT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY uniq_name (name),
+            KEY idx_active (is_active)
+        ) {$charset_collate};";
+
 
         // Run dbDelta for each statement to allow incremental upgrades.
         foreach ($sql as $statement) {
@@ -229,6 +245,18 @@ class Activate
             $wpdb->insert("{$pfx}mhc_roles", [
                 'code' => 'BCBA',
                 'name' => 'Board Certified Behavior Analyst',
+                'billable' => 1,
+                'is_active' => 1,
+            ]);
+            $wpdb->insert("{$pfx}mhc_roles", [
+                'code' => 'LMHC',
+                'name' => 'License of Mental Health Counselor',
+                'billable' => 1,
+                'is_active' => 1,
+            ]);
+            $wpdb->insert("{$pfx}mhc_roles", [
+                'code' => 'Other',
+                'name' => 'Other',
                 'billable' => 1,
                 'is_active' => 1,
             ]);

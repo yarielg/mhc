@@ -43,6 +43,8 @@ class Enqueue{
             'img_url' => MHC_PLUGIN_URL . 'assets/img/',
             'nonce'   => wp_create_nonce('mhc_ajax'),
             'user_name' => wp_get_current_user()->display_name,
+            'company_name' => mhc_company_name(),
+            'company_logo' => mhc_company_logo_url(),
         ]);
 
         wp_enqueue_style( 'main_css', MHC_PLUGIN_URL . '/assets/dist/app.css'  );

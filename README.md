@@ -84,21 +84,24 @@ Images: ensure ext-gd is enabled for logos and signatures.
 
 ## Shortcodes
 
-### `[mhc]`
-Renders the Vue  container:
+### `[mhc_app]`
+Renders the Vue container on the site home page:
 ```html
 <div id="vwp-plugin"></div>
 ```
 
-### `[mhc__login]`
+### `[mhc_app_login]`
 Displays the WordPress login form with custom labels.
 - Redirects logged-in users to `/`
 - Includes "Lost your password?" link
 
 Example usage in a WordPress page:
 ```
-[mhc__login]
+[mhc_app_login]
 ```
+
+> ⚠️ The login page **must** use the slug `app-login`. `Settings::redirect_users()` sends
+> every anonymous front-end request to `/app-login`; any other slug causes a redirect loop.
 
 ## Development
 

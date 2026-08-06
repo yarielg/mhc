@@ -6,10 +6,9 @@ final class Init{
 
     public static function get_services(){
 
-        return [
+        $services = [
             Base\Enqueue::class,
             Base\Settings::class,
-            Base\Ajax::class,
             Base\Shortcodes::class,
             Controllers\PatientsController::class,
             Controllers\WorkersController::class,
@@ -19,12 +18,20 @@ final class Init{
             Controllers\PayrollController::class,
             Controllers\PayrollSegmentController::class,
             Controllers\PdfController::class,
-            Controllers\SeedController::class,
             Controllers\ReportsController::class,
             Controllers\QuickBooksController::class,
             Controllers\InsurersController::class,
-            //Base\Ajax::class,
         ];
+
+        // Destructive/dev-only tooling: dropping every plugin table and seeding fake
+        // records must never be reachable on a live clinic. Opt in from wp-config.php
+        // with: define('MHC_ENABLE_DEV_TOOLS', true);
+        if (defined('MHC_ENABLE_DEV_TOOLS') && MHC_ENABLE_DEV_TOOLS) {
+            $services[] = Base\Ajax::class;
+            $services[] = Controllers\SeedController::class;
+        }
+
+        return $services;
     }
 
     public static function register_services(){
