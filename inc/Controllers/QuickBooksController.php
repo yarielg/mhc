@@ -90,6 +90,27 @@ class QuickBooksController
         $realm_id = isset($_GET['realmId']) ? sanitize_text_field($_GET['realmId']) : '';
         $state = isset($_GET['state']) ? sanitize_text_field($_GET['state']) : '';
 
+        // Este handler cuelga de `init`, antes de cualquier control de acceso de WordPress,
+        // y guarda tokens vivos de QuickBooks. Sin las dos comprobaciones siguientes
+        // cualquiera puede lanzar el flujo de autorización con nuestro client_id y esta
+        // misma redirect_uri, aprobarlo contra su propia company, y dejar el sitio
+        // escribiendo los cheques en los libros del atacante. El `state` que emite
+        // Settings::render_settings_page() existe justo para esto, pero no se validaba.
+        if (!current_user_can(MHC_DEFAULT_CAPABILITY)) {
+            wp_die(
+                __('You are not allowed to connect QuickBooks for this site.', 'mhc'),
+                __('Forbidden', 'mhc'),
+                ['response' => 403]
+            );
+        }
+        if (!wp_verify_nonce($state, 'mhc_qb_auth')) {
+            wp_die(
+                __('This QuickBooks authorization request could not be verified, or it expired. Start the connection again from the QuickBooks settings page.', 'mhc'),
+                __('Forbidden', 'mhc'),
+                ['response' => 403]
+            );
+        }
+
         // Validación mínima
         if (empty($code) || empty($realm_id)) {
             wp_die(__('Invalid QuickBooks authorization response.', 'mhc'));

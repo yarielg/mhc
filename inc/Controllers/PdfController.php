@@ -32,6 +32,47 @@ class PdfController
   }
 
   /**
+   * Builds a private, unguessable directory for one generated slip.
+   *
+   * The slip filename carries the worker's name, and the system temp dir is shared with
+   * every other process on the box. Nesting the file inside a per-request random folder
+   * keeps the readable name (downloads and email attachments are unchanged) without
+   * listing payroll recipients in a world-readable directory.
+   *
+   * @return string Directory path with a trailing separator.
+   */
+  private static function temp_slip_dir(): string
+  {
+    $dir = trailingslashit(get_temp_dir()) . 'mhc-slip-' . wp_generate_password(12, false, false);
+    wp_mkdir_p($dir);
+    return trailingslashit($dir);
+  }
+
+  /**
+   * Removes a slip produced by generateWorkerSlipPdf(), plus its private directory.
+   *
+   * Callers used to plain unlink() the file, which left the directory behind and skipped
+   * cleanup entirely on early returns - real payroll PDFs were found lingering in the
+   * server temp dir.
+   *
+   * @param string $path
+   * @return void
+   */
+  public static function cleanup_slip($path)
+  {
+    if (!$path || !is_string($path)) {
+      return;
+    }
+    if (file_exists($path)) {
+      @unlink($path);
+    }
+    $dir = dirname($path);
+    if (strpos(basename($dir), 'mhc-slip-') === 0 && is_dir($dir)) {
+      @rmdir($dir);
+    }
+  }
+
+  /**
    * Registers the AJAX endpoints in WordPress for the PDFs.
    * Only logged-in users can access.
    *
@@ -99,7 +140,7 @@ class PdfController
     header('Content-Type: application/pdf');
     header('Content-Disposition: inline; filename="' . $download_name . '"');
     readfile($pdfPath);
-    unlink($pdfPath);
+    self::cleanup_slip($pdfPath);
     exit;
   }
   /**
@@ -189,7 +230,10 @@ class PdfController
     // Guardar en archivo temporal y devolver ruta (igual que antes)
     $worker_name_clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $worker_name);
     $filename = $worker_name_clean . '_' . $start . '-' . $end . '.pdf';
-    $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $filename;
+    // Private per-request folder: keeps the readable filename for the download and the
+    // email attachment, without exposing it in the shared temp dir. Also avoids two
+    // concurrent requests for the same worker overwriting each other.
+    $tmp = self::temp_slip_dir() . $filename;
 
     $mpdf->Output($tmp, Destination::FILE);
     return $tmp;
