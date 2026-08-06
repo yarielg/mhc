@@ -33,11 +33,16 @@ class QbQueue
             PRIMARY KEY (id)
         ) {$charset};";
 
+        // NOTE: worker_id and qb_vendor_id are NOT NULL on purpose. MySQL does not enforce
+        // uniqueness across NULLs, so a nullable column here would silently defeat the
+        // uniq_payroll_vendor_worker index below and allow duplicate checks.
         $sql2 = "CREATE TABLE IF NOT EXISTS {$ctable} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             payroll_id BIGINT UNSIGNED NOT NULL,
+            worker_patient_role_id BIGINT UNSIGNED NULL,
+            check_number VARCHAR(100) NULL,
             worker_id BIGINT UNSIGNED NOT NULL,
-            qb_vendor_id VARCHAR(191) DEFAULT NULL,
+            qb_vendor_id VARCHAR(191) NOT NULL DEFAULT '',
             qb_check_id VARCHAR(191) NOT NULL,
             amount DECIMAL(12,2) NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -54,6 +59,12 @@ class QbQueue
         $cols_ctable = $wpdb->get_col("SHOW COLUMNS FROM {$ctable}", 0);
         if (!in_array('qb_vendor_id', $cols_ctable)) {
             $wpdb->query("ALTER TABLE {$ctable} ADD COLUMN qb_vendor_id VARCHAR(191) DEFAULT NULL AFTER worker_id");
+        }
+        if (!in_array('worker_patient_role_id', $cols_ctable)) {
+            $wpdb->query("ALTER TABLE {$ctable} ADD COLUMN worker_patient_role_id BIGINT UNSIGNED NULL AFTER payroll_id");
+        }
+        if (!in_array('check_number', $cols_ctable)) {
+            $wpdb->query("ALTER TABLE {$ctable} ADD COLUMN check_number VARCHAR(100) NULL AFTER worker_patient_role_id");
         }
 
         // Ensure there is a UNIQUE index on (payroll_id, qb_vendor_id, worker_id).

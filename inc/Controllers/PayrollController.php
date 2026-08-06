@@ -963,9 +963,17 @@ class PayrollController
                 'worker_id' => $worker_id,
                 'worker_name' => $name
             ]);
-            if (!file_exists($pdfPath)) continue;
+            if (!file_exists($pdfPath)) {
+                // Nothing was written, but generateWorkerSlipPdf() already created the
+                // private folder; drop it instead of leaking one per failed worker.
+                \Mhc\Inc\Controllers\PdfController::cleanup_slip($pdfPath);
+                continue;
+            }
 
-            $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
+            // El logo del email lo resuelve la plantilla via {{logo_url}}. Esta ruta CID apuntaba
+            // fuera del plugin (plugins/assets/img/...), nunca existio y el adjunto se omitia
+            // en silencio; se deja en null para no alterar el email que se envia hoy.
+            $logo_path = null;
             $result = mhc_send_email(
                 $email,
                 'Hello ' . esc_html($name),
@@ -975,7 +983,7 @@ class PayrollController
                 $logo_path
             );
             if ($result) $sent[] = $worker_id;
-            unlink($pdfPath);
+            \Mhc\Inc\Controllers\PdfController::cleanup_slip($pdfPath);
         }
         wp_send_json_success(['sent' => $sent, 'total' => count($sent)]);
     }
@@ -1005,7 +1013,10 @@ class PayrollController
         ]);
         if (!file_exists($pdfPath)) wp_send_json_error(['message' => 'PDF generation failed'], 500);
 
-        $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
+        // El logo del email lo resuelve la plantilla via {{logo_url}}. Esta ruta CID apuntaba
+            // fuera del plugin (plugins/assets/img/...), nunca existio y el adjunto se omitia
+            // en silencio; se deja en null para no alterar el email que se envia hoy.
+            $logo_path = null;
         $result = mhc_send_email(
             $email,
             'Hello ' . esc_html($name),
@@ -1014,7 +1025,7 @@ class PayrollController
             [$pdfPath],
             $logo_path
         );
-        unlink($pdfPath);
+        \Mhc\Inc\Controllers\PdfController::cleanup_slip($pdfPath);
         if ($result) {
             wp_send_json_success(['sent' => true, 'worker_id' => $worker_id]);
         } else {
@@ -1041,7 +1052,10 @@ class PayrollController
 
         if (!file_exists($pdfPath)) wp_send_json_error(['message' => 'PDF generation failed'], 500);
 
-        $logo_path = dirname(__DIR__, 3) . '/assets/img/mentalhelt.png';
+        // El logo del email lo resuelve la plantilla via {{logo_url}}. Esta ruta CID apuntaba
+            // fuera del plugin (plugins/assets/img/...), nunca existio y el adjunto se omitia
+            // en silencio; se deja en null para no alterar el email que se envia hoy.
+            $logo_path = null;
         $result = mhc_send_email(
             $email,
             'Hello ' . esc_html($name),
@@ -1050,7 +1064,7 @@ class PayrollController
             [$pdfPath],
             $logo_path
         );
-        unlink($pdfPath);
+        \Mhc\Inc\Controllers\PdfController::cleanup_slip($pdfPath);
         if (!$result) {
             return ['ok' => false, 'message' => 'wp_mail failed'];
         }

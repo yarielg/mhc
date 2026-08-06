@@ -17,6 +17,62 @@ use Mpdf\Output\Destination;
 class PdfController
 {
   /**
+   * Escapes a value for the PDF HTML.
+   *
+   * Several of the columns rendered here are nullable (cpt_code, notes, company,
+   * check_number, record_number...). Passing NULL straight to htmlspecialchars() is
+   * deprecated on PHP 8.1+ and becomes a TypeError on PHP 9, so cast first.
+   *
+   * @param mixed $value
+   * @return string
+   */
+  private static function esc($value): string
+  {
+    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+  }
+
+  /**
+   * Builds a private, unguessable directory for one generated slip.
+   *
+   * The slip filename carries the worker's name, and the system temp dir is shared with
+   * every other process on the box. Nesting the file inside a per-request random folder
+   * keeps the readable name (downloads and email attachments are unchanged) without
+   * listing payroll recipients in a world-readable directory.
+   *
+   * @return string Directory path with a trailing separator.
+   */
+  private static function temp_slip_dir(): string
+  {
+    $dir = trailingslashit(get_temp_dir()) . 'mhc-slip-' . wp_generate_password(12, false, false);
+    wp_mkdir_p($dir);
+    return trailingslashit($dir);
+  }
+
+  /**
+   * Removes a slip produced by generateWorkerSlipPdf(), plus its private directory.
+   *
+   * Callers used to plain unlink() the file, which left the directory behind and skipped
+   * cleanup entirely on early returns - real payroll PDFs were found lingering in the
+   * server temp dir.
+   *
+   * @param string $path
+   * @return void
+   */
+  public static function cleanup_slip($path)
+  {
+    if (!$path || !is_string($path)) {
+      return;
+    }
+    if (file_exists($path)) {
+      @unlink($path);
+    }
+    $dir = dirname($path);
+    if (strpos(basename($dir), 'mhc-slip-') === 0 && is_dir($dir)) {
+      @rmdir($dir);
+    }
+  }
+
+  /**
    * Registers the AJAX endpoints in WordPress for the PDFs.
    * Only logged-in users can access.
    *
@@ -84,7 +140,7 @@ class PdfController
     header('Content-Type: application/pdf');
     header('Content-Disposition: inline; filename="' . $download_name . '"');
     readfile($pdfPath);
-    unlink($pdfPath);
+    self::cleanup_slip($pdfPath);
     exit;
   }
   /**
@@ -174,7 +230,10 @@ class PdfController
     // Guardar en archivo temporal y devolver ruta (igual que antes)
     $worker_name_clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $worker_name);
     $filename = $worker_name_clean . '_' . $start . '-' . $end . '.pdf';
-    $tmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $filename;
+    // Private per-request folder: keeps the readable filename for the download and the
+    // email attachment, without exposing it in the shared temp dir. Also avoids two
+    // concurrent requests for the same worker overwriting each other.
+    $tmp = self::temp_slip_dir() . $filename;
 
     $mpdf->Output($tmp, Destination::FILE);
     return $tmp;
@@ -185,11 +244,12 @@ class PdfController
    */
   public static function renderWorkerSlipHtml($data, $worker_name, $company_name, $start, $end, $check_number = '---')
   {
-    $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
     $hours = $data['hours'];
     $extras = $data['extras'];
-    // Logo (ruta absoluta de archivo para mPDF)
-    $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
+    // Logo (ruta absoluta de archivo para mPDF). $company_name es la empresa del worker,
+    // no la clínica, así que la marca va en $clinic_name.
+    $logo_path = mhc_company_logo_path();
+    $clinic_name = mhc_company_name();
 
     // ==== HTML (tu versión ajustada para diseño suave) ====
     // NOTA: mantenemos nombres/estructura de columnas y datos como pediste.
@@ -221,7 +281,7 @@ class PdfController
         </td>
         <td style="width:30%; text-align:right; border:none;">
           <h2>Worker Payroll Slip</h2>
-          <div style="font-size:10px; margin-top: 1rem;">Agency of Mental Health Services</div>
+          <div style="font-size:10px; margin-top: 1rem;">' . self::esc($clinic_name) . '</div>
         </td>
       </tr>
     </table>
@@ -229,10 +289,10 @@ class PdfController
 
   <!-- Worker Info -->
   <div class="info">
-    <p><strong>Worker:</strong> ' . htmlspecialchars($worker_name) . '</p>
-    <p><strong>Company:</strong> ' . htmlspecialchars($company_name ?: "---") . '</p>
+    <p><strong>Worker:</strong> ' . self::esc($worker_name) . '</p>
+    <p><strong>Company:</strong> ' . self::esc($company_name ?: "---") . '</p>
     <p><strong>Payroll Period:</strong> ' . self::format_week_range($start, $end) . '</p>
-    <p><strong>Check Number:</strong> ' . htmlspecialchars($check_number) . '</p>
+    <p><strong>Check Number:</strong> ' . self::esc($check_number) . '</p>
   </div>
 
   <!-- Regular Payments -->
@@ -257,8 +317,8 @@ class PdfController
         $i++;
         $rowBg = ($i % 2 === 0) ? ' style="background:#fbfbfb;"' : '';
         $html .= '<tr' . $rowBg . '>
-              <td>' . htmlspecialchars($h->patient_record_number) . '</td>
-              <td>' . htmlspecialchars($h->role_code) . '</td>
+              <td>' . self::esc($h->patient_record_number) . '</td>
+              <td>' . self::esc($h->role_code) . '</td>
               <td align="center" style="white-space:nowrap;">' . self::format_week_range($h->segment_start ?? '', $h->segment_end ?? '') . '</td>
               <td align="center">' . number_format($h->hours, 2) . '</td>
               <td align="right">$' . number_format($h->used_rate, 2) . '</td>
@@ -309,10 +369,10 @@ class PdfController
         }
 
         $html .= '<tr' . $rowBg . '>
-              <td style="white-space:nowrap;">' . htmlspecialchars($e->label) . ' ' . htmlspecialchars($e->cpt_code) . '</td>
-              <td>' . htmlspecialchars($entity_name) . '</td>
+              <td style="white-space:nowrap;">' . self::esc($e->label) . ' ' . self::esc($e->cpt_code) . '</td>
+              <td>' . self::esc($entity_name) . '</td>
               <td align="right">$' . number_format($e->amount, 2) . '<br>' . $htmlHour . '</td>
-              <td>' . htmlspecialchars($e->notes);
+              <td>' . self::esc($e->notes);
         $html .= '</td></tr>';
       }
 
@@ -348,7 +408,7 @@ class PdfController
 
   <!-- Footer -->
   <div class="footer">
-    Slip generated automatically - Agency of Mental Health Services © ' . date("Y") . '
+    Slip generated automatically - ' . self::esc($clinic_name) . ' © ' . date("Y") . '
   </div>
 </div>';
     return $html;
@@ -387,7 +447,7 @@ class PdfController
    */
   public static function generateSlimPdf($data = [])
   {
-    $logo = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
+    $logo = mhc_company_logo_path();
     $pdf = new \TCPDF();
     $pdf->SetCreator('MHC Payroll');
     $pdf->SetAuthor('MHC');
@@ -549,7 +609,8 @@ class PdfController
     $sum_extras_amount = array_sum(array_column($items, 'extras_amount'));
     $sum_grand_total   = $sum_hours_amount + $sum_extras_amount;
     // PDF HTML
-    $logo_path = dirname(__DIR__, 2) . '/assets/img/mentalhelt.jpg';
+    $logo_path = mhc_company_logo_path();
+    $clinic_name = mhc_company_name();
     $html = '<style>
       body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 11px; color:#333; }
       .header { border-bottom: 2px solid #006699; padding-bottom: 10px; margin-bottom: 20px; }
@@ -568,10 +629,10 @@ class PdfController
         <td style="width:70%; border:none;">' . (file_exists($logo_path) ? '<img src="' . $logo_path . '" width="100" />' : '') . '</td>
         <td style="width:30%; text-align:right; border:none;">
           <h2>Payroll Workers Summary</h2>
-          <div style="font-size:10px; margin-top: 1rem;">Agency of Mental Health Services</div>
+          <div style="font-size:10px; margin-top: 1rem;">' . self::esc($clinic_name) . '</div>
         </td>
       </tr></table>
-      <div style="margin-top:8px; font-size:12px;">Period: <b>' . self::format_week_range($start, $end) . '</b> &nbsp;|&nbsp; Status: <b>' . htmlspecialchars($status) . '</b></div>
+      <div style="margin-top:8px; font-size:12px;">Period: <b>' . self::format_week_range($start, $end) . '</b> &nbsp;|&nbsp; Status: <b>' . self::esc($status) . '</b></div>
     </div>';
     $html .= '<div class="section-title">Workers Summary</div>';
     $html .= '<table><thead><tr>
@@ -586,12 +647,12 @@ class PdfController
     if (!empty($items)) {
       foreach ($items as $i) {
         $html .= '<tr>
-          <td>' . htmlspecialchars($i['worker_name']) . '</td>
-          <td>' . htmlspecialchars($i['company']) . '</td>
+          <td>' . self::esc($i['worker_name']) . '</td>
+          <td>' . self::esc($i['company']) . '</td>
           <td align="center">' . number_format($i['hours_hours'], 2) . '</td>
           <td align="right">$' . number_format($i['hours_amount'], 2) . '</td>
           <td align="right">$' . number_format($i['extras_amount'], 2) . '</td>
-          <td align="right">' . htmlspecialchars($i['check_number']) . '</td>
+          <td align="right">' . self::esc($i['check_number']) . '</td>
           <td align="right"><b>$' . number_format($i['grand_total'], 2) . '</b></td>
         </tr>';
       }
@@ -605,7 +666,7 @@ class PdfController
     $html .= '<tr class="totals"><td>Additionals</td><td colspan="5" align="right">$' . number_format($sum_extras_amount, 2) . '</td></tr>';
     $html .= '<tr class="totals"><td>Grand Total</td><td colspan="5" align="right"><b>$' . number_format($sum_grand_total, 2) . '</b></td></tr>';
     $html .= '</tbody></table>';
-    $html .= '<div class="footer">Summary generated automatically - Agency of Mental Health Services © ' . date('Y') . '</div>';
+    $html .= '<div class="footer">Summary generated automatically - ' . self::esc($clinic_name) . ' © ' . date('Y') . '</div>';
     // mPDF
     $mpdf = new Mpdf([
       'mode' => 'utf-8',

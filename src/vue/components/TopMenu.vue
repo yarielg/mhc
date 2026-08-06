@@ -8,9 +8,9 @@
   >
     <el-menu-item index="0">
     <img
-              style="width: 100px"
-              :src="img_url + 'mentalhelt.png'"
-              alt="Agency of Mental Health Services"
+              class="mhc-brand-logo"
+              :src="company_logo"
+              :alt="company_name"
             />
     </el-menu-item>
     <el-menu-item index="1">Processing Center</el-menu-item>
@@ -33,6 +33,8 @@
 import { ref } from 'vue'
 
 const img_url = window.parameters?.img_url || '';
+const company_name = window.parameters?.company_name || 'Agency of Mental Health Services';
+const company_logo = window.parameters?.company_logo || (img_url + 'mentalhelt.png');
 const activeIndex = ref('1')
 const handleSelect = (key: string, keyPath: string[]) => {
   console.log(key, keyPath)

@@ -84,7 +84,8 @@ class Patient {
 
         // Total count (include join to keep WHERE references valid)
         $total_sql = "SELECT COUNT(*) FROM {$table} p {$join_sql} {$where_sql}";
-        $total = (int) $wpdb->get_var($wpdb->prepare($total_sql, $params));
+        // $where_sql is empty (and $params too) on an unfiltered listing.
+        $total = (int) $wpdb->get_var($params ? $wpdb->prepare($total_sql, $params) : $total_sql);
 
         // Rows (page) - include insurer name
         $rows_sql = "SELECT p.*, ins.name AS insurer_name FROM {$table} p {$join_sql} {$where_sql} ORDER BY p.id DESC LIMIT %d OFFSET %d";

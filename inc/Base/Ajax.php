@@ -24,6 +24,13 @@ class Ajax{
         if (!current_user_can('manage_options')) {
             wp_send_json_error(['message' => 'No tienes permisos suficientes.'], 403);
         }
+        // A capability check alone is not enough: without a nonce any page an authenticated
+        // admin visits can trigger this and destroy the whole payroll history.
+        if (!function_exists('mhc_check_ajax_access')) {
+            require_once dirname(__DIR__) . '/util/helpers.php';
+        }
+        mhc_check_ajax_access();
+
         global $wpdb;
         $tables = [
             $wpdb->prefix . 'mhc_roles',

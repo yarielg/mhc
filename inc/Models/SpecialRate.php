@@ -26,10 +26,13 @@ class SpecialRate {
         $sql = "SELECT * FROM $table $where ORDER BY id DESC";
         $total = null;
         if (isset($args['limit']) && isset($args['offset'])) {
-            $total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table $where", $params));
+            $count_sql = "SELECT COUNT(*) FROM $table $where";
+            // $where only carries placeholders when a search term was supplied;
+            // calling prepare() without one triggers a _doing_it_wrong notice.
+            $total = (int) $wpdb->get_var($params ? $wpdb->prepare($count_sql, $params) : $count_sql);
             $sql .= $wpdb->prepare(" LIMIT %d OFFSET %d", intval($args['limit']), intval($args['offset']));
         }
-        $rows = $wpdb->get_results($wpdb->prepare($sql, $params), ARRAY_A);
+        $rows = $wpdb->get_results($params ? $wpdb->prepare($sql, $params) : $sql, ARRAY_A);
         if ($total !== null) {
             return [ 'items' => $rows, 'total' => $total ];
         }

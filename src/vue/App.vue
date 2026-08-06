@@ -6,7 +6,10 @@
       <el-header class="mhc-header">
         <div class="mhc-left">
           <el-button link class="mhc-hamburger" @click="toggleAside" :icon="Menu" />
-          <img style="width: 100px" :src="img_url + 'mentalhelt.png'" alt="Agency of Mental Health Services" />
+          <!-- Height-constrained: the logo is configurable now, so it has to fit the
+               60px header at any aspect ratio. A fixed width overflowed as soon as
+               someone uploaded a portrait logo. -->
+          <img class="mhc-brand-logo" :src="company_logo" :alt="company_name" />
         </div>
 
         <div class="mhc-right">
@@ -122,6 +125,8 @@ import {
 const route = useRoute()
 const router = useRouter()
 const img_url = (window as any).parameters?.img_url || ''
+const company_name = (window as any).parameters?.company_name || 'Agency of Mental Health Services'
+const company_logo = (window as any).parameters?.company_logo || (img_url + 'mentalhelt.png')
 
 // Layout state
 const collapsed = ref(false)
