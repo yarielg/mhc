@@ -117,7 +117,9 @@ class Worker {
             $params[] = (int)$is_active;
         }
 
-        $total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT w.id) FROM $table AS w $join_roles $where", $params));
+        $count_sql = "SELECT COUNT(DISTINCT w.id) FROM $table AS w $join_roles $where";
+        // $where is placeholder-free when neither a search term nor a status filter is set.
+        $total = (int) $wpdb->get_var($params ? $wpdb->prepare($count_sql, $params) : $count_sql);
 
         //return value to debug
         /* wp_send_json_success(["total"=>$total]);
