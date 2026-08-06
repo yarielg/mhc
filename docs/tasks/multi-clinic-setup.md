@@ -124,7 +124,9 @@ Phase 1 is complete.
 - [ ] Clean WordPress + WP Mail SMTP with its own mailbox
 - [ ] `git clone` → `composer install` → `npm install && npm run build`
       (`assets/dist/` and `vendor/` are gitignored and do not travel in the repo)
-- [ ] Create both pages; the login page slug must be exactly `app-login` (hardcoded in the
+- [ ] Reproduce the front-end setup (see "Front-end setup" below). This is **not** a page:
+      leave `show_on_front = posts` and override the block theme's `home` template
+- [ ] Create the Login page only; its slug must be exactly `app-login` (hardcoded in the
       `template_redirect` handler)
 - [ ] Writable `wp-content/uploads/mpdf`
 - [ ] Configure branding, QuickBooks (new realm, new redirect URI, new account IDs),
@@ -143,6 +145,61 @@ Phase 1 is complete.
 P2 and P3 fixed on request. `WP_DEBUG_LOG` is now empty across the whole V3 suite, down
 from 20 deprecations and 5 notices. Both fixes are behavior-preserving, verified by
 byte-identical PDF output and a full V1/V2/V3/V4 re-run.
+
+## Front-end setup (corrected 2026-08-06)
+
+The app is **not** served from a WordPress page. Production keeps
+`show_on_front = posts` and overrides the block theme's `home` template through the Site
+Editor. The whole template body is:
+
+```
+<!-- wp:shortcode -->
+[mhc_app]
+<!-- /wp:shortcode -->
+```
+
+No header part, no title, no footer, no wrapping group. That is what makes `#vwp-plugin` a
+direct child of `.wp-site-blocks` and lets the SPA fill the viewport:
+
+```
+body.home.blog
+  div.wp-site-blocks
+    div#vwp-plugin          width = viewport
+```
+
+Creating a page and setting it as the static front page instead produces Twenty
+Twenty-Five's stock `page` template - header, page title, footer, and `entry-content`
+capped at 645px - which boxes the SPA into a narrow column. That is the mistake made when
+`mhc-local` was first provisioned; it has been corrected there.
+
+**This override lives in the database, not in the theme files.** It is a `wp_template`
+post whose `post_name` is `home`, tied to the theme through the `wp_theme` taxonomy. The
+file-level comparison that found local and production byte-identical covered only the
+plugin, so it could never have surfaced this. Production also carries a custom `footer`
+template part, unused by the app template but part of the same class of DB-only state.
+
+Recipe for a new site:
+
+1. Leave `show_on_front = posts` (the WordPress default - do not create a front page)
+2. Appearance -> Editor -> Templates -> Home, replace the entire content with a single
+   Shortcode block containing `[mhc_app]`
+3. Create one page only: Login, slug exactly `app-login`, content `[mhc_app_login]`
+
+Equivalent programmatic form, used by `scratchpad/fix_frontpage.php`:
+
+```php
+update_option('show_on_front', 'posts');
+$id = wp_insert_post([
+    'post_type'    => 'wp_template',
+    'post_name'    => 'home',
+    'post_title'   => 'Blog Home',
+    'post_content' => "<!-- wp:shortcode -->
+[mhc_app]
+<!-- /wp:shortcode -->",
+    'post_status'  => 'publish',
+]);
+wp_set_object_terms($id, 'twentytwentyfive', 'wp_theme');
+```
 
 ## Open questions
 

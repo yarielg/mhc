@@ -26,8 +26,8 @@ plugin's global anonymous redirect):
             edits are picked up with no copy step
 
 It was provisioned by the same sequence Phase 2 will follow on the subdomain: install WP,
-activate the plugin, create Home (`[mhc_app]`) and Login (slug `app-login`,
-`[mhc_app_login]`), write `.htaccess`, create `uploads/mpdf`.
+activate the plugin, override the `home` block template with `[mhc_app]`, create the Login
+page (slug `app-login`, `[mhc_app_login]`), write `.htaccess`, create `uploads/mpdf`.
 
 ## Ground rules for this task
 
@@ -50,6 +50,11 @@ activate the plugin, create Home (`[mhc_app]`) and Login (slug `app-login`,
 - The login page slug `app-login` is hardcoded in `Settings::redirect_users()`. Any new
   site must use exactly that slug or every anonymous request enters a redirect loop.
 - Real shortcodes are `[mhc_app]` and `[mhc_app_login]`. The README is wrong (task T7).
+- **The app is not served from a page.** It comes from a `home` block-template override
+  stored in the database, with `show_on_front = posts`. Using a static front page instead
+  boxes the SPA into a 645px column. See "Front-end setup" in the task file. More
+  generally: block-theme customizations are DB state (`wp_template`, `wp_template_part`,
+  `wp_global_styles`), so comparing theme/plugin files says nothing about them.
 
 ## Next actions
 
