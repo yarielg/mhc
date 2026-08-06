@@ -35,6 +35,7 @@ production site at `app.agencyofmentalhealth.com`.
 | D3 | Fresh installs seed 5 roles + 7 special rates, insurers left empty | Matches production catalogs; insurers vary by contract |
 | D4 | Separate WordPress installation for the new clinic (not multisite, not multi-tenant) | PHI isolation, separate QuickBooks realm, independent backups |
 | D5 | Work on `feature/multi-clinic-setup`, merge to `master` after local validation | Production only changes on an explicit SFTP deploy, which is out of scope |
+| D6 | Both clinics share one Intuit app; separation is by realm, not by credentials | One app, one client_id/secret, a redirect URI per site. Each site stores its own realm_id and tokens. See P4 for the security consequence |
 
 ## Root cause: incomplete fresh-install schema
 
@@ -137,6 +138,8 @@ Phase 1 is complete.
 | P2 | `PdfController` passed NULL to `htmlspecialchars()` for nullable columns. 20 deprecations per summary PDF on PHP 8.3, fatal on PHP 9. | **Fixed**: `self::esc()` casts first; all 16 call sites routed through it. PDF output byte-identical. |
 | P3 | `wpdb::prepare()` called with a placeholder-free query and empty params on unfiltered listings. One notice per request. | **Fixed** in `Role`, `SpecialRate`, `Insurer` (count + rows), `Worker` (count), `Patient` (count). `Worker::search` and `WorkerPatientRole` were false positives. |
 
+| P4 | The OAuth callback never validates `state`. `Settings.php:459` generates `wp_create_nonce('mhc_qb_auth')`, `QuickBooksController.php:91` reads it into `$state` and never checks it. The handler runs on `init` with no capability check, so it is reachable unauthenticated. An attacker can start the authorization flow with `client_id` + the victim's registered `redirect_uri`, approve against their own QuickBooks company, and Intuit delivers the code straight to the victim site, which exchanges it and overwrites `mhc_qb_access_token`, `mhc_qb_refresh_token` and `mhc_qb_realm_id`. Result: the clinic's checks start being written into a company the attacker controls. | **Open.** Amplified by D6: one shared `client_id` means a valid code works against either clinic's callback. Fix is small - verify the nonce and require `manage_options` before storing tokens. Needs the user's go-ahead since it changes the connect flow. |
+
 P2 and P3 fixed on request. `WP_DEBUG_LOG` is now empty across the whole V3 suite, down
 from 20 deprecations and 5 notices. Both fixes are behavior-preserving, verified by
 byte-identical PDF output and a full V1/V2/V3/V4 re-run.
@@ -144,8 +147,7 @@ byte-identical PDF output and a full V1/V2/V3/V4 re-run.
 ## Open questions
 
 - **Q1** — Exact subdomain for the new clinic. Blocks Phase 2 only.
-- **Q2** — QuickBooks: add the new `/qb/callback` redirect URI to the existing Intuit app,
-  or create a separate app? Blocks Phase 2 only.
+- ~~**Q2** — QuickBooks app strategy.~~ Resolved: same Intuit app (D6).
 - **Q3** — Who administers the new site (WP admin users to create)?
 
 ## Risks
